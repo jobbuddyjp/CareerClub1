@@ -60,18 +60,30 @@ const INDUSTRY_GROUPS = {
   "エンタメ":     ["ゲーム","映像・音楽","スポーツ","出版"],
 };
 const ALL_GROUPS   = Object.keys(INDUSTRY_GROUPS);
-const STAGES       = ["書類選考","一次面接","二次面接","最終面接","内定","辞退・不合格"];
+const STAGES       = ["書類選考","一次面接","二次面接","三次面接","最終面接","内定","内定辞退","不合格","辞退"];
+const BOARD_STAGES = ["書類選考中","書類通過","一次選考","二次選考","三次選考","四次選考","最終選考","内定","内定辞退","不合格","辞退"];
+const HOUSING_TYPES = ["なし","あり（金額不明）","あり（月1万円未満）","あり（月1~3万円）","あり（月3~5万円）","あり（月5万円以上）"];
 const EMP_TYPES    = ["正社員","契約社員","派遣社員","アルバイト","インターン","元社員"];
 const TENURES      = ["~1年未満","1~3年","3~5年","5~10年","10年以上"];
 const AGE_RANGES   = ["20~24歳","25~29歳","30~34歳","35~39歳","40~44歳","45歳以上"];
 const JOB_TYPES    = ["エンジニア","営業","マーケティング","企画・経営","管理","デザイナー","研究・開発","人事","法務","その他"];
-const JOB_CATEGORIES = [
-  "全職種",
-  "総合職","技術職","一般職","専門職",
-  "パイロット（自社養成）","パイロット（既卒）","キャビンアテンダント","グランドスタッフ",
-  "エンジニア","営業","マーケティング","企画・経営","管理・バックオフィス",
-  "研究・開発","人事・採用","法務・コンプライアンス","デザイナー","その他",
-];
+const JOB_CATEGORIES_BY_GROUP = {
+  "金融・銀行":   ["全職種","総合職","法人営業","リテール営業","トレーダー","アナリスト","アクチュアリー","ITエンジニア","管理・バックオフィス","その他"],
+  "商社":         ["全職種","総合職","営業（素材）","営業（食料）","営業（機械）","営業（エネルギー）","営業（化学品）","企画・経営","ITエンジニア","その他"],
+  "メーカー":     ["全職種","総合職","技術職","研究・開発","生産管理","品質管理","営業","マーケティング","管理・バックオフィス","その他"],
+  "IT・テック":   ["全職種","エンジニア（バックエンド）","エンジニア（フロントエンド）","インフラエンジニア","データサイエンティスト","PM・PdM","デザイナー","営業","その他"],
+  "コンサル":     ["全職種","コンサルタント","シニアコンサルタント","マネージャー","シニアマネージャー","パートナー","スペシャリスト","その他"],
+  "不動産・建設": ["全職種","総合職","施工管理","設計","営業","用地仕入","プロパティマネジメント","その他"],
+  "小売・流通":   ["全職種","総合職","バイヤー","店舗スタッフ","SCM・物流","マーケティング","ITエンジニア","その他"],
+  "サービス":     ["全職種","総合職","営業","マーケティング","クリエイター","プランナー","人事・採用","その他"],
+  "医療・ヘルス": ["全職種","MR","臨床開発","薬剤師","研究・開発","営業","管理・バックオフィス","その他"],
+  "教育・公共":   ["全職種","総合職","技術職","行政職","教員・講師","その他"],
+  "エンタメ":     ["全職種","総合職","エンジニア","クリエイター","プランナー","営業","その他"],
+  "航空・交通":   ["全職種","パイロット（自社養成）","パイロット（既卒）","キャビンアテンダント","グランドスタッフ","整備士","運航管理","その他"],
+};
+const DEFAULT_JOB_CATEGORIES = ["全職種","総合職","技術職","営業","管理・バックオフィス","その他"];
+const getJobCategories = (group) => JOB_CATEGORIES_BY_GROUP[group] || DEFAULT_JOB_CATEGORIES;
+const POSITIONS    = ["一般社員","主任・係長","課長","部長","本部長・執行役員","役員・取締役","社長・CEO","その他"];
 const EMOJIS       = ["🏢","🌐","💻","🚗","🛒","📱","🏦","📋","🎮","🏥","📢","🏭","✈️","🍜","📚","🎯","💊","🔬","⚡","🌿"];
 const RCATS        = [
   { key:"salary", label:"待遇・給与" },
@@ -1056,7 +1068,10 @@ function PostsTab({ posts, ptype, label, co, uName, onAddPost, onToggleLike, onA
   const [exp,  setExp]  = useState(null);
   const [cmt,  setCmt]  = useState("");
   const [form, setForm] = useState(null);
-  const initF = { companyId:co.id, ptype, stage:"", title:"", content:"" };
+  const [customStage, setCustomStage] = useState("");
+  const [showCustomStage, setShowCustomStage] = useState(false);
+  const [stages, setStages] = useState([{ stage:"", content:"" }]);
+  const initF = { companyId:co.id, ptype, stage:"", title:"", content:"", jobCategory:"全職種", offerAmount:"", offerBase:"", offerBonus:"" };
   const sorted = [...posts].sort((a,b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
 
   return (
@@ -1071,26 +1086,47 @@ function PostsTab({ posts, ptype, label, co, uName, onAddPost, onToggleLike, onA
         <div style={{ background:C.surface, border:"1px solid " + C.border, borderTop:"3px solid " + C.accent, padding:"18px 20px", marginBottom:20 }}>
           <Fld label="職種カテゴリ">
             <select style={S.input} value={form.jobCategory || "全職種"} onChange={e => setForm({ ...form, jobCategory:e.target.value })}>
-              {JOB_CATEGORIES.map(j => <option key={j}>{j}</option>)}
+              {getJobCategories(co.group || co.industry).map(j => <option key={j}>{j}</option>)}
             </select>
           </Fld>
           <Fld label="選考段階 *">
-            <select style={S.input} value={form.stage} onChange={e => setForm({ ...form, stage:e.target.value })}>
-              <option value="">選択してください</option>
-              {STAGES.map(s => <option key={s}>{s}</option>)}
-            </select>
+            <div style={{ display:"flex", gap:8 }}>
+              <select style={{...S.input, flex:1}} value={showCustomStage ? "custom" : form.stage} onChange={e => {
+                if (e.target.value === "custom") { setShowCustomStage(true); setForm({...form, stage:customStage}); }
+                else { setShowCustomStage(false); setForm({...form, stage:e.target.value}); }
+              }}>
+                <option value="">選択してください</option>
+                {STAGES.map(s => <option key={s}>{s}</option>)}
+                <option value="custom">自由入力（4次選考など）</option>
+              </select>
+              {showCustomStage && (
+                <input style={{...S.input, flex:1}} placeholder="例：4次選考、役員面接" value={customStage} onChange={e => { setCustomStage(e.target.value); setForm({...form, stage:e.target.value}); }} />
+              )}
+            </div>
           </Fld>
           <Fld label="タイトル *">
             <input style={S.input} placeholder="例：一次面接で聞かれたこと" value={form.title} onChange={e => setForm({ ...form, title:e.target.value })} />
           </Fld>
-          <Fld label="本文 *">
-            <textarea style={{ ...S.input, resize:"vertical" }} rows={5} placeholder="面接の様子、聞かれた内容、準備のポイントなどをご記入ください。" value={form.content} onChange={e => setForm({ ...form, content:e.target.value })} />
+          <Fld label={`本文 *（最低30文字）　現在${form.content.length}文字`}>
+            <textarea style={{ ...S.input, resize:"vertical", borderColor: form.content.length > 0 && form.content.length < 30 ? "#DC2626" : C.border }} rows={5} placeholder="面接の様子、聞かれた内容、準備のポイントなどをご記入ください。（最低30文字）" value={form.content} onChange={e => setForm({ ...form, content:e.target.value })} />
+            {form.content.length > 0 && form.content.length < 30 && <p style={{ fontSize:11, color:"#DC2626", marginTop:4 }}>あと{30 - form.content.length}文字以上入力してください</p>}
           </Fld>
+          {(form.stage === "内定" || form.stage === "内定辞退") && (
+            <div style={{ background:"#F0FBF4", border:"1px solid #BBF7D0", padding:"12px 14px", borderRadius:6, marginBottom:12 }}>
+              <div style={{ fontSize:13, fontWeight:"bold", color:"#166534", marginBottom:8 }}>内定オファー情報（任意）</div>
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:8 }}>
+                <Fld label="提示年収（万円）"><input style={S.input} type="number" placeholder="600" value={form.offerAmount} onChange={e => setForm({...form, offerAmount:e.target.value})} /></Fld>
+                <Fld label="月給（万円）"><input style={S.input} type="number" placeholder="40" value={form.offerBase} onChange={e => setForm({...form, offerBase:e.target.value})} /></Fld>
+                <Fld label="賞与（万円）"><input style={S.input} type="number" placeholder="120" value={form.offerBonus} onChange={e => setForm({...form, offerBonus:e.target.value})} /></Fld>
+              </div>
+            </div>
+          )}
           <div style={{ display:"flex", alignItems:"center", gap:8, padding:"8px 0", borderTop:"1px solid " + C.border, fontSize:12, color:C.sub }}>
             <AC>{ini(uName)}</AC>{uName} として投稿
           </div>
           <button style={{ ...S.primaryBtn, width:"100%", padding:"11px" }} onClick={async () => {
             if (!form.stage || !form.title.trim() || !form.content.trim()) return;
+            if (form.content.length < 30) { alert("本文は30文字以上入力してください"); return; }
             await onAddPost(form);
             setForm(null);
           }}>
@@ -1116,6 +1152,12 @@ function PostsTab({ posts, ptype, label, co, uName, onAddPost, onToggleLike, onA
                 <span style={{ fontSize:11, color:C.sub, marginLeft:"auto" }}>{ago(p.createdAt)}</span>
               </div>
               <h3 style={{ fontSize:15, fontWeight:"bold", marginBottom:8, lineHeight:1.55, fontFamily:"serif" }}>{p.title}</h3>
+              {p.offerAmount && (
+                <div style={{ background:"#F0FDF4", border:"1px solid #BBF7D0", padding:"8px 12px", borderRadius:6, marginBottom:8, fontSize:13 }}>
+                  内定オファー: <strong style={{ color:"#166534" }}>年収{p.offerAmount}万円</strong>
+                  {p.offerBase ? ` （月給${p.offerBase}万円` : ""}{p.offerBonus ? ` + 賞与${p.offerBonus}万円）` : (p.offerBase ? "）" : "")}
+                </div>
+              )}
               <p style={{ fontSize:13, lineHeight:1.9, marginBottom:12 }}>{p.content}</p>
               <div style={{ display:"flex", alignItems:"center", gap:10, borderTop:"1px solid " + C.border, paddingTop:10, flexWrap:"wrap" }}>
                 <AC>{ini(p.author)}</AC>
@@ -1275,7 +1317,7 @@ function SalaryTab({ sals, avgSalary, co, uName, plan, onAddSalary, isAdmin, adm
   const [form, setForm] = useState(null);
   const canRead = ["standard","premium"].includes(plan);
   const byJob   = sals.reduce((acc, s) => { if (!acc[s.jobType]) acc[s.jobType] = []; acc[s.jobType].push(s); return acc; }, {});
-  const initF   = { companyId:co.id, jobType:"", ageRange:"", empType:"正社員", annualSalary:"", baseSalary:"", bonus:"", comment:"" };
+  const initF   = { companyId:co.id, jobType:"", position:"", ageRange:"", empType:"正社員", annualSalary:"", baseSalary:"", bonus:"", housingAllowance:"なし", hasRetirementPlan:false, hasFamilyAllowance:false, overtime:"", paidLeave:"", comment:"" };
 
   return (
     <div>
@@ -1313,12 +1355,20 @@ function SalaryTab({ sals, avgSalary, co, uName, plan, onAddSalary, isAdmin, adm
       </div>
       {form && (
         <div style={{ background:C.surface, border:"1px solid " + C.border, borderTop:"3px solid " + C.accent, padding:"18px 20px", marginBottom:20 }}>
-          <Fld label="職種 *">
-            <select style={S.input} value={form.jobType} onChange={e => setForm({ ...form, jobType:e.target.value })}>
-              <option value="">選択してください</option>
-              {JOB_TYPES.map(t => <option key={t}>{t}</option>)}
-            </select>
-          </Fld>
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
+            <Fld label="職種 *">
+              <select style={S.input} value={form.jobType} onChange={e => setForm({ ...form, jobType:e.target.value })}>
+                <option value="">選択してください</option>
+                {getJobCategories(co.group || co.industry).filter(j => j !== "全職種").map(t => <option key={t}>{t}</option>)}
+              </select>
+            </Fld>
+            <Fld label="役職">
+              <select style={S.input} value={form.position} onChange={e => setForm({ ...form, position:e.target.value })}>
+                <option value="">選択</option>
+                {POSITIONS.map(t => <option key={t}>{t}</option>)}
+              </select>
+            </Fld>
+          </div>
           <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
             <Fld label="年齢帯 *">
               <select style={S.input} value={form.ageRange} onChange={e => setForm({ ...form, ageRange:e.target.value })}>
@@ -1336,6 +1386,28 @@ function SalaryTab({ sals, avgSalary, co, uName, plan, onAddSalary, isAdmin, adm
             <Fld label="年収（万円）*"><input style={S.input} type="number" placeholder="600" value={form.annualSalary} onChange={e => setForm({ ...form, annualSalary:e.target.value })} /></Fld>
             <Fld label="月給（万円）" ><input style={S.input} type="number" placeholder="40"  value={form.baseSalary}   onChange={e => setForm({ ...form, baseSalary:  e.target.value })} /></Fld>
             <Fld label="賞与（万円）" ><input style={S.input} type="number" placeholder="120" value={form.bonus}        onChange={e => setForm({ ...form, bonus:       e.target.value })} /></Fld>
+          </div>
+          <div style={{ background:"#F9FAFB", border:"1px solid " + C.border, padding:"12px 14px", borderRadius:6, marginBottom:12 }}>
+            <div style={{ fontSize:13, fontWeight:"bold", marginBottom:10, color:C.ink }}>福利厚生</div>
+            <Fld label="家賃補助">
+              <select style={S.input} value={form.housingAllowance} onChange={e => setForm({...form, housingAllowance:e.target.value})}>
+                {HOUSING_TYPES.map(t => <option key={t}>{t}</option>)}
+              </select>
+            </Fld>
+            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
+              <Fld label="月間残業時間（任意）"><input style={S.input} placeholder="例：30時間" value={form.overtime} onChange={e => setForm({...form, overtime:e.target.value})} /></Fld>
+              <Fld label="有給消化率（任意）"><input style={S.input} placeholder="例：60%" value={form.paidLeave} onChange={e => setForm({...form, paidLeave:e.target.value})} /></Fld>
+            </div>
+            <div style={{ display:"flex", gap:20, marginTop:4 }}>
+              <label style={{ display:"flex", alignItems:"center", gap:6, fontSize:13, cursor:"pointer" }}>
+                <input type="checkbox" checked={form.hasRetirementPlan} onChange={e => setForm({...form, hasRetirementPlan:e.target.checked})} />
+                退職金制度あり
+              </label>
+              <label style={{ display:"flex", alignItems:"center", gap:6, fontSize:13, cursor:"pointer" }}>
+                <input type="checkbox" checked={form.hasFamilyAllowance} onChange={e => setForm({...form, hasFamilyAllowance:e.target.checked})} />
+                家族手当あり
+              </label>
+            </div>
           </div>
           <Fld label="コメント">
             <textarea style={{ ...S.input, resize:"vertical" }} rows={2} value={form.comment} onChange={e => setForm({ ...form, comment:e.target.value })} />
@@ -1367,7 +1439,7 @@ function SalaryTab({ sals, avgSalary, co, uName, plan, onAddSalary, isAdmin, adm
           <div style={{ display:"flex", justifyContent:"space-between", flexWrap:"wrap", gap:8, marginBottom:10 }}>
             <div>
               <div style={{ fontSize:22, fontWeight:"bold", color:"#1a5276", fontFamily:"serif", marginBottom:4 }}>{s.annualSalary}<span style={{ fontSize:13, fontWeight:"normal", color:C.sub }}>万円/年</span></div>
-              {[s.jobType, s.ageRange, s.empType].filter(Boolean).map(t => (
+              {[s.jobType, s.position, s.ageRange, s.empType].filter(Boolean).map(t => (
                 <span key={t} style={{ fontSize:11, color:C.sub, border:"1px solid " + C.border, padding:"1px 6px", marginRight:4 }}>{t}</span>
               ))}
             </div>
@@ -1377,7 +1449,16 @@ function SalaryTab({ sals, avgSalary, co, uName, plan, onAddSalary, isAdmin, adm
               <div style={{ marginTop:4 }}>{ago(s.createdAt)}</div>
             </div>
           </div>
-          {s.comment && <p style={{ fontSize:13, lineHeight:1.85, borderTop:"1px solid " + C.border, paddingTop:10 }}>{s.comment}</p>}
+          {(s.housingAllowance && s.housingAllowance !== "なし") || s.hasRetirementPlan || s.hasFamilyAllowance || s.overtime || s.paidLeave ? (
+            <div style={{ display:"flex", flexWrap:"wrap", gap:6, marginTop:8, paddingTop:8, borderTop:"1px solid " + C.border }}>
+              {s.housingAllowance && s.housingAllowance !== "なし" && <span style={{ fontSize:11, background:"#EFF6FF", color:"#1E40AF", border:"1px solid #BFDBFE", padding:"2px 8px", borderRadius:4 }}>家賃補助: {s.housingAllowance}</span>}
+              {s.hasRetirementPlan && <span style={{ fontSize:11, background:"#F0FDF4", color:"#166534", border:"1px solid #BBF7D0", padding:"2px 8px", borderRadius:4 }}>退職金制度あり</span>}
+              {s.hasFamilyAllowance && <span style={{ fontSize:11, background:"#F0FDF4", color:"#166534", border:"1px solid #BBF7D0", padding:"2px 8px", borderRadius:4 }}>家族手当あり</span>}
+              {s.overtime && <span style={{ fontSize:11, background:"#FFF7ED", color:"#C2410C", border:"1px solid #FED7AA", padding:"2px 8px", borderRadius:4 }}>残業: {s.overtime}</span>}
+              {s.paidLeave && <span style={{ fontSize:11, background:"#FFF7ED", color:"#C2410C", border:"1px solid #FED7AA", padding:"2px 8px", borderRadius:4 }}>有給消化率: {s.paidLeave}</span>}
+            </div>
+          ) : null}
+          {s.comment && <p style={{ fontSize:13, lineHeight:1.85, borderTop:"1px solid " + C.border, paddingTop:10, marginTop:8 }}>{s.comment}</p>}
           <div style={{ display:"flex", alignItems:"center", gap:8, marginTop:10, paddingTop:10, borderTop:"1px solid " + C.border }}>
             <AC>{ini(s.author)}</AC><span style={{ fontSize:12, color:C.sub }}>{s.author}</span>
           </div>
@@ -1666,7 +1747,7 @@ function PricingPage({ sess, go, setAuthMode, plan, upgradePlan, isMobile }) {
 
 // ─── 企業追加 ─────────────────────────────────────────────────────────────────
 function AddCompanyPage({ go, onSubmit, uName, authUser, setAuthMode }) {
-  const [f,   setF]   = useState({ name:"", group:"", industry:"", emoji:"🏢" });
+  const [f,   setF]   = useState({ name:"", group:"", industry:"", emoji:"🏢", established:"", employees:"", website:"" });
   const [err, setErr] = useState("");
   const subs = f.group ? (INDUSTRY_GROUPS[f.group] || []) : [];
 
@@ -1675,13 +1756,6 @@ function AddCompanyPage({ go, onSubmit, uName, authUser, setAuthMode }) {
       <PageHeader title="企業を追加する" desc="まだ掲載されていない企業を追加できます。無料会員登録が必要です。" />
       <div style={{ background:C.surface, border:"1px solid " + C.border, borderTop:"3px solid " + C.accent, padding:"18px 20px" }}>
         {err && <div style={S.errBox}>{err}</div>}
-        <Fld label="アイコン">
-          <div style={{ display:"flex", flexWrap:"wrap", gap:4 }}>
-            {EMOJIS.map(e => (
-              <button key={e} style={{ border:"2px solid " + (f.emoji === e ? C.accent : "#eee"), background: f.emoji === e ? "#FFF8F0" : "#F7F7F7", width:33, height:33, fontSize:16, cursor:"pointer", display:"inline-flex", alignItems:"center", justifyContent:"center" }} onClick={() => setF({ ...f, emoji:e })}>{e}</button>
-            ))}
-          </div>
-        </Fld>
         <Fld label="企業名 *">
           <input style={S.input} placeholder="例：株式会社○○" value={f.name} onChange={e => setF({ ...f, name:e.target.value })} />
         </Fld>
@@ -1705,6 +1779,11 @@ function AddCompanyPage({ go, onSubmit, uName, authUser, setAuthMode }) {
             </div>
           </Fld>
         )}
+        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
+          <Fld label="設立年（任意）"><input style={S.input} placeholder="例：1990" value={f.established} onChange={e => setF({...f, established:e.target.value})} /></Fld>
+          <Fld label="従業員数（任意）"><input style={S.input} placeholder="例：5000人" value={f.employees} onChange={e => setF({...f, employees:e.target.value})} /></Fld>
+        </div>
+        <Fld label="公式サイトURL（任意）"><input style={S.input} placeholder="https://..." value={f.website} onChange={e => setF({...f, website:e.target.value})} /></Fld>
         {!authUser
           ? <div style={{ padding:"12px 14px", background:"#FFF8F0", border:"1px solid #E8C97A", marginBottom:12, fontSize:13 }}>
               企業を追加するには <button style={S.textLink} onClick={() => setAuthMode && setAuthMode("login")}>ログイン</button> が必要です（無料）
@@ -1713,7 +1792,8 @@ function AddCompanyPage({ go, onSubmit, uName, authUser, setAuthMode }) {
         }
         <button style={{ ...S.primaryBtn, width:"100%", padding:"12px" }} onClick={async () => {
           if (!f.name.trim() || !f.group) { setErr("企業名と業界は必須です"); return; }
-          await onSubmit({ ...f, industry: f.industry || f.group });
+          const emoji = EMOJIS[Math.floor(Math.random()*EMOJIS.length)];
+          await onSubmit({ ...f, emoji, industry: f.industry || f.group });
         }}>
           企業を追加する
         </button>
