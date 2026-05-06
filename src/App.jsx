@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
@@ -23,6 +23,27 @@ import {
   limit,
 } from "firebase/firestore";
 import { auth, db } from "./firebase.js";
+
+
+// エラー境界 - レンダリングエラーをキャッチして表示する
+class ErrorBoundary extends React.Component {
+  constructor(props) { super(props); this.state = { hasError: false, error: null }; }
+  static getDerivedStateFromError(error) { return { hasError: true, error }; }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{ padding:40, textAlign:"center", fontFamily:"sans-serif" }}>
+          <h2 style={{ color:"#DC2626", marginBottom:16 }}>エラーが発生しました</h2>
+          <pre style={{ background:"#FEF2F2", padding:16, borderRadius:8, textAlign:"left", fontSize:12, overflow:"auto", maxWidth:600, margin:"0 auto" }}>
+            {String(this.state.error)}
+          </pre>
+          <p style={{ marginTop:16, color:"#666", fontSize:13 }}>このエラー内容をClaudeに送ってください</p>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 // ─── 定数 ─────────────────────────────────────────────────────────────────────
 const INDUSTRY_GROUPS = {
@@ -492,6 +513,7 @@ export default function App() {
   const sp = { sess, go, companies, posts, reviews, salaries, jobListings, plan, isAdmin, adminDelete, adminEdit, setEditTgt, setAuthMode, isMobile, uName, upgradePlan, authUser, favorites, toggleFavorite };
 
   return (
+    <ErrorBoundary>
     <div style={S.root}>
       <style>{CSS}</style>
       <AppNav {...sp} menuOpen={menuOpen} setMenuOpen={setMenuOpen} logout={logout} />
@@ -552,6 +574,7 @@ export default function App() {
         <p style={{ fontSize:10, color:"#888", textAlign:"center", marginTop:8 }}>(c) 2026 CareerClub（キャリクラ）</p>
       </footer>
     </div>
+    </ErrorBoundary>
   );
 }
 
@@ -1642,7 +1665,7 @@ function PricingPage({ sess, go, setAuthMode, plan, upgradePlan, isMobile }) {
 }
 
 // ─── 企業追加 ─────────────────────────────────────────────────────────────────
-function AddCompanyPage({ go, onSubmit, uName }) {
+function AddCompanyPage({ go, onSubmit, uName, authUser, setAuthMode }) {
   const [f,   setF]   = useState({ name:"", group:"", industry:"", emoji:"🏢" });
   const [err, setErr] = useState("");
   const subs = f.group ? (INDUSTRY_GROUPS[f.group] || []) : [];
@@ -1684,7 +1707,7 @@ function AddCompanyPage({ go, onSubmit, uName }) {
         )}
         {!authUser
           ? <div style={{ padding:"12px 14px", background:"#FFF8F0", border:"1px solid #E8C97A", marginBottom:12, fontSize:13 }}>
-              企業を追加するには <button style={S.textLink} onClick={() => {}}>ログイン</button> が必要です（無料）
+              企業を追加するには <button style={S.textLink} onClick={() => setAuthMode && setAuthMode("login")}>ログイン</button> が必要です（無料）
             </div>
           : <div style={{ padding:"10px 0", borderTop:"1px solid " + C.border, fontSize:12, color:C.sub }}>{uName} として追加されます</div>
         }
