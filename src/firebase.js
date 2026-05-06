@@ -3,7 +3,7 @@ import { getAuth } from 'firebase/auth'
 import { getFirestore } from 'firebase/firestore'
 
 const firebaseConfig = {
-  apiKey:            "AIzaSyAl9y6z3QIwDOxjsfCrl3ucZ0LI4e7iVL4",
+  apiKey:            "AIzaSyAl9y6z3QIwDOxjsfCrl3ucZOLI4e7iVl4",
   authDomain:        "careerclub-276f1.firebaseapp.com",
   projectId:         "careerclub-276f1",
   storageBucket:     "careerclub-276f1.firebasestorage.app",
