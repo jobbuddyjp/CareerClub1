@@ -223,19 +223,24 @@ export default function App() {
   // ── 公開データ読み込み（Firestore）
   useEffect(() => {
     (async () => {
-      const [c, p, r, s, j] = await Promise.all([
-        fsAll("companies"),
-        fsAll("posts",       "createdAt"),
-        fsAll("reviews",     "createdAt"),
-        fsAll("salaries",    "createdAt"),
-        fsAll("joblistings", "postedDate"),
-      ]);
-      setCompanies(c);
-      setPosts(p);
-      setReviews(r);
-      setSalaries(s);
-      setJobListings(j);
-      setDataReady(true);
+      try {
+        const [c, p, r, s, j] = await Promise.all([
+          fsAll("companies"),
+          fsAll("posts",       "createdAt"),
+          fsAll("reviews",     "createdAt"),
+          fsAll("salaries",    "createdAt"),
+          fsAll("joblistings", "postedDate"),
+        ]);
+        setCompanies(c);
+        setPosts(p);
+        setReviews(r);
+        setSalaries(s);
+        setJobListings(j);
+      } catch (e) {
+        console.error("Firestore load error:", e);
+      } finally {
+        setDataReady(true);
+      }
     })();
   }, []);
 
@@ -474,7 +479,7 @@ export default function App() {
   else filteredCos.sort((a,b) => coPosts(b.id).length + coRevs(b.id).length - (coPosts(a.id).length + coRevs(a.id).length));
 
   // ローディング
-  if (authUser === undefined || !dataReady) {
+  if (!dataReady) {
     return (
       <div style={{ display:"flex", justifyContent:"center", alignItems:"center", height:"100vh", flexDirection:"column", gap:16 }}>
         <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
