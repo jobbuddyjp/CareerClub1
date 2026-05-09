@@ -64,6 +64,7 @@ const INDUSTRY_GROUPS = {
 const ALL_GROUPS   = Object.keys(INDUSTRY_GROUPS);
 const STAGES       = ["書類選考","一次面接","二次面接","三次面接","最終面接","内定","内定辞退","不合格","辞退"];
 const BOARD_STAGES = ["書類選考中","書類通過","一次選考","二次選考","三次選考","四次選考","最終選考","内定","内定辞退","不合格","辞退"];
+const APPLY_METHODS = ["転職エージェント経由","ビズリーチ経由","企業ホームページから直接","リファラル(社員紹介)","求人サイト経由","ヘッドハンター経由","SNS経由","その他"];
 const HOUSING_TYPES = ["なし","あり（金額不明）","あり（月1万円未満）","あり（月1~3万円）","あり（月3~5万円）","あり（月5万円以上）"];
 const EMP_TYPES    = ["正社員","契約社員","派遣社員","アルバイト","インターン","元社員"];
 const TENURES      = ["~1年未満","1~3年","3~5年","5~10年","10年以上"];
@@ -2333,14 +2334,20 @@ function CompanyPage({ go, co, cposts, crevs, csals, cjobs, initTab, onToggleLik
   const sal = calcAvgSal(csals);
 
   const es = filterByJob(cposts.filter(p => p.ptype === "es"));
-  const tabs = [
+  // 選考者(求職者)向け / 在籍者向け の2グループに分離
+  const tabsCandidate = [
     ["interview", "面接体験談", iv.length],
     ["board",     "選考掲示板", bd.length],
     ["es",        "ES例文",     es.length],
-    ["review",    "口コミ",     crevs.length],
-    ["salary",    "年収情報",   csals.length],
-    ["jobs",      "募集要項",   cjobs.length],
   ];
+  const tabsEmployee = [
+    ["review",    "在籍者による企業評価", crevs.length],
+    ["salary",    "年収情報",             csals.length],
+  ];
+  const tabsOther = [
+    ["jobs",      "募集要項", cjobs.length],
+  ];
+  const tabs = [...tabsCandidate, ...tabsEmployee, ...tabsOther];
 
   return (
     <div>
@@ -2386,13 +2393,38 @@ function CompanyPage({ go, co, cposts, crevs, csals, cjobs, initTab, onToggleLik
           ))}
         </div>
       </div>
-      <div style={{ display:"flex", borderBottom:"2px solid " + C.ink, marginTop:8, overflowX:"auto" }}>
-        {tabs.map(([k,l,n]) => (
-          <button key={k} style={{ background:"none", border:"none", padding:"9px 14px", fontSize:12, fontFamily:"inherit", cursor:"pointer", color: tab===k ? C.accent : C.sub, borderBottom:"3px solid " + (tab===k ? C.accent : "transparent"), marginBottom:-2, fontWeight: tab===k ? "bold" : "500", whiteSpace:"nowrap" }} onClick={() => setTab(k)}>
-            {l}<span style={{ fontSize:10, background: tab===k ? C.accent : "#eee", color: tab===k ? "#fff" : C.sub, padding:"1px 5px", marginLeft:3 }}>{n}</span>
-          </button>
-        ))}
+      {/* タブグループ：選考者向け（オレンジ系）/ 在籍者向け（青系）/ その他 */}
+      <div style={{ marginTop:14, marginBottom:0 }}>
+        <div style={{ display:"flex", flexWrap:"wrap", gap:0, borderBottom:"2px solid " + C.ink }}>
+          {/* 選考者向け */}
+          <div style={{ display:"flex", paddingRight:14, borderRight:"1px solid " + C.border, position:"relative" }}>
+            <span style={{ position:"absolute", top:-14, left:0, fontSize:9, color:"#C2410C", fontWeight:"bold", letterSpacing:"0.06em", whiteSpace:"nowrap" }}>📝 選考を受けた人の情報</span>
+            {tabsCandidate.map(([k,l,n]) => (
+              <button key={k} style={{ background:"none", border:"none", padding:"9px 12px", fontSize:12, fontFamily:"inherit", cursor:"pointer", color: tab===k ? "#C2410C" : C.sub, borderBottom:"3px solid " + (tab===k ? "#F59E0B" : "transparent"), marginBottom:-2, fontWeight: tab===k ? "bold" : "500", whiteSpace:"nowrap" }} onClick={() => setTab(k)}>
+                {l}<span style={{ fontSize:10, background: tab===k ? "#F59E0B" : "#eee", color: tab===k ? "#fff" : C.sub, padding:"1px 5px", marginLeft:3, borderRadius:2 }}>{n}</span>
+              </button>
+            ))}
+          </div>
+          {/* 在籍者向け */}
+          <div style={{ display:"flex", paddingLeft:14, paddingRight:14, borderRight:"1px solid " + C.border, position:"relative" }}>
+            <span style={{ position:"absolute", top:-14, left:14, fontSize:9, color:C.accent, fontWeight:"bold", letterSpacing:"0.06em", whiteSpace:"nowrap" }}>🏢 在籍者・元社員の情報</span>
+            {tabsEmployee.map(([k,l,n]) => (
+              <button key={k} style={{ background:"none", border:"none", padding:"9px 12px", fontSize:12, fontFamily:"inherit", cursor:"pointer", color: tab===k ? C.accent : C.sub, borderBottom:"3px solid " + (tab===k ? C.accent : "transparent"), marginBottom:-2, fontWeight: tab===k ? "bold" : "500", whiteSpace:"nowrap" }} onClick={() => setTab(k)}>
+                {l}<span style={{ fontSize:10, background: tab===k ? C.accent : "#eee", color: tab===k ? "#fff" : C.sub, padding:"1px 5px", marginLeft:3, borderRadius:2 }}>{n}</span>
+              </button>
+            ))}
+          </div>
+          {/* その他 */}
+          <div style={{ display:"flex", paddingLeft:14 }}>
+            {tabsOther.map(([k,l,n]) => (
+              <button key={k} style={{ background:"none", border:"none", padding:"9px 12px", fontSize:12, fontFamily:"inherit", cursor:"pointer", color: tab===k ? C.ink : C.sub, borderBottom:"3px solid " + (tab===k ? C.ink : "transparent"), marginBottom:-2, fontWeight: tab===k ? "bold" : "500", whiteSpace:"nowrap" }} onClick={() => setTab(k)}>
+                {l}<span style={{ fontSize:10, background: tab===k ? C.ink : "#eee", color: tab===k ? "#fff" : C.sub, padding:"1px 5px", marginLeft:3, borderRadius:2 }}>{n}</span>
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
+      <div style={{ marginTop:18 }} />
       <div style={{ paddingTop:20 }}>
         {tab === "interview" && <PostsTab posts={iv} ptype="interview" label="面接体験談" co={co} uName={uName} onAddPost={onAddPost} onToggleLike={onToggleLike} onAddComment={onAddComment} isAdmin={isAdmin} adminDelete={adminDelete} setEditTgt={setEditTgt} favorites={favorites} toggleFavorite={toggleFavorite} jobCat={jobCat} sess={sess} setAuthMode={setAuthMode} />}
         {tab === "board"     && <PostsTab posts={bd} ptype="board"     label="選考掲示板" co={co} uName={uName} onAddPost={onAddPost} onToggleLike={onToggleLike} onAddComment={onAddComment} isAdmin={isAdmin} adminDelete={adminDelete} setEditTgt={setEditTgt} favorites={favorites} toggleFavorite={toggleFavorite} jobCat={jobCat} sess={sess} setAuthMode={setAuthMode} />}
@@ -2414,15 +2446,32 @@ function PostsTab({ posts, ptype, label, co, uName, onAddPost, onToggleLike, onA
   const [showCustomStage, setShowCustomStage] = useState(false);
   const [stages, setStages] = useState([{ stage:"", content:"" }]);
   const isES = ptype === "es";
+  const isInterview = ptype === "interview";
   const initF = isES
     ? { companyId:co.id, ptype, stage:"内定", title:"", content:"", jobCategory:"全職種", esQuestion:"", year:new Date().getFullYear() }
+    : isInterview
+    ? {
+        companyId:co.id, ptype, stage:"", title:"", content:"", jobCategory:"全職種",
+        // 多段階情報
+        applyMethod:"", prevJobType:"", prevSalary:"", prevAge:"",
+        stages:[
+          { name:"書類選考", content:"", days:"", result:"通過" }
+        ],
+        finalResult:"", offerAmount:"", offerBase:"", offerBonus:""
+      }
     : { companyId:co.id, ptype, stage:"", title:"", content:"", jobCategory:"全職種", offerAmount:"", offerBase:"", offerBonus:"" };
   const sorted = [...posts].sort((a,b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
 
   return (
     <div>
+      {ptype === "board" && (
+        <div style={{ background:"#FFFBEB", border:"1px solid #FDE68A", padding:"10px 14px", borderRadius:6, marginBottom:14, fontSize:12, color:"#92400E", lineHeight:1.7 }}>
+          <strong>📋 職種ごとに掲示板が分かれています</strong><br />
+          上部の「職種カテゴリ」から選びたい職種を選んでください。投稿時も職種を選んでください。
+        </div>
+      )}
       <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:14, paddingBottom:10, borderBottom:"1px solid " + C.border, flexWrap:"wrap", gap:8 }}>
-        <span style={{ fontSize:12, color:C.sub }}>{posts.length}件の{label}</span>
+        <span style={{ fontSize:12, color:C.sub }}>{posts.length}件の{label}{ptype === "board" && jobCat !== "全職種" ? ` (${jobCat})` : ""}</span>
         <button style={S.primaryBtn} onClick={() => setForm(form ? null : initF)}>
           {form ? "キャンセル" : "＋ " + label + "を投稿する"}
         </button>
@@ -2453,7 +2502,7 @@ function PostsTab({ posts, ptype, label, co, uName, onAddPost, onToggleLike, onA
               </Fld>
             </>
           )}
-          {!isES && (
+          {!isES && !isInterview && (
           <Fld label="選考段階 *">
             <div style={{ display:"flex", gap:8 }}>
               <select style={{...S.input, flex:1}} value={showCustomStage ? "custom" : form.stage} onChange={e => {
@@ -2470,14 +2519,103 @@ function PostsTab({ posts, ptype, label, co, uName, onAddPost, onToggleLike, onA
             </div>
           </Fld>
           )}
+          {isInterview && (
+            <>
+              <div style={{ background:"#FFF7ED", border:"1px solid #FED7AA", padding:"12px 14px", borderRadius:6, marginBottom:14 }}>
+                <div style={{ fontSize:13, fontWeight:"bold", color:"#9A3412", marginBottom:10 }}>📋 応募・選考前の情報</div>
+                <Fld label="応募方法 *">
+                  <select style={S.input} value={form.applyMethod} onChange={e => setForm({...form, applyMethod:e.target.value})}>
+                    <option value="">選択してください</option>
+                    {APPLY_METHODS.map(t => <option key={t}>{t}</option>)}
+                  </select>
+                </Fld>
+                <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:10 }}>
+                  <Fld label="応募時の職種"><input style={S.input} placeholder="例：法人営業" value={form.prevJobType} onChange={e => setForm({...form, prevJobType:e.target.value})} /></Fld>
+                  <Fld label="現年収（万円）"><input style={S.input} type="number" placeholder="500" value={form.prevSalary} onChange={e => setForm({...form, prevSalary:e.target.value})} /></Fld>
+                  <Fld label="応募時の年齢"><input style={S.input} type="number" placeholder="28" value={form.prevAge} onChange={e => setForm({...form, prevAge:e.target.value})} /></Fld>
+                </div>
+              </div>
+              <div style={{ background:"#F0F9FF", border:"1px solid #BAE6FD", padding:"12px 14px", borderRadius:6, marginBottom:14 }}>
+                <div style={{ fontSize:13, fontWeight:"bold", color:"#0C4A6E", marginBottom:10, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                  <span>🎯 選考プロセス（段階ごとに記入）</span>
+                  <button type="button" style={{ background:C.accent, color:"#fff", border:"none", padding:"4px 12px", fontSize:11, fontFamily:"inherit", cursor:"pointer", borderRadius:4 }} onClick={() => {
+                    const next = form.stages.length;
+                    const defaultName = ["書類選考","一次面接","二次面接","三次面接","四次面接","五次面接","六次面接","七次面接","八次面接","最終面接"][next] || `${next + 1}回目の選考`;
+                    setForm({...form, stages:[...form.stages, { name:defaultName, content:"", days:"", result:"通過" }]});
+                  }}>＋ 段階を追加</button>
+                </div>
+                {form.stages.map((stg, i) => (
+                  <div key={i} style={{ background:"#fff", border:"1px solid " + C.border, padding:"10px 12px", marginBottom:8, borderRadius:4 }}>
+                    <div style={{ display:"flex", gap:6, alignItems:"center", marginBottom:8 }}>
+                      <span style={{ background:C.accent, color:"#fff", padding:"2px 10px", fontSize:11, fontWeight:"bold", borderRadius:3 }}>段階 {i + 1}</span>
+                      <input style={{...S.input, flex:1}} placeholder="例：書類選考、一次面接、最終面接" value={stg.name} onChange={e => {
+                        const ns = [...form.stages]; ns[i] = {...ns[i], name:e.target.value}; setForm({...form, stages:ns});
+                      }} />
+                      {form.stages.length > 1 && (
+                        <button type="button" style={{ background:"#FEE2E2", color:"#991B1B", border:"none", padding:"4px 10px", fontSize:11, cursor:"pointer", fontFamily:"inherit", borderRadius:3 }} onClick={() => {
+                          const ns = form.stages.filter((_, idx) => idx !== i); setForm({...form, stages:ns});
+                        }}>削除</button>
+                      )}
+                    </div>
+                    <Fld label={`${stg.name}の内容（質問・課題・形式など）`}>
+                      <textarea style={{...S.input, resize:"vertical"}} rows={3} placeholder="例：志望動機、自己PR、逆質問など。30分の面接で...などを記入" value={stg.content} onChange={e => {
+                        const ns = [...form.stages]; ns[i] = {...ns[i], content:e.target.value}; setForm({...form, stages:ns});
+                      }} />
+                    </Fld>
+                    <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
+                      <Fld label="結果通知までの日数"><input style={S.input} placeholder="例：3日後" value={stg.days} onChange={e => {
+                        const ns = [...form.stages]; ns[i] = {...ns[i], days:e.target.value}; setForm({...form, stages:ns});
+                      }} /></Fld>
+                      <Fld label="結果">
+                        <select style={S.input} value={stg.result} onChange={e => {
+                          const ns = [...form.stages]; ns[i] = {...ns[i], result:e.target.value}; setForm({...form, stages:ns});
+                        }}>
+                          <option>通過</option>
+                          <option>不通過</option>
+                          <option>辞退</option>
+                          <option>選考中</option>
+                        </select>
+                      </Fld>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <Fld label="最終結果 *">
+                <select style={S.input} value={form.finalResult} onChange={e => setForm({...form, finalResult:e.target.value, stage:e.target.value})}>
+                  <option value="">選択してください</option>
+                  <option value="内定">内定（入社）</option>
+                  <option value="内定辞退">内定辞退</option>
+                  <option value="不合格">不合格</option>
+                  <option value="辞退">途中辞退</option>
+                  <option value="選考中">選考中</option>
+                </select>
+              </Fld>
+              {(form.finalResult === "内定" || form.finalResult === "内定辞退") && (
+                <div style={{ background:"#F0FDF4", border:"1px solid #BBF7D0", padding:"12px 14px", borderRadius:6, marginBottom:14 }}>
+                  <div style={{ fontSize:13, fontWeight:"bold", color:"#166534", marginBottom:8 }}>💰 オファー情報</div>
+                  <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:8 }}>
+                    <Fld label="提示年収（万円）"><input style={S.input} type="number" placeholder="700" value={form.offerAmount} onChange={e => setForm({...form, offerAmount:e.target.value})} /></Fld>
+                    <Fld label="月給（万円）"><input style={S.input} type="number" placeholder="45" value={form.offerBase} onChange={e => setForm({...form, offerBase:e.target.value})} /></Fld>
+                    <Fld label="賞与（万円）"><input style={S.input} type="number" placeholder="160" value={form.offerBonus} onChange={e => setForm({...form, offerBonus:e.target.value})} /></Fld>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
           <Fld label={isES ? "回答タイトル *" : "タイトル *"}>
             <input style={S.input} placeholder="例：一次面接で聞かれたこと" value={form.title} onChange={e => setForm({ ...form, title:e.target.value })} />
           </Fld>
-          <Fld label={`本文 *（最低30文字）　現在${form.content.length}文字`}>
-            <textarea style={{ ...S.input, resize:"vertical", borderColor: form.content.length > 0 && form.content.length < 30 ? "#DC2626" : C.border }} rows={5} placeholder="面接の様子、聞かれた内容、準備のポイントなどをご記入ください。（最低30文字）" value={form.content} onChange={e => setForm({ ...form, content:e.target.value })} />
-            {form.content.length > 0 && form.content.length < 30 && <p style={{ fontSize:11, color:"#DC2626", marginTop:4 }}>あと{30 - form.content.length}文字以上入力してください</p>}
-          </Fld>
-          {(form.stage === "内定" || form.stage === "内定辞退") && (
+          {isInterview ? (
+            <Fld label="総評・感想（任意）">
+              <textarea style={{ ...S.input, resize:"vertical" }} rows={3} placeholder="選考全体を通しての感想・準備のポイントなどがあれば（任意）" value={form.content} onChange={e => setForm({ ...form, content:e.target.value })} />
+            </Fld>
+          ) : (
+            <Fld label={`本文 *（最低30文字）　現在${form.content.length}文字`}>
+              <textarea style={{ ...S.input, resize:"vertical", borderColor: form.content.length > 0 && form.content.length < 30 ? "#DC2626" : C.border }} rows={5} placeholder="面接の様子、聞かれた内容、準備のポイントなどをご記入ください。（最低30文字）" value={form.content} onChange={e => setForm({ ...form, content:e.target.value })} />
+              {form.content.length > 0 && form.content.length < 30 && <p style={{ fontSize:11, color:"#DC2626", marginTop:4 }}>あと{30 - form.content.length}文字以上入力してください</p>}
+            </Fld>
+          )}
+          {!isInterview && (form.stage === "内定" || form.stage === "内定辞退") && (
             <div style={{ background:"#F0FBF4", border:"1px solid #BBF7D0", padding:"12px 14px", borderRadius:6, marginBottom:12 }}>
               <div style={{ fontSize:13, fontWeight:"bold", color:"#166534", marginBottom:8 }}>内定オファー情報（任意）</div>
               <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:8 }}>
@@ -2491,10 +2629,20 @@ function PostsTab({ posts, ptype, label, co, uName, onAddPost, onToggleLike, onA
             <AC>{ini(uName)}</AC>{uName} として投稿
           </div>
           <button style={{ ...S.primaryBtn, width:"100%", padding:"11px" }} onClick={async () => {
-            if (!form.title.trim() || !form.content.trim()) return;
+            if (!form.title.trim()) { alert("タイトルを入力してください"); return; }
+            if (isInterview) {
+              if (!form.applyMethod) { alert("応募方法を選択してください"); return; }
+              if (!form.finalResult) { alert("最終結果を選択してください"); return; }
+              if (form.stages.length === 0) { alert("選考段階を1つ以上入力してください"); return; }
+              // 補完
+              const summary = form.stages.map(s => `【${s.name}】${s.content}`).join("\n\n");
+              await onAddPost({ ...form, content: form.content || summary, stage: form.finalResult });
+              setForm(null);
+              return;
+            }
             if (!isES && !form.stage) return;
             if (isES && !form.esQuestion.trim()) { alert("ES設問内容を入力してください"); return; }
-            if (form.content.length < 30) { alert("本文は30文字以上入力してください"); return; }
+            if (!isInterview && form.content.length < 30) { alert("本文は30文字以上入力してください"); return; }
             await onAddPost(form);
             setForm(null);
           }}>
@@ -2503,8 +2651,16 @@ function PostsTab({ posts, ptype, label, co, uName, onAddPost, onToggleLike, onA
         </div>
       )}
       {sorted.length === 0 && <Empty text={"まだ" + label + "がありません。最初の投稿をしてみましょう！"} />}
+      {/* 選考掲示板・ES例文は1件目からロック、面接体験談は2件目以降ロック */}
+      {sorted.length > 0 && !sess && (ptype === "board" || ptype === "es") && (
+        <BoardLockedNotice setAuthMode={setAuthMode} count={sorted.length} type={label} />
+      )}
       {sorted.map((p, idx) => {
-        const isLocked = !sess && idx >= 1;
+        const isLocked = !sess && (
+          (ptype === "board" || ptype === "es") ? idx >= 0 :
+          ptype === "interview" ? idx >= 1 :
+          idx >= 1
+        );
         return (
             <article key={p.id} style={{ background:C.surface, padding:"12px 0", borderBottom:"1px solid " + C.border, position:"relative", filter: isLocked ? "blur(5px)" : "none", pointerEvents: isLocked ? "none" : "auto", userSelect: isLocked ? "none" : "auto" }}>
               {isAdmin && (
@@ -2530,7 +2686,51 @@ function PostsTab({ posts, ptype, label, co, uName, onAddPost, onToggleLike, onA
               {p.year && p.ptype === "es" && (
                 <div style={{ fontSize:11, color:C.sub, marginBottom:6 }}>応募: {p.year}年 / 結果: {p.stage}</div>
               )}
-              {p.offerAmount && (
+              {/* 面接体験談の概要バッジ（誰でも見える基本情報） */}
+              {p.ptype === "interview" && (
+                <div style={{ display:"flex", flexWrap:"wrap", gap:6, marginBottom:10 }}>
+                  {p.finalResult && (
+                    <span style={{ background: p.finalResult === "内定" ? "#16A34A" : p.finalResult === "内定辞退" ? "#0891B2" : p.finalResult === "不合格" ? "#DC2626" : "#6B7280", color:"#fff", padding:"3px 10px", fontSize:11, fontWeight:"bold", borderRadius:3 }}>
+                      最終結果: {p.finalResult}
+                    </span>
+                  )}
+                  {p.stages && p.stages.length > 0 && (
+                    <span style={{ background:"#EFF6FF", color:"#1E40AF", border:"1px solid #BFDBFE", padding:"3px 10px", fontSize:11, fontWeight:"bold", borderRadius:3 }}>
+                      {p.stages.length}段階の選考
+                    </span>
+                  )}
+                  {p.applyMethod && (
+                    <span style={{ background:"#FFF7ED", color:"#C2410C", border:"1px solid #FED7AA", padding:"3px 10px", fontSize:11, borderRadius:3 }}>
+                      応募: {p.applyMethod}
+                    </span>
+                  )}
+                </div>
+              )}
+              {/* 現年収 → オファー年収（誰でも見える） */}
+              {p.ptype === "interview" && (p.prevSalary || p.offerAmount) && (
+                <div style={{ background:"#F0F9FF", border:"1px solid #BAE6FD", padding:"10px 14px", borderRadius:6, marginBottom:10, fontSize:13, fontWeight:"bold", color:"#0C4A6E" }}>
+                  {p.prevSalary && <span>現年収: {p.prevSalary}万円</span>}
+                  {p.prevSalary && p.offerAmount && <span style={{ margin:"0 8px", color:C.accent }}>→</span>}
+                  {p.offerAmount && <span>オファー年収: {p.offerAmount}万円</span>}
+                </div>
+              )}
+              {/* 多段階詳細（ロックの場合は親要素のblurで自動的に隠される） */}
+              {p.ptype === "interview" && p.stages && p.stages.length > 0 && (
+                <div style={{ marginBottom:10 }}>
+                  {p.stages.map((stg, i) => (
+                    <div key={i} style={{ borderLeft:"3px solid " + C.accent, paddingLeft:10, marginBottom:8 }}>
+                      <div style={{ display:"flex", gap:6, alignItems:"center", marginBottom:4, flexWrap:"wrap" }}>
+                        <span style={{ fontSize:11, fontWeight:"bold", color:C.accent }}>{stg.name}</span>
+                        {stg.result && <span style={{ fontSize:10, background: stg.result === "通過" ? "#DCFCE7" : "#FEE2E2", color: stg.result === "通過" ? "#166534" : "#991B1B", padding:"1px 6px", borderRadius:2 }}>{stg.result}</span>}
+                        {stg.days && <span style={{ fontSize:10, color:C.sub }}>結果通知: {stg.days}</span>}
+                      </div>
+                      {stg.content && <p style={{ fontSize:12, lineHeight:1.7, color:C.ink, marginBottom:4 }}>{stg.content}</p>}
+                    </div>
+                  ))}
+                </div>
+              )}
+              {/* 旧来のオファー情報（互換性のため残す） */}
+              {p.ptype !== "interview" && p.offerAmount && (
                 <div style={{ background:"#F0FDF4", border:"1px solid #BBF7D0", padding:"8px 12px", borderRadius:6, marginBottom:8, fontSize:13 }}>
                   内定オファー: <strong style={{ color:"#166534" }}>年収{p.offerAmount}万円</strong>
                   {p.offerBase ? ` （月給${p.offerBase}万円` : ""}{p.offerBonus ? ` + 賞与${p.offerBonus}万円）` : (p.offerBase ? "）" : "")}
@@ -2575,7 +2775,7 @@ function PostsTab({ posts, ptype, label, co, uName, onAddPost, onToggleLike, onA
             </article>
         );
       })}
-      {!sess && sorted.length > 1 && <LockedContent setAuthMode={setAuthMode} count={sorted.length - 1} type={label} />}
+      {!sess && ptype === "interview" && sorted.length > 1 && <LockedContent setAuthMode={setAuthMode} count={sorted.length - 1} type={label} />}
     </div>
   );
 }
@@ -2612,7 +2812,15 @@ function ReviewsTab({ revs, avgData: a, co, uName, plan, onAddReview, isAdmin, a
     const drs = revs.filter(r => r.dept === d);
     return { dept: d, count: drs.length, avg: calcAvg(drs) };
   }).filter(s => s.count > 0).sort((a,b) => b.count - a.count);
-  const initF = { companyId:co.id, overall:3, rats:{motivation:3,morale:3,relations:3,white:3,growth:3,wlb:3,salary:3,mgmt:3}, empType:"正社員", tenure:"1~3年", dept:"全部門", position:"一般社員", overtimeBucket:"", paidLeaveBucket:"", quitReason:"退職検討なし", prevJob:"", pros:"", cons:"", advice:"" };
+  const initF = {
+    companyId:co.id, overall:3,
+    rats:{motivation:3,morale:3,relations:3,white:3,growth:3,wlb:3,salary:3,mgmt:3},
+    ratComments:{motivation:"",morale:"",relations:"",white:"",growth:"",wlb:"",salary:"",mgmt:""},
+    empType:"正社員", tenure:"1~3年", dept:"全部門", position:"一般社員",
+    overtimeBucket:"", paidLeaveBucket:"", quitReason:"退職検討なし", prevJob:"",
+    retirementPlanComment:"", familyAllowanceComment:"",
+    pros:"", cons:"", advice:""
+  };
 
   return (
     <div>
@@ -2728,10 +2936,19 @@ function ReviewsTab({ revs, avgData: a, co, uName, plan, onAddReview, isAdmin, a
       {form && (
         <div style={{ background:C.surface, border:"1px solid " + C.border, borderTop:"3px solid " + C.accent, padding:"18px 20px", marginBottom:20 }}>
           <Fld label="総合評価 *"><StarPicker value={form.overall} onChange={v => setForm({ ...form, overall:v })} label="総合評価" /></Fld>
-          <Fld label="カテゴリ別評価">
+          <Fld label="カテゴリ別評価とコメント">
             <div style={{ borderLeft:"3px solid " + C.border, paddingLeft:12 }}>
               {RCATS.map(cat => (
-                <StarPicker key={cat.key} value={form.rats[cat.key]} onChange={v => setForm({ ...form, rats:{ ...form.rats, [cat.key]:v } })} label={cat.label} />
+                <div key={cat.key} style={{ marginBottom:14, paddingBottom:12, borderBottom:"1px dashed " + C.border }}>
+                  <StarPicker value={form.rats[cat.key]} onChange={v => setForm({ ...form, rats:{ ...form.rats, [cat.key]:v } })} label={cat.label} />
+                  <textarea
+                    style={{ ...S.input, resize:"vertical", marginTop:4, fontSize:12 }}
+                    rows={2}
+                    placeholder={`${cat.label}についてのコメント（任意）`}
+                    value={form.ratComments[cat.key]}
+                    onChange={e => setForm({ ...form, ratComments:{ ...form.ratComments, [cat.key]:e.target.value } })}
+                  />
+                </div>
               ))}
             </div>
           </Fld>
@@ -2800,13 +3017,28 @@ function ReviewsTab({ revs, avgData: a, co, uName, plan, onAddReview, isAdmin, a
             </div>
             <span style={{ fontSize:11, color:C.sub }}>{ago(r.createdAt)}</span>
           </div>
-          <div style={{ display:"flex", flexWrap:"wrap", gap:10, padding:"8px 12px", background:"#F7F7F7", borderLeft:"3px solid " + C.border, marginBottom:12 }}>
-            {RCATS.map(cat => (
-              <div key={cat.key} style={{ textAlign:"center", minWidth:60 }}>
-                <div style={{ fontSize:9, color:C.sub, marginBottom:1 }}>{cat.label}</div>
-                <div style={{ fontSize:13, fontWeight:"bold", color: (r.rats && r.rats[cat.key] >= 4) ? C.accent : C.ink }}>{((r.rats && r.rats[cat.key]) || 0).toFixed(1)}</div>
+          <div style={{ marginBottom:12 }}>
+            <div style={{ display:"flex", flexWrap:"wrap", gap:10, padding:"8px 12px", background:"#F7F7F7", borderLeft:"3px solid " + C.border, marginBottom:6 }}>
+              {RCATS.map(cat => (
+                <div key={cat.key} style={{ textAlign:"center", minWidth:60 }}>
+                  <div style={{ fontSize:9, color:C.sub, marginBottom:1 }}>{cat.label}</div>
+                  <div style={{ fontSize:13, fontWeight:"bold", color: (r.rats && r.rats[cat.key] >= 4) ? C.accent : C.ink }}>{((r.rats && r.rats[cat.key]) || 0).toFixed(1)}</div>
+                </div>
+              ))}
+            </div>
+            {/* カテゴリ別コメント */}
+            {r.ratComments && RCATS.some(cat => r.ratComments[cat.key]) && (
+              <div style={{ paddingLeft:8, marginTop:8 }}>
+                {RCATS.filter(cat => r.ratComments && r.ratComments[cat.key]).map(cat => (
+                  <div key={cat.key} style={{ marginBottom:8, paddingLeft:10, borderLeft:"2px solid " + C.light }}>
+                    <div style={{ fontSize:11, fontWeight:"bold", color:C.accent, marginBottom:2 }}>
+                      {cat.label} <Stars r={r.rats[cat.key]} size={10} />
+                    </div>
+                    <p style={{ fontSize:12, color:C.ink, lineHeight:1.7 }}>{r.ratComments[cat.key]}</p>
+                  </div>
+                ))}
               </div>
-            ))}
+            )}
           </div>
           {(r.overtimeBucket || r.paidLeaveBucket || (r.quitReason && r.quitReason !== "退職検討なし") || r.prevJob) && (
             <div style={{ display:"flex", flexWrap:"wrap", gap:6, marginBottom:10, padding:"8px 12px", background:"#FAFBFC", borderLeft:"3px solid " + C.accent, fontSize:11 }}>
@@ -2836,7 +3068,7 @@ function SalaryTab({ sals, avgSalary, co, uName, plan, onAddSalary, isAdmin, adm
   const [form, setForm] = useState(null);
   const canRead = ["standard","premium"].includes(plan);
   const byJob   = sals.reduce((acc, s) => { if (!acc[s.jobType]) acc[s.jobType] = []; acc[s.jobType].push(s); return acc; }, {});
-  const initF   = { companyId:co.id, jobType:"", position:"", ageRange:"", empType:"正社員", annualSalary:"", baseSalary:"", bonus:"", housingAllowance:"なし", hasRetirementPlan:false, hasFamilyAllowance:false, overtime:"", paidLeave:"", comment:"" };
+  const initF   = { companyId:co.id, jobType:"", position:"", ageRange:"", empType:"正社員", annualSalary:"", baseSalary:"", bonus:"", housingAllowance:"なし", housingAllowanceComment:"", hasRetirementPlan:false, retirementPlanComment:"", hasFamilyAllowance:false, familyAllowanceComment:"", overtime:"", paidLeave:"", comment:"" };
 
   return (
     <div>
@@ -2917,15 +3149,25 @@ function SalaryTab({ sals, avgSalary, co, uName, plan, onAddSalary, isAdmin, adm
               <Fld label="月間残業時間（任意）"><input style={S.input} placeholder="例：30時間" value={form.overtime} onChange={e => setForm({...form, overtime:e.target.value})} /></Fld>
               <Fld label="有給消化率（任意）"><input style={S.input} placeholder="例：60%" value={form.paidLeave} onChange={e => setForm({...form, paidLeave:e.target.value})} /></Fld>
             </div>
-            <div style={{ display:"flex", gap:20, marginTop:4 }}>
-              <label style={{ display:"flex", alignItems:"center", gap:6, fontSize:13, cursor:"pointer" }}>
-                <input type="checkbox" checked={form.hasRetirementPlan} onChange={e => setForm({...form, hasRetirementPlan:e.target.checked})} />
-                退職金制度あり
-              </label>
-              <label style={{ display:"flex", alignItems:"center", gap:6, fontSize:13, cursor:"pointer" }}>
-                <input type="checkbox" checked={form.hasFamilyAllowance} onChange={e => setForm({...form, hasFamilyAllowance:e.target.checked})} />
-                家族手当あり
-              </label>
+            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:14, marginTop:8 }}>
+              <div>
+                <label style={{ display:"flex", alignItems:"center", gap:6, fontSize:13, cursor:"pointer", marginBottom:6 }}>
+                  <input type="checkbox" checked={form.hasRetirementPlan} onChange={e => setForm({...form, hasRetirementPlan:e.target.checked})} />
+                  退職金制度あり
+                </label>
+                {form.hasRetirementPlan && (
+                  <textarea style={{...S.input, resize:"vertical", fontSize:12}} rows={2} placeholder="退職金制度の詳細（金額・制度名など）" value={form.retirementPlanComment} onChange={e => setForm({...form, retirementPlanComment:e.target.value})} />
+                )}
+              </div>
+              <div>
+                <label style={{ display:"flex", alignItems:"center", gap:6, fontSize:13, cursor:"pointer", marginBottom:6 }}>
+                  <input type="checkbox" checked={form.hasFamilyAllowance} onChange={e => setForm({...form, hasFamilyAllowance:e.target.checked})} />
+                  家族手当あり
+                </label>
+                {form.hasFamilyAllowance && (
+                  <textarea style={{...S.input, resize:"vertical", fontSize:12}} rows={2} placeholder="家族手当の詳細（配偶者○万円、子○万円など）" value={form.familyAllowanceComment} onChange={e => setForm({...form, familyAllowanceComment:e.target.value})} />
+                )}
+              </div>
             </div>
           </div>
           <Fld label="コメント">
@@ -2965,12 +3207,30 @@ function SalaryTab({ sals, avgSalary, co, uName, plan, onAddSalary, isAdmin, adm
             </div>
           </div>
           {(s.housingAllowance && s.housingAllowance !== "なし") || s.hasRetirementPlan || s.hasFamilyAllowance || s.overtime || s.paidLeave ? (
-            <div style={{ display:"flex", flexWrap:"wrap", gap:6, marginTop:8, paddingTop:8, borderTop:"1px solid " + C.border }}>
-              {s.housingAllowance && s.housingAllowance !== "なし" && <span style={{ fontSize:11, background:"#EFF6FF", color:"#1E40AF", border:"1px solid #BFDBFE", padding:"2px 8px", borderRadius:4 }}>家賃補助: {s.housingAllowance}</span>}
-              {s.hasRetirementPlan && <span style={{ fontSize:11, background:"#F0FDF4", color:"#166534", border:"1px solid #BBF7D0", padding:"2px 8px", borderRadius:4 }}>退職金制度あり</span>}
-              {s.hasFamilyAllowance && <span style={{ fontSize:11, background:"#F0FDF4", color:"#166534", border:"1px solid #BBF7D0", padding:"2px 8px", borderRadius:4 }}>家族手当あり</span>}
-              {s.overtime && <span style={{ fontSize:11, background:"#FFF7ED", color:"#C2410C", border:"1px solid #FED7AA", padding:"2px 8px", borderRadius:4 }}>残業: {s.overtime}</span>}
-              {s.paidLeave && <span style={{ fontSize:11, background:"#FFF7ED", color:"#C2410C", border:"1px solid #FED7AA", padding:"2px 8px", borderRadius:4 }}>有給消化率: {s.paidLeave}</span>}
+            <div style={{ marginTop:8, paddingTop:8, borderTop:"1px solid " + C.border }}>
+              <div style={{ display:"flex", flexWrap:"wrap", gap:6, marginBottom:6 }}>
+                {s.housingAllowance && s.housingAllowance !== "なし" && <span style={{ fontSize:11, background:"#EFF6FF", color:"#1E40AF", border:"1px solid #BFDBFE", padding:"2px 8px", borderRadius:4 }}>家賃補助: {s.housingAllowance}</span>}
+                {s.hasRetirementPlan && <span style={{ fontSize:11, background:"#F0FDF4", color:"#166534", border:"1px solid #BBF7D0", padding:"2px 8px", borderRadius:4 }}>退職金制度あり</span>}
+                {s.hasFamilyAllowance && <span style={{ fontSize:11, background:"#F0FDF4", color:"#166534", border:"1px solid #BBF7D0", padding:"2px 8px", borderRadius:4 }}>家族手当あり</span>}
+                {s.overtime && <span style={{ fontSize:11, background:"#FFF7ED", color:"#C2410C", border:"1px solid #FED7AA", padding:"2px 8px", borderRadius:4 }}>残業: {s.overtime}</span>}
+                {s.paidLeave && <span style={{ fontSize:11, background:"#FFF7ED", color:"#C2410C", border:"1px solid #FED7AA", padding:"2px 8px", borderRadius:4 }}>有給消化率: {s.paidLeave}</span>}
+              </div>
+              {(s.retirementPlanComment || s.familyAllowanceComment) && (
+                <div style={{ paddingLeft:8 }}>
+                  {s.retirementPlanComment && (
+                    <div style={{ marginBottom:6, paddingLeft:10, borderLeft:"2px solid #BBF7D0" }}>
+                      <div style={{ fontSize:10, fontWeight:"bold", color:"#166534", marginBottom:2 }}>退職金制度</div>
+                      <p style={{ fontSize:12, color:C.ink, lineHeight:1.7 }}>{s.retirementPlanComment}</p>
+                    </div>
+                  )}
+                  {s.familyAllowanceComment && (
+                    <div style={{ paddingLeft:10, borderLeft:"2px solid #BBF7D0" }}>
+                      <div style={{ fontSize:10, fontWeight:"bold", color:"#166534", marginBottom:2 }}>家族手当</div>
+                      <p style={{ fontSize:12, color:C.ink, lineHeight:1.7 }}>{s.familyAllowanceComment}</p>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           ) : null}
           {s.comment && <p style={{ fontSize:13, lineHeight:1.85, borderTop:"1px solid " + C.border, paddingTop:10, marginTop:8 }}>{s.comment}</p>}
@@ -3671,6 +3931,48 @@ function AccessDenied({ go }) {
     </div>
   );
 }
+function BoardLockedNotice({ setAuthMode, count, type }) {
+  return (
+    <div style={{
+      background:"#fff",
+      border:"2px solid " + C.accent,
+      borderRadius:8,
+      padding:"24px 28px",
+      marginBottom:16,
+      boxShadow:"0 4px 16px rgba(30,90,150,0.12)"
+    }}>
+      <div style={{ display:"flex", alignItems:"center", gap:14, marginBottom:14, flexWrap:"wrap" }}>
+        <div style={{ fontSize:32 }}>🔒</div>
+        <div style={{ flex:1, minWidth:200 }}>
+          <h3 style={{ fontSize:15, fontWeight:"bold", color:C.ink, marginBottom:4 }}>
+            {type}を見るには無料会員登録が必要です
+          </h3>
+          <p style={{ fontSize:12, color:C.sub, lineHeight:1.7 }}>
+            登録済みの<strong style={{ color:C.accent }}>{count}件</strong>の投稿が閲覧できます。メールアドレスだけで30秒で完了します。
+          </p>
+        </div>
+      </div>
+      <div style={{ display:"flex", gap:8, flexWrap:"wrap", marginBottom:14 }}>
+        {["✓ 選考フロー","✓ 内定情報","✓ 面接の質問","✓ 通過率"].map(t => (
+          <span key={t} style={{ background:C.light, color:C.accent, padding:"4px 10px", fontSize:11, borderRadius:14, fontWeight:"bold" }}>{t}</span>
+        ))}
+      </div>
+      <button style={{
+        background:C.accent, color:"#fff", border:"none",
+        padding:"12px 28px", fontSize:14, fontWeight:"bold",
+        fontFamily:"inherit", cursor:"pointer", borderRadius:6,
+        width:"100%",
+        boxShadow:"0 2px 8px rgba(30,90,150,0.3)"
+      }} onClick={() => setAuthMode("register")}>
+        閲覧する（無料会員登録）→
+      </button>
+      <div style={{ fontSize:11, color:C.sub, marginTop:8, textAlign:"center" }}>
+        すでに会員の方は <button style={{...S.textLink, fontSize:11}} onClick={() => setAuthMode("login")}>ログイン</button>
+      </div>
+    </div>
+  );
+}
+
 function LockedContent({ setAuthMode, count, type }) {
   return (
     <div style={{
@@ -3707,7 +4009,7 @@ function LockedContent({ setAuthMode, count, type }) {
           fontFamily:"inherit", cursor:"pointer", borderRadius:6,
           boxShadow:"0 2px 8px rgba(30,90,150,0.3)"
         }} onClick={() => setAuthMode("register")}>
-          無料会員登録して続きを読む →
+          閲覧する（無料会員登録）→
         </button>
         <div style={{ fontSize:11, color:C.sub, marginTop:10 }}>
           すでに会員の方は <button style={{...S.textLink, fontSize:11}} onClick={() => setAuthMode("login")}>ログイン</button>
