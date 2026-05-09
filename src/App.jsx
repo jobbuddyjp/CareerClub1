@@ -3,6 +3,7 @@ import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   sendEmailVerification,
+  sendPasswordResetEmail,
   signOut,
   onAuthStateChanged,
   updateProfile,
@@ -58,6 +59,7 @@ const INDUSTRY_GROUPS = {
   "医療・ヘルス": ["病院・クリニック","医療機器","医薬品卸"],
   "教育・公共":   ["学校・予備校","官公庁・公務員","NPO・団体"],
   "エンタメ":     ["ゲーム","映像・音楽","スポーツ","出版"],
+  "航空・交通":   ["航空","鉄道","バス","海運"],
 };
 const ALL_GROUPS   = Object.keys(INDUSTRY_GROUPS);
 const STAGES       = ["書類選考","一次面接","二次面接","三次面接","最終面接","内定","内定辞退","不合格","辞退"];
@@ -86,11 +88,55 @@ const getJobCategories = (group) => JOB_CATEGORIES_BY_GROUP[group] || DEFAULT_JO
 const POSITIONS    = ["一般社員","主任・係長","課長","部長","本部長・執行役員","役員・取締役","社長・CEO","その他"];
 const EMOJIS       = ["🏢","🌐","💻","🚗","🛒","📱","🏦","📋","🎮","🏥","📢","🏭","✈️","🍜","📚","🎯","💊","🔬","⚡","🌿"];
 const RCATS        = [
-  { key:"salary", label:"待遇・給与" },
-  { key:"culture",label:"社風・文化" },
-  { key:"wlb",    label:"WLB" },
-  { key:"career", label:"キャリア・成長" },
-  { key:"mgmt",   label:"経営・将来性" },
+  { key:"motivation", label:"働きがい" },
+  { key:"morale",     label:"社員のやる気" },
+  { key:"relations",  label:"同僚・上司との関係" },
+  { key:"white",      label:"ホワイト度" },
+  { key:"growth",     label:"成長環境" },
+  { key:"wlb",        label:"ワークライフバランス" },
+  { key:"salary",     label:"待遇・給与の満足度" },
+  { key:"mgmt",       label:"経営の安定性・将来性" },
+];
+
+// 部門カテゴリ
+const DEPARTMENTS = ["全部門","営業","マーケティング","企画・経営","技術・開発","研究開発","製造・生産","品質管理","管理・バックオフィス","人事","経理・財務","法務","IT・システム","クリエイティブ","コンサル","その他"];
+
+// 退職検討理由
+const QUIT_REASONS = [
+  "給与・待遇への不満",
+  "残業・労働時間",
+  "人間関係・社風",
+  "キャリア・成長機会",
+  "業務内容のミスマッチ",
+  "経営方針への疑問",
+  "評価制度への不満",
+  "昇進・昇格の停滞",
+  "ワークライフバランス",
+  "勤務地・転勤",
+  "家庭の事情",
+  "健康上の理由",
+  "退職検討なし",
+  "その他"
+];
+
+// 残業時間カテゴリ（数値統計用）
+const OVERTIME_BUCKETS = [
+  { label:"~10時間", value:5 },
+  { label:"10~20時間", value:15 },
+  { label:"20~30時間", value:25 },
+  { label:"30~45時間", value:37 },
+  { label:"45~60時間", value:52 },
+  { label:"60~80時間", value:70 },
+  { label:"80時間~", value:90 },
+];
+
+// 有給消化率カテゴリ
+const PAID_LEAVE_BUCKETS = [
+  { label:"0~20%", value:10 },
+  { label:"20~40%", value:30 },
+  { label:"40~60%", value:50 },
+  { label:"60~80%", value:70 },
+  { label:"80~100%", value:90 },
 ];
 const STAGE_COLORS = {
   "書類選考":    { bg:"#F0F4FF", tx:"#1E3A8A", br:"#BFCCF0" },
@@ -108,8 +154,15 @@ const PLANS = {
 
 // ─── カラーパレット ────────────────────────────────────────────────────────────
 const C = {
-  bg:"#F5F5F0", surface:"#FFFFFF", ink:"#1A1A1A",
-  sub:"#606060", accent:"#9B0000", border:"#CCCCCC",
+  bg:"#F7FAFC",          // 明るい背景
+  surface:"#FFFFFF",     // カード背景
+  ink:"#1A2B4A",         // 深い紺色（テキスト）
+  sub:"#5A6B82",         // サブテキスト
+  accent:"#1E5A96",      // 上品な青（メインカラー）
+  accent2:"#2B7BD1",     // 明るい青（ホバー・アクセント）
+  light:"#E3F0FA",       // 淡い青
+  border:"#D5DEE8",      // 境界線
+  success:"#16A34A",     // 成功色
 };
 
 // ─── ユーティリティ ────────────────────────────────────────────────────────────
@@ -189,6 +242,1162 @@ const fsUpdate = async (c, id, data) => {
   await updateDoc(dref(c, id), { ...data, updatedAt: serverTimestamp() });
 };
 
+const SEED_COMPANIES = [
+  { name:"三菱UFJ銀行", group:"金融・銀行", industry:"銀行", emoji:"🏦" },
+  { name:"三井住友銀行", group:"金融・銀行", industry:"銀行", emoji:"🏦" },
+  { name:"みずほ銀行", group:"金融・銀行", industry:"銀行", emoji:"🏦" },
+  { name:"りそな銀行", group:"金融・銀行", industry:"銀行", emoji:"🏦" },
+  { name:"埼玉りそな銀行", group:"金融・銀行", industry:"銀行", emoji:"🏦" },
+  { name:"三井住友信託銀行", group:"金融・銀行", industry:"銀行", emoji:"🏦" },
+  { name:"SBI新生銀行", group:"金融・銀行", industry:"銀行", emoji:"🏦" },
+  { name:"あおぞら銀行", group:"金融・銀行", industry:"銀行", emoji:"🏦" },
+  { name:"ゆうちょ銀行", group:"金融・銀行", industry:"銀行", emoji:"🏦" },
+  { name:"農林中央金庫", group:"金融・銀行", industry:"銀行", emoji:"🏦" },
+  { name:"日本政策投資銀行", group:"金融・銀行", industry:"銀行", emoji:"🏦" },
+  { name:"商工組合中央金庫", group:"金融・銀行", industry:"銀行", emoji:"🏦" },
+  { name:"新生銀行", group:"金融・銀行", industry:"銀行", emoji:"🏦" },
+  { name:"日本政策金融公庫", group:"金融・銀行", industry:"銀行", emoji:"🏦" },
+  { name:"住信SBIネット銀行", group:"金融・銀行", industry:"銀行", emoji:"🏦" },
+  { name:"セブン銀行", group:"金融・銀行", industry:"銀行", emoji:"🏦" },
+  { name:"イオン銀行", group:"金融・銀行", industry:"銀行", emoji:"🏦" },
+  { name:"楽天銀行", group:"金融・銀行", industry:"銀行", emoji:"🏦" },
+  { name:"auじぶん銀行", group:"金融・銀行", industry:"銀行", emoji:"🏦" },
+  { name:"ソニー銀行", group:"金融・銀行", industry:"銀行", emoji:"🏦" },
+  { name:"PayPay銀行", group:"金融・銀行", industry:"銀行", emoji:"🏦" },
+  { name:"横浜銀行", group:"金融・銀行", industry:"地方銀行", emoji:"🏦" },
+  { name:"千葉銀行", group:"金融・銀行", industry:"地方銀行", emoji:"🏦" },
+  { name:"常陽銀行", group:"金融・銀行", industry:"地方銀行", emoji:"🏦" },
+  { name:"静岡銀行", group:"金融・銀行", industry:"地方銀行", emoji:"🏦" },
+  { name:"ふくおかフィナンシャルグループ", group:"金融・銀行", industry:"地方銀行", emoji:"🏦" },
+  { name:"西日本シティ銀行", group:"金融・銀行", industry:"地方銀行", emoji:"🏦" },
+  { name:"八十二銀行", group:"金融・銀行", industry:"地方銀行", emoji:"🏦" },
+  { name:"群馬銀行", group:"金融・銀行", industry:"地方銀行", emoji:"🏦" },
+  { name:"京都銀行", group:"金融・銀行", industry:"地方銀行", emoji:"🏦" },
+  { name:"広島銀行", group:"金融・銀行", industry:"地方銀行", emoji:"🏦" },
+  { name:"北陸銀行", group:"金融・銀行", industry:"地方銀行", emoji:"🏦" },
+  { name:"北海道銀行", group:"金融・銀行", industry:"地方銀行", emoji:"🏦" },
+  { name:"山口フィナンシャルグループ", group:"金融・銀行", industry:"地方銀行", emoji:"🏦" },
+  { name:"めぶきフィナンシャルグループ", group:"金融・銀行", industry:"地方銀行", emoji:"🏦" },
+  { name:"コンコルディア・フィナンシャルグループ", group:"金融・銀行", industry:"地方銀行", emoji:"🏦" },
+  { name:"九州フィナンシャルグループ", group:"金融・銀行", industry:"地方銀行", emoji:"🏦" },
+  { name:"北國フィナンシャルホールディングス", group:"金融・銀行", industry:"地方銀行", emoji:"🏦" },
+  { name:"岩手銀行", group:"金融・銀行", industry:"地方銀行", emoji:"🏦" },
+  { name:"秋田銀行", group:"金融・銀行", industry:"地方銀行", emoji:"🏦" },
+  { name:"東邦銀行", group:"金融・銀行", industry:"地方銀行", emoji:"🏦" },
+  { name:"武蔵野銀行", group:"金融・銀行", industry:"地方銀行", emoji:"🏦" },
+  { name:"千葉興業銀行", group:"金融・銀行", industry:"地方銀行", emoji:"🏦" },
+  { name:"東京きらぼしフィナンシャルグループ", group:"金融・銀行", industry:"地方銀行", emoji:"🏦" },
+  { name:"スルガ銀行", group:"金融・銀行", industry:"地方銀行", emoji:"🏦" },
+  { name:"山梨中央銀行", group:"金融・銀行", industry:"地方銀行", emoji:"🏦" },
+  { name:"北越銀行", group:"金融・銀行", industry:"地方銀行", emoji:"🏦" },
+  { name:"富山第一銀行", group:"金融・銀行", industry:"地方銀行", emoji:"🏦" },
+  { name:"福井銀行", group:"金融・銀行", industry:"地方銀行", emoji:"🏦" },
+  { name:"百五銀行", group:"金融・銀行", industry:"地方銀行", emoji:"🏦" },
+  { name:"三十三フィナンシャルグループ", group:"金融・銀行", industry:"地方銀行", emoji:"🏦" },
+  { name:"滋賀銀行", group:"金融・銀行", industry:"地方銀行", emoji:"🏦" },
+  { name:"南都銀行", group:"金融・銀行", industry:"地方銀行", emoji:"🏦" },
+  { name:"紀陽銀行", group:"金融・銀行", industry:"地方銀行", emoji:"🏦" },
+  { name:"但馬銀行", group:"金融・銀行", industry:"地方銀行", emoji:"🏦" },
+  { name:"池田泉州ホールディングス", group:"金融・銀行", industry:"地方銀行", emoji:"🏦" },
+  { name:"阿波銀行", group:"金融・銀行", industry:"地方銀行", emoji:"🏦" },
+  { name:"百十四銀行", group:"金融・銀行", industry:"地方銀行", emoji:"🏦" },
+  { name:"伊予銀行", group:"金融・銀行", industry:"地方銀行", emoji:"🏦" },
+  { name:"四国銀行", group:"金融・銀行", industry:"地方銀行", emoji:"🏦" },
+  { name:"佐賀銀行", group:"金融・銀行", industry:"地方銀行", emoji:"🏦" },
+  { name:"十八親和銀行", group:"金融・銀行", industry:"地方銀行", emoji:"🏦" },
+  { name:"肥後銀行", group:"金融・銀行", industry:"地方銀行", emoji:"🏦" },
+  { name:"大分銀行", group:"金融・銀行", industry:"地方銀行", emoji:"🏦" },
+  { name:"宮崎銀行", group:"金融・銀行", industry:"地方銀行", emoji:"🏦" },
+  { name:"鹿児島銀行", group:"金融・銀行", industry:"地方銀行", emoji:"🏦" },
+  { name:"琉球銀行", group:"金融・銀行", industry:"地方銀行", emoji:"🏦" },
+  { name:"沖縄銀行", group:"金融・銀行", industry:"地方銀行", emoji:"🏦" },
+  { name:"三菱UFJ信託銀行", group:"金融・銀行", industry:"信託銀行", emoji:"🏦" },
+  { name:"みずほ信託銀行", group:"金融・銀行", industry:"信託銀行", emoji:"🏦" },
+  { name:"野村信託銀行", group:"金融・銀行", industry:"信託銀行", emoji:"🏦" },
+  { name:"SMBC信託銀行", group:"金融・銀行", industry:"信託銀行", emoji:"🏦" },
+  { name:"野村證券", group:"金融・銀行", industry:"証券会社", emoji:"🏦" },
+  { name:"大和証券", group:"金融・銀行", industry:"証券会社", emoji:"🏦" },
+  { name:"SMBC日興証券", group:"金融・銀行", industry:"証券会社", emoji:"🏦" },
+  { name:"みずほ証券", group:"金融・銀行", industry:"証券会社", emoji:"🏦" },
+  { name:"三菱UFJモルガン・スタンレー証券", group:"金融・銀行", industry:"証券会社", emoji:"🏦" },
+  { name:"岡三証券", group:"金融・銀行", industry:"証券会社", emoji:"🏦" },
+  { name:"東海東京証券", group:"金融・銀行", industry:"証券会社", emoji:"🏦" },
+  { name:"松井証券", group:"金融・銀行", industry:"証券会社", emoji:"🏦" },
+  { name:"マネックスグループ", group:"金融・銀行", industry:"証券会社", emoji:"🏦" },
+  { name:"SBI証券", group:"金融・銀行", industry:"証券会社", emoji:"🏦" },
+  { name:"楽天証券", group:"金融・銀行", industry:"証券会社", emoji:"🏦" },
+  { name:"au カブコム証券", group:"金融・銀行", industry:"証券会社", emoji:"🏦" },
+  { name:"GMOクリック証券", group:"金融・銀行", industry:"証券会社", emoji:"🏦" },
+  { name:"ジャフコ グループ", group:"金融・銀行", industry:"証券会社", emoji:"🏦" },
+  { name:"東京証券取引所", group:"金融・銀行", industry:"証券会社", emoji:"🏦" },
+  { name:"日本取引所グループ", group:"金融・銀行", industry:"証券会社", emoji:"🏦" },
+  { name:"日本生命保険", group:"金融・銀行", industry:"生命保険", emoji:"🏦" },
+  { name:"第一生命保険", group:"金融・銀行", industry:"生命保険", emoji:"🏦" },
+  { name:"明治安田生命保険", group:"金融・銀行", industry:"生命保険", emoji:"🏦" },
+  { name:"住友生命保険", group:"金融・銀行", industry:"生命保険", emoji:"🏦" },
+  { name:"かんぽ生命保険", group:"金融・銀行", industry:"生命保険", emoji:"🏦" },
+  { name:"ソニー生命保険", group:"金融・銀行", industry:"生命保険", emoji:"🏦" },
+  { name:"アフラック生命保険", group:"金融・銀行", industry:"生命保険", emoji:"🏦" },
+  { name:"プルデンシャル生命保険", group:"金融・銀行", industry:"生命保険", emoji:"🏦" },
+  { name:"T&Dホールディングス", group:"金融・銀行", industry:"生命保険", emoji:"🏦" },
+  { name:"大樹生命保険", group:"金融・銀行", industry:"生命保険", emoji:"🏦" },
+  { name:"太陽生命保険", group:"金融・銀行", industry:"生命保険", emoji:"🏦" },
+  { name:"富国生命保険", group:"金融・銀行", industry:"生命保険", emoji:"🏦" },
+  { name:"朝日生命保険", group:"金融・銀行", industry:"生命保険", emoji:"🏦" },
+  { name:"ライフネット生命保険", group:"金融・銀行", industry:"生命保険", emoji:"🏦" },
+  { name:"アクサ生命保険", group:"金融・銀行", industry:"生命保険", emoji:"🏦" },
+  { name:"オリックス生命保険", group:"金融・銀行", industry:"生命保険", emoji:"🏦" },
+  { name:"三井住友海上あいおい生命保険", group:"金融・銀行", industry:"生命保険", emoji:"🏦" },
+  { name:"東京海上日動あんしん生命保険", group:"金融・銀行", industry:"生命保険", emoji:"🏦" },
+  { name:"東京海上日動火災保険", group:"金融・銀行", industry:"損害保険", emoji:"🏦" },
+  { name:"三井住友海上火災保険", group:"金融・銀行", industry:"損害保険", emoji:"🏦" },
+  { name:"損害保険ジャパン", group:"金融・銀行", industry:"損害保険", emoji:"🏦" },
+  { name:"あいおいニッセイ同和損害保険", group:"金融・銀行", industry:"損害保険", emoji:"🏦" },
+  { name:"東京海上ホールディングス", group:"金融・銀行", industry:"損害保険", emoji:"🏦" },
+  { name:"SOMPOホールディングス", group:"金融・銀行", industry:"損害保険", emoji:"🏦" },
+  { name:"MS&ADインシュアランスグループホールディングス", group:"金融・銀行", industry:"損害保険", emoji:"🏦" },
+  { name:"AIG損害保険", group:"金融・銀行", industry:"損害保険", emoji:"🏦" },
+  { name:"Chubb損害保険", group:"金融・銀行", industry:"損害保険", emoji:"🏦" },
+  { name:"ゼネラリ・ホールディングス・ジャパン", group:"金融・銀行", industry:"損害保険", emoji:"🏦" },
+  { name:"チューリッヒ保険", group:"金融・銀行", industry:"損害保険", emoji:"🏦" },
+  { name:"オリックス", group:"金融・銀行", industry:"銀行", emoji:"🏦" },
+  { name:"三菱HCキャピタル", group:"金融・銀行", industry:"銀行", emoji:"🏦" },
+  { name:"東京センチュリー", group:"金融・銀行", industry:"銀行", emoji:"🏦" },
+  { name:"リコーリース", group:"金融・銀行", industry:"銀行", emoji:"🏦" },
+  { name:"NECキャピタルソリューション", group:"金融・銀行", industry:"銀行", emoji:"🏦" },
+  { name:"クレディセゾン", group:"金融・銀行", industry:"銀行", emoji:"🏦" },
+  { name:"ジャックス", group:"金融・銀行", industry:"銀行", emoji:"🏦" },
+  { name:"アコム", group:"金融・銀行", industry:"銀行", emoji:"🏦" },
+  { name:"アイフル", group:"金融・銀行", industry:"銀行", emoji:"🏦" },
+  { name:"SBIホールディングス", group:"金融・銀行", industry:"銀行", emoji:"🏦" },
+  { name:"オリエントコーポレーション", group:"金融・銀行", industry:"銀行", emoji:"🏦" },
+  { name:"イオンフィナンシャルサービス", group:"金融・銀行", industry:"銀行", emoji:"🏦" },
+  { name:"ジャパンネット銀行", group:"金融・銀行", industry:"銀行", emoji:"🏦" },
+  { name:"セゾン情報システムズ", group:"金融・銀行", industry:"銀行", emoji:"🏦" },
+  { name:"三菱商事", group:"商社", industry:"総合商社", emoji:"🌐" },
+  { name:"三井物産", group:"商社", industry:"総合商社", emoji:"🌐" },
+  { name:"伊藤忠商事", group:"商社", industry:"総合商社", emoji:"🌐" },
+  { name:"住友商事", group:"商社", industry:"総合商社", emoji:"🌐" },
+  { name:"丸紅", group:"商社", industry:"総合商社", emoji:"🌐" },
+  { name:"豊田通商", group:"商社", industry:"総合商社", emoji:"🌐" },
+  { name:"双日", group:"商社", industry:"総合商社", emoji:"🌐" },
+  { name:"メタルワン", group:"商社", industry:"専門商社", emoji:"🌐" },
+  { name:"三菱食品", group:"商社", industry:"専門商社", emoji:"🌐" },
+  { name:"伊藤忠食品", group:"商社", industry:"専門商社", emoji:"🌐" },
+  { name:"三井食品", group:"商社", industry:"専門商社", emoji:"🌐" },
+  { name:"加賀電子", group:"商社", industry:"専門商社", emoji:"🌐" },
+  { name:"稲畑産業", group:"商社", industry:"専門商社", emoji:"🌐" },
+  { name:"兼松", group:"商社", industry:"専門商社", emoji:"🌐" },
+  { name:"日鉄物産", group:"商社", industry:"専門商社", emoji:"🌐" },
+  { name:"JFE商事", group:"商社", industry:"専門商社", emoji:"🌐" },
+  { name:"阪和興業", group:"商社", industry:"専門商社", emoji:"🌐" },
+  { name:"エレマテック", group:"商社", industry:"専門商社", emoji:"🌐" },
+  { name:"因幡電機産業", group:"商社", industry:"専門商社", emoji:"🌐" },
+  { name:"日伝", group:"商社", industry:"専門商社", emoji:"🌐" },
+  { name:"西華産業", group:"商社", industry:"専門商社", emoji:"🌐" },
+  { name:"光世証券", group:"商社", industry:"専門商社", emoji:"🌐" },
+  { name:"岡谷鋼機", group:"商社", industry:"専門商社", emoji:"🌐" },
+  { name:"蝶理", group:"商社", industry:"専門商社", emoji:"🌐" },
+  { name:"東邦HD", group:"商社", industry:"専門商社", emoji:"🌐" },
+  { name:"スズケン", group:"商社", industry:"専門商社", emoji:"🌐" },
+  { name:"アルフレッサ ホールディングス", group:"商社", industry:"専門商社", emoji:"🌐" },
+  { name:"メディパルホールディングス", group:"商社", industry:"専門商社", emoji:"🌐" },
+  { name:"ユアサ商事", group:"商社", industry:"専門商社", emoji:"🌐" },
+  { name:"岩谷産業", group:"商社", industry:"専門商社", emoji:"🌐" },
+  { name:"中外鉱業", group:"商社", industry:"専門商社", emoji:"🌐" },
+  { name:"ハピネット", group:"商社", industry:"専門商社", emoji:"🌐" },
+  { name:"あらた", group:"商社", industry:"専門商社", emoji:"🌐" },
+  { name:"パルタック", group:"商社", industry:"専門商社", emoji:"🌐" },
+  { name:"三谷商事", group:"商社", industry:"専門商社", emoji:"🌐" },
+  { name:"ミスミグループ本社", group:"商社", industry:"専門商社", emoji:"🌐" },
+  { name:"正栄食品工業", group:"商社", industry:"専門商社", emoji:"🌐" },
+  { name:"明和産業", group:"商社", industry:"専門商社", emoji:"🌐" },
+  { name:"東京産業", group:"商社", industry:"専門商社", emoji:"🌐" },
+  { name:"TKC", group:"商社", industry:"専門商社", emoji:"🌐" },
+  { name:"シナネンホールディングス", group:"商社", industry:"専門商社", emoji:"🌐" },
+  { name:"トヨタ自動車", group:"メーカー", industry:"自動車", emoji:"🏭" },
+  { name:"ホンダ", group:"メーカー", industry:"自動車", emoji:"🏭" },
+  { name:"日産自動車", group:"メーカー", industry:"自動車", emoji:"🏭" },
+  { name:"スズキ", group:"メーカー", industry:"自動車", emoji:"🏭" },
+  { name:"マツダ", group:"メーカー", industry:"自動車", emoji:"🏭" },
+  { name:"SUBARU", group:"メーカー", industry:"自動車", emoji:"🏭" },
+  { name:"いすゞ自動車", group:"メーカー", industry:"自動車", emoji:"🏭" },
+  { name:"三菱自動車工業", group:"メーカー", industry:"自動車", emoji:"🏭" },
+  { name:"ヤマハ発動機", group:"メーカー", industry:"自動車", emoji:"🏭" },
+  { name:"川崎重工業", group:"メーカー", industry:"自動車", emoji:"🏭" },
+  { name:"日野自動車", group:"メーカー", industry:"自動車", emoji:"🏭" },
+  { name:"UDトラックス", group:"メーカー", industry:"自動車", emoji:"🏭" },
+  { name:"デンソー", group:"メーカー", industry:"自動車", emoji:"🏭" },
+  { name:"アイシン", group:"メーカー", industry:"自動車", emoji:"🏭" },
+  { name:"豊田自動織機", group:"メーカー", industry:"自動車", emoji:"🏭" },
+  { name:"ジェイテクト", group:"メーカー", industry:"自動車", emoji:"🏭" },
+  { name:"トヨタ紡織", group:"メーカー", industry:"自動車", emoji:"🏭" },
+  { name:"小糸製作所", group:"メーカー", industry:"自動車", emoji:"🏭" },
+  { name:"豊田合成", group:"メーカー", industry:"自動車", emoji:"🏭" },
+  { name:"NTN", group:"メーカー", industry:"自動車", emoji:"🏭" },
+  { name:"NSK", group:"メーカー", industry:"自動車", emoji:"🏭" },
+  { name:"日本特殊陶業", group:"メーカー", industry:"自動車", emoji:"🏭" },
+  { name:"ブリヂストン", group:"メーカー", industry:"自動車", emoji:"🏭" },
+  { name:"住友ゴム工業", group:"メーカー", industry:"自動車", emoji:"🏭" },
+  { name:"横浜ゴム", group:"メーカー", industry:"自動車", emoji:"🏭" },
+  { name:"TOYO TIRE", group:"メーカー", industry:"自動車", emoji:"🏭" },
+  { name:"曙ブレーキ工業", group:"メーカー", industry:"自動車", emoji:"🏭" },
+  { name:"ボッシュ", group:"メーカー", industry:"自動車", emoji:"🏭" },
+  { name:"エクセディ", group:"メーカー", industry:"自動車", emoji:"🏭" },
+  { name:"太平洋工業", group:"メーカー", industry:"自動車", emoji:"🏭" },
+  { name:"河西工業", group:"メーカー", industry:"自動車", emoji:"🏭" },
+  { name:"スタンレー電気", group:"メーカー", industry:"自動車", emoji:"🏭" },
+  { name:"市光工業", group:"メーカー", industry:"自動車", emoji:"🏭" },
+  { name:"日本電産", group:"メーカー", industry:"自動車", emoji:"🏭" },
+  { name:"ミツバ", group:"メーカー", industry:"自動車", emoji:"🏭" },
+  { name:"ヨロズ", group:"メーカー", industry:"自動車", emoji:"🏭" },
+  { name:"ハイレックス", group:"メーカー", industry:"自動車", emoji:"🏭" },
+  { name:"フタバ産業", group:"メーカー", industry:"自動車", emoji:"🏭" },
+  { name:"シロキ工業", group:"メーカー", industry:"自動車", emoji:"🏭" },
+  { name:"愛三工業", group:"メーカー", industry:"自動車", emoji:"🏭" },
+  { name:"ソニーグループ", group:"メーカー", industry:"電機・電子", emoji:"🏭" },
+  { name:"パナソニックホールディングス", group:"メーカー", industry:"電機・電子", emoji:"🏭" },
+  { name:"日立製作所", group:"メーカー", industry:"電機・電子", emoji:"🏭" },
+  { name:"三菱電機", group:"メーカー", industry:"電機・電子", emoji:"🏭" },
+  { name:"東芝", group:"メーカー", industry:"電機・電子", emoji:"🏭" },
+  { name:"シャープ", group:"メーカー", industry:"電機・電子", emoji:"🏭" },
+  { name:"富士通", group:"メーカー", industry:"電機・電子", emoji:"🏭" },
+  { name:"NEC", group:"メーカー", industry:"電機・電子", emoji:"🏭" },
+  { name:"キヤノン", group:"メーカー", industry:"電機・電子", emoji:"🏭" },
+  { name:"リコー", group:"メーカー", industry:"電機・電子", emoji:"🏭" },
+  { name:"コニカミノルタ", group:"メーカー", industry:"電機・電子", emoji:"🏭" },
+  { name:"セイコーエプソン", group:"メーカー", industry:"電機・電子", emoji:"🏭" },
+  { name:"ブラザー工業", group:"メーカー", industry:"電機・電子", emoji:"🏭" },
+  { name:"オムロン", group:"メーカー", industry:"電機・電子", emoji:"🏭" },
+  { name:"横河電機", group:"メーカー", industry:"電機・電子", emoji:"🏭" },
+  { name:"アンリツ", group:"メーカー", industry:"電機・電子", emoji:"🏭" },
+  { name:"島津製作所", group:"メーカー", industry:"電機・電子", emoji:"🏭" },
+  { name:"島田理化工業", group:"メーカー", industry:"電機・電子", emoji:"🏭" },
+  { name:"HOYA", group:"メーカー", industry:"電機・電子", emoji:"🏭" },
+  { name:"オリンパス", group:"メーカー", industry:"電機・電子", emoji:"🏭" },
+  { name:"ニコン", group:"メーカー", industry:"電機・電子", emoji:"🏭" },
+  { name:"富士フイルムホールディングス", group:"メーカー", industry:"電機・電子", emoji:"🏭" },
+  { name:"アドバンテスト", group:"メーカー", industry:"電機・電子", emoji:"🏭" },
+  { name:"スクリーンホールディングス", group:"メーカー", industry:"電機・電子", emoji:"🏭" },
+  { name:"ディスコ", group:"メーカー", industry:"電機・電子", emoji:"🏭" },
+  { name:"東京精密", group:"メーカー", industry:"電機・電子", emoji:"🏭" },
+  { name:"新光電気工業", group:"メーカー", industry:"電機・電子", emoji:"🏭" },
+  { name:"イビデン", group:"メーカー", industry:"電機・電子", emoji:"🏭" },
+  { name:"太陽誘電", group:"メーカー", industry:"電機・電子", emoji:"🏭" },
+  { name:"ニチコン", group:"メーカー", industry:"電機・電子", emoji:"🏭" },
+  { name:"ルビコン", group:"メーカー", industry:"電機・電子", emoji:"🏭" },
+  { name:"FDK", group:"メーカー", industry:"電機・電子", emoji:"🏭" },
+  { name:"古河電池", group:"メーカー", industry:"電機・電子", emoji:"🏭" },
+  { name:"GSユアサ", group:"メーカー", industry:"電機・電子", emoji:"🏭" },
+  { name:"ローム", group:"メーカー", industry:"電機・電子", emoji:"🏭" },
+  { name:"ルネサスエレクトロニクス", group:"メーカー", industry:"電機・電子", emoji:"🏭" },
+  { name:"東京エレクトロン", group:"メーカー", industry:"電機・電子", emoji:"🏭" },
+  { name:"SUMCO", group:"メーカー", industry:"電機・電子", emoji:"🏭" },
+  { name:"信越化学工業", group:"メーカー", industry:"電機・電子", emoji:"🏭" },
+  { name:"レーザーテック", group:"メーカー", industry:"電機・電子", emoji:"🏭" },
+  { name:"アルプスアルパイン", group:"メーカー", industry:"電機・電子", emoji:"🏭" },
+  { name:"TDK", group:"メーカー", industry:"電機・電子", emoji:"🏭" },
+  { name:"村田製作所", group:"メーカー", industry:"電機・電子", emoji:"🏭" },
+  { name:"京セラ", group:"メーカー", industry:"電機・電子", emoji:"🏭" },
+  { name:"ミネベアミツミ", group:"メーカー", industry:"電機・電子", emoji:"🏭" },
+  { name:"ヒロセ電機", group:"メーカー", industry:"電機・電子", emoji:"🏭" },
+  { name:"ヤマハ", group:"メーカー", industry:"電機・電子", emoji:"🏭" },
+  { name:"コルグ", group:"メーカー", industry:"電機・電子", emoji:"🏭" },
+  { name:"JVCケンウッド", group:"メーカー", industry:"電機・電子", emoji:"🏭" },
+  { name:"パイオニア", group:"メーカー", industry:"電機・電子", emoji:"🏭" },
+  { name:"アイホン", group:"メーカー", industry:"電機・電子", emoji:"🏭" },
+  { name:"アイコム", group:"メーカー", industry:"電機・電子", emoji:"🏭" },
+  { name:"リョービ", group:"メーカー", industry:"電機・電子", emoji:"🏭" },
+  { name:"マキタ", group:"メーカー", industry:"電機・電子", emoji:"🏭" },
+  { name:"ホシザキ", group:"メーカー", industry:"電機・電子", emoji:"🏭" },
+  { name:"パナソニック", group:"メーカー", industry:"電機・電子", emoji:"🏭" },
+  { name:"アイリスオーヤマ", group:"メーカー", industry:"電機・電子", emoji:"🏭" },
+  { name:"ダイキン工業", group:"メーカー", industry:"電機・電子", emoji:"🏭" },
+  { name:"三菱重工サーマルシステムズ", group:"メーカー", industry:"電機・電子", emoji:"🏭" },
+  { name:"富士電機", group:"メーカー", industry:"電機・電子", emoji:"🏭" },
+  { name:"明電舎", group:"メーカー", industry:"電機・電子", emoji:"🏭" },
+  { name:"東芝テック", group:"メーカー", industry:"電機・電子", emoji:"🏭" },
+  { name:"NECネッツエスアイ", group:"メーカー", industry:"電機・電子", emoji:"🏭" },
+  { name:"パナホーム", group:"メーカー", industry:"電機・電子", emoji:"🏭" },
+  { name:"東光電気", group:"メーカー", industry:"電機・電子", emoji:"🏭" },
+  { name:"タムラ製作所", group:"メーカー", industry:"電機・電子", emoji:"🏭" },
+  { name:"ロームグループ", group:"メーカー", industry:"半導体・電子部品", emoji:"🏭" },
+  { name:"KOKUSAI ELECTRIC", group:"メーカー", industry:"半導体・電子部品", emoji:"🏭" },
+  { name:"東京応化工業", group:"メーカー", industry:"半導体・電子部品", emoji:"🏭" },
+  { name:"JSR", group:"メーカー", industry:"半導体・電子部品", emoji:"🏭" },
+  { name:"アドテック", group:"メーカー", industry:"半導体・電子部品", emoji:"🏭" },
+  { name:"東洋合成工業", group:"メーカー", industry:"半導体・電子部品", emoji:"🏭" },
+  { name:"住友ベークライト", group:"メーカー", industry:"半導体・電子部品", emoji:"🏭" },
+  { name:"三菱マテリアル", group:"メーカー", industry:"半導体・電子部品", emoji:"🏭" },
+  { name:"三井金属鉱業", group:"メーカー", industry:"半導体・電子部品", emoji:"🏭" },
+  { name:"古河電気工業", group:"メーカー", industry:"半導体・電子部品", emoji:"🏭" },
+  { name:"昭和電工", group:"メーカー", industry:"半導体・電子部品", emoji:"🏭" },
+  { name:"レゾナック", group:"メーカー", industry:"半導体・電子部品", emoji:"🏭" },
+  { name:"DOWAホールディングス", group:"メーカー", industry:"半導体・電子部品", emoji:"🏭" },
+  { name:"三菱重工業", group:"メーカー", industry:"機械・重工", emoji:"🏭" },
+  { name:"IHI", group:"メーカー", industry:"機械・重工", emoji:"🏭" },
+  { name:"クボタ", group:"メーカー", industry:"機械・重工", emoji:"🏭" },
+  { name:"ファナック", group:"メーカー", industry:"機械・重工", emoji:"🏭" },
+  { name:"コマツ", group:"メーカー", industry:"機械・重工", emoji:"🏭" },
+  { name:"日立建機", group:"メーカー", industry:"機械・重工", emoji:"🏭" },
+  { name:"オークマ", group:"メーカー", industry:"機械・重工", emoji:"🏭" },
+  { name:"DMG森精機", group:"メーカー", industry:"機械・重工", emoji:"🏭" },
+  { name:"アマダ", group:"メーカー", industry:"機械・重工", emoji:"🏭" },
+  { name:"JUKI", group:"メーカー", industry:"機械・重工", emoji:"🏭" },
+  { name:"ナブテスコ", group:"メーカー", industry:"機械・重工", emoji:"🏭" },
+  { name:"ヤンマーホールディングス", group:"メーカー", industry:"機械・重工", emoji:"🏭" },
+  { name:"タダノ", group:"メーカー", industry:"機械・重工", emoji:"🏭" },
+  { name:"タクボ", group:"メーカー", industry:"機械・重工", emoji:"🏭" },
+  { name:"新明和工業", group:"メーカー", industry:"機械・重工", emoji:"🏭" },
+  { name:"住友重機械工業", group:"メーカー", industry:"機械・重工", emoji:"🏭" },
+  { name:"日本製鋼所", group:"メーカー", industry:"機械・重工", emoji:"🏭" },
+  { name:"椿本チエイン", group:"メーカー", industry:"機械・重工", emoji:"🏭" },
+  { name:"ハーモニック・ドライブ・システムズ", group:"メーカー", industry:"機械・重工", emoji:"🏭" },
+  { name:"ジャパンマテリアル", group:"メーカー", industry:"機械・重工", emoji:"🏭" },
+  { name:"SMC", group:"メーカー", industry:"機械・重工", emoji:"🏭" },
+  { name:"CKD", group:"メーカー", industry:"機械・重工", emoji:"🏭" },
+  { name:"エスペック", group:"メーカー", industry:"機械・重工", emoji:"🏭" },
+  { name:"ナガオカ", group:"メーカー", industry:"機械・重工", emoji:"🏭" },
+  { name:"日本精工", group:"メーカー", industry:"機械・重工", emoji:"🏭" },
+  { name:"東京瓦斯", group:"メーカー", industry:"機械・重工", emoji:"🏭" },
+  { name:"大阪ガス", group:"メーカー", industry:"機械・重工", emoji:"🏭" },
+  { name:"東邦ガス", group:"メーカー", industry:"機械・重工", emoji:"🏭" },
+  { name:"西部ガス", group:"メーカー", industry:"機械・重工", emoji:"🏭" },
+  { name:"JERA", group:"メーカー", industry:"機械・重工", emoji:"🏭" },
+  { name:"関西電力", group:"メーカー", industry:"機械・重工", emoji:"🏭" },
+  { name:"東北電力", group:"メーカー", industry:"機械・重工", emoji:"🏭" },
+  { name:"中部電力", group:"メーカー", industry:"機械・重工", emoji:"🏭" },
+  { name:"北陸電力", group:"メーカー", industry:"機械・重工", emoji:"🏭" },
+  { name:"中国電力", group:"メーカー", industry:"機械・重工", emoji:"🏭" },
+  { name:"四国電力", group:"メーカー", industry:"機械・重工", emoji:"🏭" },
+  { name:"九州電力", group:"メーカー", industry:"機械・重工", emoji:"🏭" },
+  { name:"沖縄電力", group:"メーカー", industry:"機械・重工", emoji:"🏭" },
+  { name:"北海道電力", group:"メーカー", industry:"機械・重工", emoji:"🏭" },
+  { name:"東京電力ホールディングス", group:"メーカー", industry:"機械・重工", emoji:"🏭" },
+  { name:"三菱ケミカルグループ", group:"メーカー", industry:"化学・素材", emoji:"🏭" },
+  { name:"住友化学", group:"メーカー", industry:"化学・素材", emoji:"🏭" },
+  { name:"三井化学", group:"メーカー", industry:"化学・素材", emoji:"🏭" },
+  { name:"旭化成", group:"メーカー", industry:"化学・素材", emoji:"🏭" },
+  { name:"東レ", group:"メーカー", industry:"化学・素材", emoji:"🏭" },
+  { name:"帝人", group:"メーカー", industry:"化学・素材", emoji:"🏭" },
+  { name:"クラレ", group:"メーカー", industry:"化学・素材", emoji:"🏭" },
+  { name:"DIC", group:"メーカー", industry:"化学・素材", emoji:"🏭" },
+  { name:"日本触媒", group:"メーカー", industry:"化学・素材", emoji:"🏭" },
+  { name:"日油", group:"メーカー", industry:"化学・素材", emoji:"🏭" },
+  { name:"花王", group:"メーカー", industry:"化学・素材", emoji:"🏭" },
+  { name:"ライオン", group:"メーカー", industry:"化学・素材", emoji:"🏭" },
+  { name:"資生堂", group:"メーカー", industry:"化学・素材", emoji:"🏭" },
+  { name:"コーセー", group:"メーカー", industry:"化学・素材", emoji:"🏭" },
+  { name:"ポーラ・オルビスホールディングス", group:"メーカー", industry:"化学・素材", emoji:"🏭" },
+  { name:"マンダム", group:"メーカー", industry:"化学・素材", emoji:"🏭" },
+  { name:"小林製薬", group:"メーカー", industry:"化学・素材", emoji:"🏭" },
+  { name:"アース製薬", group:"メーカー", industry:"化学・素材", emoji:"🏭" },
+  { name:"ピジョン", group:"メーカー", industry:"化学・素材", emoji:"🏭" },
+  { name:"ユニ・チャーム", group:"メーカー", industry:"化学・素材", emoji:"🏭" },
+  { name:"エステー", group:"メーカー", industry:"化学・素材", emoji:"🏭" },
+  { name:"白元アース", group:"メーカー", industry:"化学・素材", emoji:"🏭" },
+  { name:"日本製鉄", group:"メーカー", industry:"化学・素材", emoji:"🏭" },
+  { name:"JFEホールディングス", group:"メーカー", industry:"化学・素材", emoji:"🏭" },
+  { name:"神戸製鋼所", group:"メーカー", industry:"化学・素材", emoji:"🏭" },
+  { name:"日新製鋼", group:"メーカー", industry:"化学・素材", emoji:"🏭" },
+  { name:"大同特殊鋼", group:"メーカー", industry:"化学・素材", emoji:"🏭" },
+  { name:"山陽特殊製鋼", group:"メーカー", industry:"化学・素材", emoji:"🏭" },
+  { name:"住友金属鉱山", group:"メーカー", industry:"化学・素材", emoji:"🏭" },
+  { name:"古河機械金属", group:"メーカー", industry:"化学・素材", emoji:"🏭" },
+  { name:"AGC", group:"メーカー", industry:"化学・素材", emoji:"🏭" },
+  { name:"日本電気硝子", group:"メーカー", industry:"化学・素材", emoji:"🏭" },
+  { name:"日本板硝子", group:"メーカー", industry:"化学・素材", emoji:"🏭" },
+  { name:"太平洋セメント", group:"メーカー", industry:"化学・素材", emoji:"🏭" },
+  { name:"住友大阪セメント", group:"メーカー", industry:"化学・素材", emoji:"🏭" },
+  { name:"UBE", group:"メーカー", industry:"化学・素材", emoji:"🏭" },
+  { name:"TOTO", group:"メーカー", industry:"化学・素材", emoji:"🏭" },
+  { name:"LIXILグループ", group:"メーカー", industry:"化学・素材", emoji:"🏭" },
+  { name:"INAX", group:"メーカー", industry:"化学・素材", emoji:"🏭" },
+  { name:"タカラスタンダード", group:"メーカー", industry:"化学・素材", emoji:"🏭" },
+  { name:"クリナップ", group:"メーカー", industry:"化学・素材", emoji:"🏭" },
+  { name:"リクシル", group:"メーカー", industry:"化学・素材", emoji:"🏭" },
+  { name:"パナソニックハウジング", group:"メーカー", industry:"化学・素材", emoji:"🏭" },
+  { name:"サントリーホールディングス", group:"メーカー", industry:"食品・飲料", emoji:"🏭" },
+  { name:"アサヒグループホールディングス", group:"メーカー", industry:"食品・飲料", emoji:"🏭" },
+  { name:"キリンホールディングス", group:"メーカー", industry:"食品・飲料", emoji:"🏭" },
+  { name:"サッポロホールディングス", group:"メーカー", industry:"食品・飲料", emoji:"🏭" },
+  { name:"オリオンビール", group:"メーカー", industry:"食品・飲料", emoji:"🏭" },
+  { name:"コカ・コーラボトラーズジャパンホールディングス", group:"メーカー", industry:"食品・飲料", emoji:"🏭" },
+  { name:"ダイドーグループホールディングス", group:"メーカー", industry:"食品・飲料", emoji:"🏭" },
+  { name:"ポッカサッポロフード&ビバレッジ", group:"メーカー", industry:"食品・飲料", emoji:"🏭" },
+  { name:"伊藤園", group:"メーカー", industry:"食品・飲料", emoji:"🏭" },
+  { name:"コカ・コーラ ボトラーズジャパン", group:"メーカー", industry:"食品・飲料", emoji:"🏭" },
+  { name:"味の素", group:"メーカー", industry:"食品・飲料", emoji:"🏭" },
+  { name:"ヤマザキビスケット", group:"メーカー", industry:"食品・飲料", emoji:"🏭" },
+  { name:"明治ホールディングス", group:"メーカー", industry:"食品・飲料", emoji:"🏭" },
+  { name:"森永製菓", group:"メーカー", industry:"食品・飲料", emoji:"🏭" },
+  { name:"江崎グリコ", group:"メーカー", industry:"食品・飲料", emoji:"🏭" },
+  { name:"カルビー", group:"メーカー", industry:"食品・飲料", emoji:"🏭" },
+  { name:"ロッテ", group:"メーカー", industry:"食品・飲料", emoji:"🏭" },
+  { name:"森永乳業", group:"メーカー", industry:"食品・飲料", emoji:"🏭" },
+  { name:"雪印メグミルク", group:"メーカー", industry:"食品・飲料", emoji:"🏭" },
+  { name:"ヤクルト本社", group:"メーカー", industry:"食品・飲料", emoji:"🏭" },
+  { name:"フジパングループ本社", group:"メーカー", industry:"食品・飲料", emoji:"🏭" },
+  { name:"敷島製パン", group:"メーカー", industry:"食品・飲料", emoji:"🏭" },
+  { name:"山崎製パン", group:"メーカー", industry:"食品・飲料", emoji:"🏭" },
+  { name:"パスコ", group:"メーカー", industry:"食品・飲料", emoji:"🏭" },
+  { name:"日清食品ホールディングス", group:"メーカー", industry:"食品・飲料", emoji:"🏭" },
+  { name:"東洋水産", group:"メーカー", industry:"食品・飲料", emoji:"🏭" },
+  { name:"ハウス食品グループ本社", group:"メーカー", industry:"食品・飲料", emoji:"🏭" },
+  { name:"エスビー食品", group:"メーカー", industry:"食品・飲料", emoji:"🏭" },
+  { name:"ミツカン", group:"メーカー", industry:"食品・飲料", emoji:"🏭" },
+  { name:"キッコーマン", group:"メーカー", industry:"食品・飲料", emoji:"🏭" },
+  { name:"カゴメ", group:"メーカー", industry:"食品・飲料", emoji:"🏭" },
+  { name:"Mizkan", group:"メーカー", industry:"食品・飲料", emoji:"🏭" },
+  { name:"プリマハム", group:"メーカー", industry:"食品・飲料", emoji:"🏭" },
+  { name:"伊藤ハム", group:"メーカー", industry:"食品・飲料", emoji:"🏭" },
+  { name:"日本ハム", group:"メーカー", industry:"食品・飲料", emoji:"🏭" },
+  { name:"ニチレイ", group:"メーカー", industry:"食品・飲料", emoji:"🏭" },
+  { name:"マルハニチロ", group:"メーカー", industry:"食品・飲料", emoji:"🏭" },
+  { name:"ニチロ", group:"メーカー", industry:"食品・飲料", emoji:"🏭" },
+  { name:"極洋", group:"メーカー", industry:"食品・飲料", emoji:"🏭" },
+  { name:"東洋製罐", group:"メーカー", industry:"食品・飲料", emoji:"🏭" },
+  { name:"東京製鐵", group:"メーカー", industry:"食品・飲料", emoji:"🏭" },
+  { name:"日清製粉グループ本社", group:"メーカー", industry:"食品・飲料", emoji:"🏭" },
+  { name:"日清オイリオグループ", group:"メーカー", industry:"食品・飲料", emoji:"🏭" },
+  { name:"J-オイルミルズ", group:"メーカー", industry:"食品・飲料", emoji:"🏭" },
+  { name:"不二製油グループ本社", group:"メーカー", industry:"食品・飲料", emoji:"🏭" },
+  { name:"日東富士製粉", group:"メーカー", industry:"食品・飲料", emoji:"🏭" },
+  { name:"昭和産業", group:"メーカー", industry:"食品・飲料", emoji:"🏭" },
+  { name:"王子ホールディングス", group:"メーカー", industry:"食品・飲料", emoji:"🏭" },
+  { name:"日本製紙", group:"メーカー", industry:"食品・飲料", emoji:"🏭" },
+  { name:"北越コーポレーション", group:"メーカー", industry:"食品・飲料", emoji:"🏭" },
+  { name:"三菱製紙", group:"メーカー", industry:"食品・飲料", emoji:"🏭" },
+  { name:"レンゴー", group:"メーカー", industry:"食品・飲料", emoji:"🏭" },
+  { name:"大王製紙", group:"メーカー", industry:"食品・飲料", emoji:"🏭" },
+  { name:"日本紙パルプ商事", group:"メーカー", industry:"食品・飲料", emoji:"🏭" },
+  { name:"凸版印刷", group:"メーカー", industry:"食品・飲料", emoji:"🏭" },
+  { name:"大日本印刷", group:"メーカー", industry:"食品・飲料", emoji:"🏭" },
+  { name:"共同印刷", group:"メーカー", industry:"食品・飲料", emoji:"🏭" },
+  { name:"図書印刷", group:"メーカー", industry:"食品・飲料", emoji:"🏭" },
+  { name:"DNP大日本印刷", group:"メーカー", industry:"食品・飲料", emoji:"🏭" },
+  { name:"武田薬品工業", group:"メーカー", industry:"医薬品", emoji:"🏭" },
+  { name:"アステラス製薬", group:"メーカー", industry:"医薬品", emoji:"🏭" },
+  { name:"第一三共", group:"メーカー", industry:"医薬品", emoji:"🏭" },
+  { name:"エーザイ", group:"メーカー", industry:"医薬品", emoji:"🏭" },
+  { name:"中外製薬", group:"メーカー", industry:"医薬品", emoji:"🏭" },
+  { name:"大塚ホールディングス", group:"メーカー", industry:"医薬品", emoji:"🏭" },
+  { name:"塩野義製薬", group:"メーカー", industry:"医薬品", emoji:"🏭" },
+  { name:"協和キリン", group:"メーカー", industry:"医薬品", emoji:"🏭" },
+  { name:"参天製薬", group:"メーカー", industry:"医薬品", emoji:"🏭" },
+  { name:"小野薬品工業", group:"メーカー", industry:"医薬品", emoji:"🏭" },
+  { name:"大日本住友製薬", group:"メーカー", industry:"医薬品", emoji:"🏭" },
+  { name:"住友ファーマ", group:"メーカー", industry:"医薬品", emoji:"🏭" },
+  { name:"東邦ホールディングス", group:"メーカー", industry:"医薬品", emoji:"🏭" },
+  { name:"ロート製薬", group:"メーカー", industry:"医薬品", emoji:"🏭" },
+  { name:"久光製薬", group:"メーカー", industry:"医薬品", emoji:"🏭" },
+  { name:"ツムラ", group:"メーカー", industry:"医薬品", emoji:"🏭" },
+  { name:"ロハス・モチベーション", group:"メーカー", industry:"医薬品", emoji:"🏭" },
+  { name:"沢井製薬", group:"メーカー", industry:"医薬品", emoji:"🏭" },
+  { name:"日医工", group:"メーカー", industry:"医薬品", emoji:"🏭" },
+  { name:"ソレイジア・ファーマ", group:"メーカー", industry:"医薬品", emoji:"🏭" },
+  { name:"クラシエホールディングス", group:"メーカー", industry:"医薬品", emoji:"🏭" },
+  { name:"テルモ", group:"メーカー", industry:"医薬品", emoji:"🏭" },
+  { name:"ニプロ", group:"メーカー", industry:"医薬品", emoji:"🏭" },
+  { name:"シスメックス", group:"メーカー", industry:"医薬品", emoji:"🏭" },
+  { name:"JMS", group:"メーカー", industry:"医薬品", emoji:"🏭" },
+  { name:"日本光電工業", group:"メーカー", industry:"医薬品", emoji:"🏭" },
+  { name:"フクダ電子", group:"メーカー", industry:"医薬品", emoji:"🏭" },
+  { name:"アズビル", group:"メーカー", industry:"医薬品", emoji:"🏭" },
+  { name:"PHCホールディングス", group:"メーカー", industry:"医薬品", emoji:"🏭" },
+  { name:"エム・スリー", group:"メーカー", industry:"医薬品", emoji:"🏭" },
+  { name:"ペプチドリーム", group:"メーカー", industry:"医薬品", emoji:"🏭" },
+  { name:"アンジェス", group:"メーカー", industry:"医薬品", emoji:"🏭" },
+  { name:"Chugai Pharmabody Research", group:"メーカー", industry:"医薬品", emoji:"🏭" },
+  { name:"GSK", group:"メーカー", industry:"医薬品", emoji:"🏭" },
+  { name:"ノバルティス ファーマ", group:"メーカー", industry:"医薬品", emoji:"🏭" },
+  { name:"ファイザー", group:"メーカー", industry:"医薬品", emoji:"🏭" },
+  { name:"メルク", group:"メーカー", industry:"医薬品", emoji:"🏭" },
+  { name:"サノフィ", group:"メーカー", industry:"医薬品", emoji:"🏭" },
+  { name:"ロシュ・ダイアグノスティックス", group:"メーカー", industry:"医薬品", emoji:"🏭" },
+  { name:"YKK", group:"メーカー", industry:"その他メーカー", emoji:"🏭" },
+  { name:"YKK AP", group:"メーカー", industry:"その他メーカー", emoji:"🏭" },
+  { name:"三菱鉛筆", group:"メーカー", industry:"その他メーカー", emoji:"🏭" },
+  { name:"パイロットコーポレーション", group:"メーカー", industry:"その他メーカー", emoji:"🏭" },
+  { name:"コクヨ", group:"メーカー", industry:"その他メーカー", emoji:"🏭" },
+  { name:"プラス", group:"メーカー", industry:"その他メーカー", emoji:"🏭" },
+  { name:"セーラー万年筆", group:"メーカー", industry:"その他メーカー", emoji:"🏭" },
+  { name:"ぺんてる", group:"メーカー", industry:"その他メーカー", emoji:"🏭" },
+  { name:"マブチモーター", group:"メーカー", industry:"その他メーカー", emoji:"🏭" },
+  { name:"ナカニシ", group:"メーカー", industry:"その他メーカー", emoji:"🏭" },
+  { name:"ユニチャーム", group:"メーカー", industry:"その他メーカー", emoji:"🏭" },
+  { name:"アシックス", group:"メーカー", industry:"その他メーカー", emoji:"🏭" },
+  { name:"ミズノ", group:"メーカー", industry:"その他メーカー", emoji:"🏭" },
+  { name:"デサント", group:"メーカー", industry:"その他メーカー", emoji:"🏭" },
+  { name:"ゴールドウイン", group:"メーカー", industry:"その他メーカー", emoji:"🏭" },
+  { name:"ヨネックス", group:"メーカー", industry:"その他メーカー", emoji:"🏭" },
+  { name:"シマノ", group:"メーカー", industry:"その他メーカー", emoji:"🏭" },
+  { name:"ジーシー", group:"メーカー", industry:"その他メーカー", emoji:"🏭" },
+  { name:"モリタホールディングス", group:"メーカー", industry:"その他メーカー", emoji:"🏭" },
+  { name:"松風", group:"メーカー", industry:"その他メーカー", emoji:"🏭" },
+  { name:"シキボウ", group:"メーカー", industry:"その他メーカー", emoji:"🏭" },
+  { name:"セーレン", group:"メーカー", industry:"その他メーカー", emoji:"🏭" },
+  { name:"三菱レイヨン", group:"メーカー", industry:"その他メーカー", emoji:"🏭" },
+  { name:"東洋紡", group:"メーカー", industry:"その他メーカー", emoji:"🏭" },
+  { name:"クラボウ", group:"メーカー", industry:"その他メーカー", emoji:"🏭" },
+  { name:"ヘリオス テクノ ホールディング", group:"メーカー", industry:"その他メーカー", emoji:"🏭" },
+  { name:"タカラトミー", group:"メーカー", industry:"その他メーカー", emoji:"🏭" },
+  { name:"エポック社", group:"メーカー", industry:"その他メーカー", emoji:"🏭" },
+  { name:"セガサミーホールディングス", group:"メーカー", industry:"その他メーカー", emoji:"🏭" },
+  { name:"アディダス", group:"メーカー", industry:"その他メーカー", emoji:"🏭" },
+  { name:"ナイキ", group:"メーカー", industry:"その他メーカー", emoji:"🏭" },
+  { name:"プーマ", group:"メーカー", industry:"その他メーカー", emoji:"🏭" },
+  { name:"タイガー魔法瓶", group:"メーカー", industry:"その他メーカー", emoji:"🏭" },
+  { name:"象印マホービン", group:"メーカー", industry:"その他メーカー", emoji:"🏭" },
+  { name:"ピーコック魔法瓶工業", group:"メーカー", industry:"その他メーカー", emoji:"🏭" },
+  { name:"ティファール", group:"メーカー", industry:"その他メーカー", emoji:"🏭" },
+  { name:"NTTデータ", group:"IT・テック", industry:"SIer", emoji:"💻" },
+  { name:"野村総合研究所", group:"IT・テック", industry:"SIer", emoji:"💻" },
+  { name:"日鉄ソリューションズ", group:"IT・テック", industry:"SIer", emoji:"💻" },
+  { name:"SCSK", group:"IT・テック", industry:"SIer", emoji:"💻" },
+  { name:"TIS", group:"IT・テック", industry:"SIer", emoji:"💻" },
+  { name:"BIPROGY", group:"IT・テック", industry:"SIer", emoji:"💻" },
+  { name:"伊藤忠テクノソリューションズ", group:"IT・テック", industry:"SIer", emoji:"💻" },
+  { name:"日本ユニシス", group:"IT・テック", industry:"SIer", emoji:"💻" },
+  { name:"オービックビジネスコンサルタント", group:"IT・テック", industry:"SIer", emoji:"💻" },
+  { name:"オービック", group:"IT・テック", industry:"SIer", emoji:"💻" },
+  { name:"日立ソリューションズ", group:"IT・テック", industry:"SIer", emoji:"💻" },
+  { name:"NSD", group:"IT・テック", industry:"SIer", emoji:"💻" },
+  { name:"コムチュア", group:"IT・テック", industry:"SIer", emoji:"💻" },
+  { name:"アルファシステムズ", group:"IT・テック", industry:"SIer", emoji:"💻" },
+  { name:"DTS", group:"IT・テック", industry:"SIer", emoji:"💻" },
+  { name:"ＳＣＳＫ", group:"IT・テック", industry:"SIer", emoji:"💻" },
+  { name:"システナ", group:"IT・テック", industry:"SIer", emoji:"💻" },
+  { name:"NSSOL", group:"IT・テック", industry:"SIer", emoji:"💻" },
+  { name:"ネットワンシステムズ", group:"IT・テック", industry:"SIer", emoji:"💻" },
+  { name:"クエスト", group:"IT・テック", industry:"SIer", emoji:"💻" },
+  { name:"アイネット", group:"IT・テック", industry:"SIer", emoji:"💻" },
+  { name:"電通国際情報サービス", group:"IT・テック", industry:"SIer", emoji:"💻" },
+  { name:"CTC", group:"IT・テック", industry:"SIer", emoji:"💻" },
+  { name:"TDCソフト", group:"IT・テック", industry:"SIer", emoji:"💻" },
+  { name:"アルゴグラフィックス", group:"IT・テック", industry:"SIer", emoji:"💻" },
+  { name:"インフォコム", group:"IT・テック", industry:"SIer", emoji:"💻" },
+  { name:"ウェルネット", group:"IT・テック", industry:"SIer", emoji:"💻" },
+  { name:"ITホールディングス", group:"IT・テック", industry:"SIer", emoji:"💻" },
+  { name:"サイボウズ", group:"IT・テック", industry:"ソフトウェア", emoji:"💻" },
+  { name:"マネーフォワード", group:"IT・テック", industry:"ソフトウェア", emoji:"💻" },
+  { name:"freee", group:"IT・テック", industry:"ソフトウェア", emoji:"💻" },
+  { name:"Sansan", group:"IT・テック", industry:"ソフトウェア", emoji:"💻" },
+  { name:"ラクス", group:"IT・テック", industry:"ソフトウェア", emoji:"💻" },
+  { name:"ラクスル", group:"IT・テック", industry:"ソフトウェア", emoji:"💻" },
+  { name:"BASE", group:"IT・テック", industry:"ソフトウェア", emoji:"💻" },
+  { name:"STORES", group:"IT・テック", industry:"ソフトウェア", emoji:"💻" },
+  { name:"Chatwork", group:"IT・テック", industry:"ソフトウェア", emoji:"💻" },
+  { name:"kintone", group:"IT・テック", industry:"ソフトウェア", emoji:"💻" },
+  { name:"ZOHO", group:"IT・テック", industry:"ソフトウェア", emoji:"💻" },
+  { name:"セールスフォース", group:"IT・テック", industry:"ソフトウェア", emoji:"💻" },
+  { name:"SAP", group:"IT・テック", industry:"ソフトウェア", emoji:"💻" },
+  { name:"オラクル", group:"IT・テック", industry:"ソフトウェア", emoji:"💻" },
+  { name:"アドビ", group:"IT・テック", industry:"ソフトウェア", emoji:"💻" },
+  { name:"ワークス アプリケーションズ", group:"IT・テック", industry:"ソフトウェア", emoji:"💻" },
+  { name:"プロネクサス", group:"IT・テック", industry:"ソフトウェア", emoji:"💻" },
+  { name:"ジーニー", group:"IT・テック", industry:"ソフトウェア", emoji:"💻" },
+  { name:"アドウェイズ", group:"IT・テック", industry:"ソフトウェア", emoji:"💻" },
+  { name:"DACホールディングス", group:"IT・テック", industry:"ソフトウェア", emoji:"💻" },
+  { name:"VOYAGE GROUP", group:"IT・テック", industry:"ソフトウェア", emoji:"💻" },
+  { name:"Speee", group:"IT・テック", industry:"ソフトウェア", emoji:"💻" },
+  { name:"エフルート", group:"IT・テック", industry:"ソフトウェア", emoji:"💻" },
+  { name:"インタースペース", group:"IT・テック", industry:"ソフトウェア", emoji:"💻" },
+  { name:"アジャイルメディア・ネットワーク", group:"IT・テック", industry:"ソフトウェア", emoji:"💻" },
+  { name:"アイレップ", group:"IT・テック", industry:"ソフトウェア", emoji:"💻" },
+  { name:"セプテーニ・ホールディングス", group:"IT・テック", industry:"ソフトウェア", emoji:"💻" },
+  { name:"オプトホールディング", group:"IT・テック", industry:"ソフトウェア", emoji:"💻" },
+  { name:"オープンエイト", group:"IT・テック", industry:"ソフトウェア", emoji:"💻" },
+  { name:"フリークアウト", group:"IT・テック", industry:"ソフトウェア", emoji:"💻" },
+  { name:"アシスト", group:"IT・テック", industry:"ソフトウェア", emoji:"💻" },
+  { name:"オロ", group:"IT・テック", industry:"ソフトウェア", emoji:"💻" },
+  { name:"ユーザベース", group:"IT・テック", industry:"ソフトウェア", emoji:"💻" },
+  { name:"JBCC", group:"IT・テック", industry:"ソフトウェア", emoji:"💻" },
+  { name:"JBS", group:"IT・テック", industry:"ソフトウェア", emoji:"💻" },
+  { name:"クニエ", group:"IT・テック", industry:"ソフトウェア", emoji:"💻" },
+  { name:"Diquest", group:"IT・テック", industry:"ソフトウェア", emoji:"💻" },
+  { name:"Ridge-i", group:"IT・テック", industry:"ソフトウェア", emoji:"💻" },
+  { name:"楽天グループ", group:"IT・テック", industry:"Web・インターネット", emoji:"💻" },
+  { name:"LINEヤフー", group:"IT・テック", industry:"Web・インターネット", emoji:"💻" },
+  { name:"Zホールディングス", group:"IT・テック", industry:"Web・インターネット", emoji:"💻" },
+  { name:"メルカリ", group:"IT・テック", industry:"Web・インターネット", emoji:"💻" },
+  { name:"DeNA", group:"IT・テック", industry:"Web・インターネット", emoji:"💻" },
+  { name:"サイバーエージェント", group:"IT・テック", industry:"Web・インターネット", emoji:"💻" },
+  { name:"リクルートホールディングス", group:"IT・テック", industry:"Web・インターネット", emoji:"💻" },
+  { name:"ZOZO", group:"IT・テック", industry:"Web・インターネット", emoji:"💻" },
+  { name:"エムスリー", group:"IT・テック", industry:"Web・インターネット", emoji:"💻" },
+  { name:"クックパッド", group:"IT・テック", industry:"Web・インターネット", emoji:"💻" },
+  { name:"エニグモ", group:"IT・テック", industry:"Web・インターネット", emoji:"💻" },
+  { name:"スタートトゥデイ", group:"IT・テック", industry:"Web・インターネット", emoji:"💻" },
+  { name:"クラウドワークス", group:"IT・テック", industry:"Web・インターネット", emoji:"💻" },
+  { name:"ランサーズ", group:"IT・テック", industry:"Web・インターネット", emoji:"💻" },
+  { name:"ココナラ", group:"IT・テック", industry:"Web・インターネット", emoji:"💻" },
+  { name:"ベース", group:"IT・テック", industry:"Web・インターネット", emoji:"💻" },
+  { name:"ミクシィ", group:"IT・テック", industry:"Web・インターネット", emoji:"💻" },
+  { name:"グリー", group:"IT・テック", industry:"Web・インターネット", emoji:"💻" },
+  { name:"コロプラ", group:"IT・テック", industry:"Web・インターネット", emoji:"💻" },
+  { name:"アカツキ", group:"IT・テック", industry:"Web・インターネット", emoji:"💻" },
+  { name:"エイチーム", group:"IT・テック", industry:"Web・インターネット", emoji:"💻" },
+  { name:"Klab", group:"IT・テック", industry:"Web・インターネット", emoji:"💻" },
+  { name:"ガンホー・オンライン・エンターテイメント", group:"IT・テック", industry:"Web・インターネット", emoji:"💻" },
+  { name:"SHIFT", group:"IT・テック", industry:"Web・インターネット", emoji:"💻" },
+  { name:"エス・エム・エス", group:"IT・テック", industry:"Web・インターネット", emoji:"💻" },
+  { name:"ビジョナル", group:"IT・テック", industry:"Web・インターネット", emoji:"💻" },
+  { name:"ビズリーチ", group:"IT・テック", industry:"Web・インターネット", emoji:"💻" },
+  { name:"ユナイテッド", group:"IT・テック", industry:"Web・インターネット", emoji:"💻" },
+  { name:"ぐるなび", group:"IT・テック", industry:"Web・インターネット", emoji:"💻" },
+  { name:"食べログ", group:"IT・テック", industry:"Web・インターネット", emoji:"💻" },
+  { name:"カカクコム", group:"IT・テック", industry:"Web・インターネット", emoji:"💻" },
+  { name:"オリコ", group:"IT・テック", industry:"Web・インターネット", emoji:"💻" },
+  { name:"ぴあ", group:"IT・テック", industry:"Web・インターネット", emoji:"💻" },
+  { name:"ローソンチケット", group:"IT・テック", industry:"Web・インターネット", emoji:"💻" },
+  { name:"Tマガジン", group:"IT・テック", industry:"Web・インターネット", emoji:"💻" },
+  { name:"ヤフオク", group:"IT・テック", industry:"Web・インターネット", emoji:"💻" },
+  { name:"モバオク", group:"IT・テック", industry:"Web・インターネット", emoji:"💻" },
+  { name:"ZOZOTOWN", group:"IT・テック", industry:"Web・インターネット", emoji:"💻" },
+  { name:"ZOZOUSED", group:"IT・テック", industry:"Web・インターネット", emoji:"💻" },
+  { name:"ピクシブ", group:"IT・テック", industry:"Web・インターネット", emoji:"💻" },
+  { name:"ニコニコ動画", group:"IT・テック", industry:"Web・インターネット", emoji:"💻" },
+  { name:"ドワンゴ", group:"IT・テック", industry:"Web・インターネット", emoji:"💻" },
+  { name:"KADOKAWA", group:"IT・テック", industry:"Web・インターネット", emoji:"💻" },
+  { name:"ユーチューブ", group:"IT・テック", industry:"Web・インターネット", emoji:"💻" },
+  { name:"TikTok", group:"IT・テック", industry:"Web・インターネット", emoji:"💻" },
+  { name:"インスタグラム", group:"IT・テック", industry:"Web・インターネット", emoji:"💻" },
+  { name:"Twitter", group:"IT・テック", industry:"Web・インターネット", emoji:"💻" },
+  { name:"ペイパル", group:"IT・テック", industry:"Web・インターネット", emoji:"💻" },
+  { name:"Stripe", group:"IT・テック", industry:"Web・インターネット", emoji:"💻" },
+  { name:"スマレジ", group:"IT・テック", industry:"Web・インターネット", emoji:"💻" },
+  { name:"Square", group:"IT・テック", industry:"Web・インターネット", emoji:"💻" },
+  { name:"アマゾンジャパン", group:"IT・テック", industry:"Web・インターネット", emoji:"💻" },
+  { name:"ネットプロテクションズ", group:"IT・テック", industry:"Web・インターネット", emoji:"💻" },
+  { name:"WiL", group:"IT・テック", industry:"Web・インターネット", emoji:"💻" },
+  { name:"スパイラル", group:"IT・テック", industry:"Web・インターネット", emoji:"💻" },
+  { name:"Smarpony", group:"IT・テック", industry:"Web・インターネット", emoji:"💻" },
+  { name:"NTT", group:"IT・テック", industry:"通信", emoji:"💻" },
+  { name:"NTTドコモ", group:"IT・テック", industry:"通信", emoji:"💻" },
+  { name:"KDDI", group:"IT・テック", industry:"通信", emoji:"💻" },
+  { name:"ソフトバンク", group:"IT・テック", industry:"通信", emoji:"💻" },
+  { name:"楽天モバイル", group:"IT・テック", industry:"通信", emoji:"💻" },
+  { name:"沖縄セルラー電話", group:"IT・テック", industry:"通信", emoji:"💻" },
+  { name:"インターネットイニシアティブ", group:"IT・テック", industry:"通信", emoji:"💻" },
+  { name:"ソフトバンクテクノロジー", group:"IT・テック", industry:"通信", emoji:"💻" },
+  { name:"ニフティ", group:"IT・テック", industry:"通信", emoji:"💻" },
+  { name:"BIGLOBE", group:"IT・テック", industry:"通信", emoji:"💻" },
+  { name:"エキサイト", group:"IT・テック", industry:"通信", emoji:"💻" },
+  { name:"USEN-NEXT HOLDINGS", group:"IT・テック", industry:"通信", emoji:"💻" },
+  { name:"スカパーJSATホールディングス", group:"IT・テック", industry:"通信", emoji:"💻" },
+  { name:"ジュピターテレコム", group:"IT・テック", industry:"通信", emoji:"💻" },
+  { name:"ケーブルテレビジョン東京", group:"IT・テック", industry:"通信", emoji:"💻" },
+  { name:"アクセンチュア", group:"コンサル", industry:"経営コンサル", emoji:"💡" },
+  { name:"デロイトトーマツコンサルティング", group:"コンサル", industry:"経営コンサル", emoji:"💡" },
+  { name:"PwCコンサルティング", group:"コンサル", industry:"経営コンサル", emoji:"💡" },
+  { name:"ベイカレント・コンサルティング", group:"コンサル", industry:"経営コンサル", emoji:"💡" },
+  { name:"アビームコンサルティング", group:"コンサル", industry:"経営コンサル", emoji:"💡" },
+  { name:"EYストラテジー・アンド・コンサルティング", group:"コンサル", industry:"経営コンサル", emoji:"💡" },
+  { name:"KPMGコンサルティング", group:"コンサル", industry:"経営コンサル", emoji:"💡" },
+  { name:"ボストン コンサルティング グループ", group:"コンサル", industry:"経営コンサル", emoji:"💡" },
+  { name:"マッキンゼー・アンド・カンパニー", group:"コンサル", industry:"経営コンサル", emoji:"💡" },
+  { name:"ベイン・アンド・カンパニー", group:"コンサル", industry:"経営コンサル", emoji:"💡" },
+  { name:"アーサー・ディ・リトル", group:"コンサル", industry:"経営コンサル", emoji:"💡" },
+  { name:"ローランド・ベルガー", group:"コンサル", industry:"経営コンサル", emoji:"💡" },
+  { name:"A.T. カーニー", group:"コンサル", industry:"経営コンサル", emoji:"💡" },
+  { name:"ストラテジー&", group:"コンサル", industry:"経営コンサル", emoji:"💡" },
+  { name:"オリバー・ワイマン", group:"コンサル", industry:"経営コンサル", emoji:"💡" },
+  { name:"ATカーニー", group:"コンサル", industry:"経営コンサル", emoji:"💡" },
+  { name:"シグマクシス", group:"コンサル", industry:"経営コンサル", emoji:"💡" },
+  { name:"リブ・コンサルティング", group:"コンサル", industry:"経営コンサル", emoji:"💡" },
+  { name:"リッジラインズ", group:"コンサル", industry:"経営コンサル", emoji:"💡" },
+  { name:"フィールドマネージメント", group:"コンサル", industry:"経営コンサル", emoji:"💡" },
+  { name:"コーポレイトディレクション", group:"コンサル", industry:"経営コンサル", emoji:"💡" },
+  { name:"ドリームインキュベータ", group:"コンサル", industry:"経営コンサル", emoji:"💡" },
+  { name:"経営共創基盤", group:"コンサル", industry:"経営コンサル", emoji:"💡" },
+  { name:"リクルートマネジメントソリューションズ", group:"コンサル", industry:"経営コンサル", emoji:"💡" },
+  { name:"船井総合研究所", group:"コンサル", industry:"経営コンサル", emoji:"💡" },
+  { name:"タナベコンサルティンググループ", group:"コンサル", industry:"経営コンサル", emoji:"💡" },
+  { name:"山田コンサルティンググループ", group:"コンサル", industry:"経営コンサル", emoji:"💡" },
+  { name:"プライスウォーターハウスクーパース", group:"コンサル", industry:"経営コンサル", emoji:"💡" },
+  { name:"フューチャー", group:"コンサル", industry:"ITコンサル", emoji:"💡" },
+  { name:"JBCCホールディングス", group:"コンサル", industry:"ITコンサル", emoji:"💡" },
+  { name:"ガートナー ジャパン", group:"コンサル", industry:"ITコンサル", emoji:"💡" },
+  { name:"フロスト&サリバン ジャパン", group:"コンサル", industry:"ITコンサル", emoji:"💡" },
+  { name:"三井不動産", group:"不動産・建設", industry:"デベロッパー", emoji:"🏢" },
+  { name:"三菱地所", group:"不動産・建設", industry:"デベロッパー", emoji:"🏢" },
+  { name:"住友不動産", group:"不動産・建設", industry:"デベロッパー", emoji:"🏢" },
+  { name:"東急不動産", group:"不動産・建設", industry:"デベロッパー", emoji:"🏢" },
+  { name:"野村不動産ホールディングス", group:"不動産・建設", industry:"デベロッパー", emoji:"🏢" },
+  { name:"森ビル", group:"不動産・建設", industry:"デベロッパー", emoji:"🏢" },
+  { name:"ヒューリック", group:"不動産・建設", industry:"デベロッパー", emoji:"🏢" },
+  { name:"東京建物", group:"不動産・建設", industry:"デベロッパー", emoji:"🏢" },
+  { name:"オープンハウスグループ", group:"不動産・建設", industry:"デベロッパー", emoji:"🏢" },
+  { name:"レオパレス21", group:"不動産・建設", industry:"デベロッパー", emoji:"🏢" },
+  { name:"大東建託", group:"不動産・建設", industry:"デベロッパー", emoji:"🏢" },
+  { name:"スターツコーポレーション", group:"不動産・建設", industry:"デベロッパー", emoji:"🏢" },
+  { name:"アパグループ", group:"不動産・建設", industry:"デベロッパー", emoji:"🏢" },
+  { name:"サンフロンティア不動産", group:"不動産・建設", industry:"デベロッパー", emoji:"🏢" },
+  { name:"プレサンスコーポレーション", group:"不動産・建設", industry:"デベロッパー", emoji:"🏢" },
+  { name:"タカラレーベン", group:"不動産・建設", industry:"デベロッパー", emoji:"🏢" },
+  { name:"フージャースホールディングス", group:"不動産・建設", industry:"デベロッパー", emoji:"🏢" },
+  { name:"シノケングループ", group:"不動産・建設", industry:"デベロッパー", emoji:"🏢" },
+  { name:"INTERTRUST", group:"不動産・建設", industry:"デベロッパー", emoji:"🏢" },
+  { name:"SREホールディングス", group:"不動産・建設", industry:"デベロッパー", emoji:"🏢" },
+  { name:"リログループ", group:"不動産・建設", industry:"デベロッパー", emoji:"🏢" },
+  { name:"平和不動産", group:"不動産・建設", industry:"デベロッパー", emoji:"🏢" },
+  { name:"平河ヒューテック", group:"不動産・建設", industry:"デベロッパー", emoji:"🏢" },
+  { name:"東京楽天地", group:"不動産・建設", industry:"デベロッパー", emoji:"🏢" },
+  { name:"京阪神ビルディング", group:"不動産・建設", industry:"デベロッパー", emoji:"🏢" },
+  { name:"近鉄不動産", group:"不動産・建設", industry:"デベロッパー", emoji:"🏢" },
+  { name:"阪急阪神不動産", group:"不動産・建設", industry:"デベロッパー", emoji:"🏢" },
+  { name:"南海不動産", group:"不動産・建設", industry:"デベロッパー", emoji:"🏢" },
+  { name:"ユーシン精機", group:"不動産・建設", industry:"デベロッパー", emoji:"🏢" },
+  { name:"関電不動産", group:"不動産・建設", industry:"デベロッパー", emoji:"🏢" },
+  { name:"大成建設", group:"不動産・建設", industry:"建設・ゼネコン", emoji:"🏢" },
+  { name:"鹿島建設", group:"不動産・建設", industry:"建設・ゼネコン", emoji:"🏢" },
+  { name:"清水建設", group:"不動産・建設", industry:"建設・ゼネコン", emoji:"🏢" },
+  { name:"大林組", group:"不動産・建設", industry:"建設・ゼネコン", emoji:"🏢" },
+  { name:"竹中工務店", group:"不動産・建設", industry:"建設・ゼネコン", emoji:"🏢" },
+  { name:"戸田建設", group:"不動産・建設", industry:"建設・ゼネコン", emoji:"🏢" },
+  { name:"熊谷組", group:"不動産・建設", industry:"建設・ゼネコン", emoji:"🏢" },
+  { name:"前田建設工業", group:"不動産・建設", industry:"建設・ゼネコン", emoji:"🏢" },
+  { name:"西松建設", group:"不動産・建設", industry:"建設・ゼネコン", emoji:"🏢" },
+  { name:"鴻池組", group:"不動産・建設", industry:"建設・ゼネコン", emoji:"🏢" },
+  { name:"奥村組", group:"不動産・建設", industry:"建設・ゼネコン", emoji:"🏢" },
+  { name:"鉄建建設", group:"不動産・建設", industry:"建設・ゼネコン", emoji:"🏢" },
+  { name:"東鉄工業", group:"不動産・建設", industry:"建設・ゼネコン", emoji:"🏢" },
+  { name:"錢高組", group:"不動産・建設", industry:"建設・ゼネコン", emoji:"🏢" },
+  { name:"東洋建設", group:"不動産・建設", industry:"建設・ゼネコン", emoji:"🏢" },
+  { name:"佐藤工業", group:"不動産・建設", industry:"建設・ゼネコン", emoji:"🏢" },
+  { name:"長谷工コーポレーション", group:"不動産・建設", industry:"建設・ゼネコン", emoji:"🏢" },
+  { name:"木下グループ", group:"不動産・建設", industry:"建設・ゼネコン", emoji:"🏢" },
+  { name:"三井住友建設", group:"不動産・建設", industry:"建設・ゼネコン", emoji:"🏢" },
+  { name:"東急建設", group:"不動産・建設", industry:"建設・ゼネコン", emoji:"🏢" },
+  { name:"JR西日本テクノス", group:"不動産・建設", industry:"建設・ゼネコン", emoji:"🏢" },
+  { name:"住友林業", group:"不動産・建設", industry:"建設・ゼネコン", emoji:"🏢" },
+  { name:"積水ハウス", group:"不動産・建設", industry:"建設・ゼネコン", emoji:"🏢" },
+  { name:"大和ハウス工業", group:"不動産・建設", industry:"建設・ゼネコン", emoji:"🏢" },
+  { name:"ミサワホーム", group:"不動産・建設", industry:"建設・ゼネコン", emoji:"🏢" },
+  { name:"旭化成ホームズ", group:"不動産・建設", industry:"建設・ゼネコン", emoji:"🏢" },
+  { name:"三井ホーム", group:"不動産・建設", industry:"建設・ゼネコン", emoji:"🏢" },
+  { name:"トヨタホーム", group:"不動産・建設", industry:"建設・ゼネコン", emoji:"🏢" },
+  { name:"タマホーム", group:"不動産・建設", industry:"建設・ゼネコン", emoji:"🏢" },
+  { name:"アキュラホーム", group:"不動産・建設", industry:"建設・ゼネコン", emoji:"🏢" },
+  { name:"オープンハウス", group:"不動産・建設", industry:"建設・ゼネコン", emoji:"🏢" },
+  { name:"建築工房零", group:"不動産・建設", industry:"建設・ゼネコン", emoji:"🏢" },
+  { name:"コタ", group:"不動産・建設", industry:"建設・ゼネコン", emoji:"🏢" },
+  { name:"セブン&アイ・ホールディングス", group:"小売・流通", industry:"専門小売", emoji:"🛒" },
+  { name:"イオン", group:"小売・流通", industry:"専門小売", emoji:"🛒" },
+  { name:"ファーストリテイリング", group:"小売・流通", industry:"専門小売", emoji:"🛒" },
+  { name:"ニトリホールディングス", group:"小売・流通", industry:"専門小売", emoji:"🛒" },
+  { name:"良品計画", group:"小売・流通", industry:"専門小売", emoji:"🛒" },
+  { name:"三越伊勢丹ホールディングス", group:"小売・流通", industry:"専門小売", emoji:"🛒" },
+  { name:"高島屋", group:"小売・流通", industry:"専門小売", emoji:"🛒" },
+  { name:"大丸松坂屋百貨店", group:"小売・流通", industry:"専門小売", emoji:"🛒" },
+  { name:"Jフロント リテイリング", group:"小売・流通", industry:"専門小売", emoji:"🛒" },
+  { name:"H2Oリテイリング", group:"小売・流通", industry:"専門小売", emoji:"🛒" },
+  { name:"近鉄百貨店", group:"小売・流通", industry:"専門小売", emoji:"🛒" },
+  { name:"松屋", group:"小売・流通", industry:"専門小売", emoji:"🛒" },
+  { name:"東急百貨店", group:"小売・流通", industry:"専門小売", emoji:"🛒" },
+  { name:"小田急百貨店", group:"小売・流通", industry:"専門小売", emoji:"🛒" },
+  { name:"西武百貨店", group:"小売・流通", industry:"専門小売", emoji:"🛒" },
+  { name:"そごう", group:"小売・流通", industry:"専門小売", emoji:"🛒" },
+  { name:"コクミン", group:"小売・流通", industry:"専門小売", emoji:"🛒" },
+  { name:"ココカラファイン", group:"小売・流通", industry:"専門小売", emoji:"🛒" },
+  { name:"スギ薬局", group:"小売・流通", industry:"専門小売", emoji:"🛒" },
+  { name:"マツモトキヨシ", group:"小売・流通", industry:"専門小売", emoji:"🛒" },
+  { name:"ツルハホールディングス", group:"小売・流通", industry:"専門小売", emoji:"🛒" },
+  { name:"ウエルシアホールディングス", group:"小売・流通", industry:"専門小売", emoji:"🛒" },
+  { name:"コスモス薬品", group:"小売・流通", industry:"専門小売", emoji:"🛒" },
+  { name:"クスリのアオキ", group:"小売・流通", industry:"専門小売", emoji:"🛒" },
+  { name:"ドラッグストアマツモトキヨシ", group:"小売・流通", industry:"専門小売", emoji:"🛒" },
+  { name:"ヤマダホールディングス", group:"小売・流通", industry:"専門小売", emoji:"🛒" },
+  { name:"ビックカメラ", group:"小売・流通", industry:"専門小売", emoji:"🛒" },
+  { name:"ヨドバシカメラ", group:"小売・流通", industry:"専門小売", emoji:"🛒" },
+  { name:"ノジマ", group:"小売・流通", industry:"専門小売", emoji:"🛒" },
+  { name:"ケーズホールディングス", group:"小売・流通", industry:"専門小売", emoji:"🛒" },
+  { name:"エディオン", group:"小売・流通", industry:"専門小売", emoji:"🛒" },
+  { name:"上新電機", group:"小売・流通", industry:"専門小売", emoji:"🛒" },
+  { name:"コジマ", group:"小売・流通", industry:"専門小売", emoji:"🛒" },
+  { name:"ベスト電器", group:"小売・流通", industry:"専門小売", emoji:"🛒" },
+  { name:"ヨドバシ・ドット・コム", group:"小売・流通", industry:"専門小売", emoji:"🛒" },
+  { name:"Amazon", group:"小売・流通", industry:"専門小売", emoji:"🛒" },
+  { name:"楽天市場", group:"小売・流通", industry:"専門小売", emoji:"🛒" },
+  { name:"Yahoo!ショッピング", group:"小売・流通", industry:"専門小売", emoji:"🛒" },
+  { name:"BUYMA", group:"小売・流通", industry:"専門小売", emoji:"🛒" },
+  { name:"ZARA", group:"小売・流通", industry:"専門小売", emoji:"🛒" },
+  { name:"H&M", group:"小売・流通", industry:"専門小売", emoji:"🛒" },
+  { name:"GAP", group:"小売・流通", industry:"専門小売", emoji:"🛒" },
+  { name:"UNIQLO", group:"小売・流通", industry:"専門小売", emoji:"🛒" },
+  { name:"しまむら", group:"小売・流通", industry:"専門小売", emoji:"🛒" },
+  { name:"西松屋チェーン", group:"小売・流通", industry:"専門小売", emoji:"🛒" },
+  { name:"アダストリア", group:"小売・流通", industry:"専門小売", emoji:"🛒" },
+  { name:"ユナイテッドアローズ", group:"小売・流通", industry:"専門小売", emoji:"🛒" },
+  { name:"ビームス", group:"小売・流通", industry:"専門小売", emoji:"🛒" },
+  { name:"シップス", group:"小売・流通", industry:"専門小売", emoji:"🛒" },
+  { name:"オンワードホールディングス", group:"小売・流通", industry:"専門小売", emoji:"🛒" },
+  { name:"ワールド", group:"小売・流通", industry:"専門小売", emoji:"🛒" },
+  { name:"TSI ホールディングス", group:"小売・流通", industry:"専門小売", emoji:"🛒" },
+  { name:"ストライプインターナショナル", group:"小売・流通", industry:"専門小売", emoji:"🛒" },
+  { name:"ハニーズホールディングス", group:"小売・流通", industry:"専門小売", emoji:"🛒" },
+  { name:"ABCマート", group:"小売・流通", industry:"専門小売", emoji:"🛒" },
+  { name:"チヨダ", group:"小売・流通", industry:"専門小売", emoji:"🛒" },
+  { name:"エービーシー・マート", group:"小売・流通", industry:"専門小売", emoji:"🛒" },
+  { name:"ジーフット", group:"小売・流通", industry:"専門小売", emoji:"🛒" },
+  { name:"ヒラキ", group:"小売・流通", industry:"専門小売", emoji:"🛒" },
+  { name:"オアシスライフスタイルグループ", group:"小売・流通", industry:"専門小売", emoji:"🛒" },
+  { name:"コナカ", group:"小売・流通", industry:"専門小売", emoji:"🛒" },
+  { name:"AOKIホールディングス", group:"小売・流通", industry:"専門小売", emoji:"🛒" },
+  { name:"青山商事", group:"小売・流通", industry:"専門小売", emoji:"🛒" },
+  { name:"はるやまホールディングス", group:"小売・流通", industry:"専門小売", emoji:"🛒" },
+  { name:"タカキュー", group:"小売・流通", industry:"専門小売", emoji:"🛒" },
+  { name:"アスクル", group:"小売・流通", industry:"専門小売", emoji:"🛒" },
+  { name:"ロハコ", group:"小売・流通", industry:"専門小売", emoji:"🛒" },
+  { name:"モノタロウ", group:"小売・流通", industry:"専門小売", emoji:"🛒" },
+  { name:"ミスミ", group:"小売・流通", industry:"専門小売", emoji:"🛒" },
+  { name:"コクヨマーケティング", group:"小売・流通", industry:"専門小売", emoji:"🛒" },
+  { name:"アイリスプラザ", group:"小売・流通", industry:"専門小売", emoji:"🛒" },
+  { name:"ヨーカドー", group:"小売・流通", industry:"百貨店・スーパー", emoji:"🛒" },
+  { name:"ライフコーポレーション", group:"小売・流通", industry:"百貨店・スーパー", emoji:"🛒" },
+  { name:"ロピア", group:"小売・流通", industry:"百貨店・スーパー", emoji:"🛒" },
+  { name:"オーケー", group:"小売・流通", industry:"百貨店・スーパー", emoji:"🛒" },
+  { name:"サミット", group:"小売・流通", industry:"百貨店・スーパー", emoji:"🛒" },
+  { name:"成城石井", group:"小売・流通", industry:"百貨店・スーパー", emoji:"🛒" },
+  { name:"紀ノ国屋", group:"小売・流通", industry:"百貨店・スーパー", emoji:"🛒" },
+  { name:"クイーンズ伊勢丹", group:"小売・流通", industry:"百貨店・スーパー", emoji:"🛒" },
+  { name:"ヤオコー", group:"小売・流通", industry:"百貨店・スーパー", emoji:"🛒" },
+  { name:"ベルク", group:"小売・流通", industry:"百貨店・スーパー", emoji:"🛒" },
+  { name:"マルエツ", group:"小売・流通", industry:"百貨店・スーパー", emoji:"🛒" },
+  { name:"東急ストア", group:"小売・流通", industry:"百貨店・スーパー", emoji:"🛒" },
+  { name:"東武ストア", group:"小売・流通", industry:"百貨店・スーパー", emoji:"🛒" },
+  { name:"小田急OX", group:"小売・流通", industry:"百貨店・スーパー", emoji:"🛒" },
+  { name:"ライフ", group:"小売・流通", industry:"百貨店・スーパー", emoji:"🛒" },
+  { name:"ダイエー", group:"小売・流通", industry:"百貨店・スーパー", emoji:"🛒" },
+  { name:"西友", group:"小売・流通", industry:"百貨店・スーパー", emoji:"🛒" },
+  { name:"平和堂", group:"小売・流通", industry:"百貨店・スーパー", emoji:"🛒" },
+  { name:"アークス", group:"小売・流通", industry:"百貨店・スーパー", emoji:"🛒" },
+  { name:"アクシアル リテイリング", group:"小売・流通", industry:"百貨店・スーパー", emoji:"🛒" },
+  { name:"ヤマナカ", group:"小売・流通", industry:"百貨店・スーパー", emoji:"🛒" },
+  { name:"ハローズ", group:"小売・流通", industry:"百貨店・スーパー", emoji:"🛒" },
+  { name:"イズミ", group:"小売・流通", industry:"百貨店・スーパー", emoji:"🛒" },
+  { name:"フジ", group:"小売・流通", industry:"百貨店・スーパー", emoji:"🛒" },
+  { name:"コープこうべ", group:"小売・流通", industry:"百貨店・スーパー", emoji:"🛒" },
+  { name:"ユーコープ", group:"小売・流通", industry:"百貨店・スーパー", emoji:"🛒" },
+  { name:"コープみらい", group:"小売・流通", industry:"百貨店・スーパー", emoji:"🛒" },
+  { name:"ベルーナ", group:"小売・流通", industry:"EC・通販", emoji:"🛒" },
+  { name:"ニッセン・ホールディングス", group:"小売・流通", industry:"EC・通販", emoji:"🛒" },
+  { name:"千趣会", group:"小売・流通", industry:"EC・通販", emoji:"🛒" },
+  { name:"スターゼン", group:"小売・流通", industry:"EC・通販", emoji:"🛒" },
+  { name:"オイシックス・ラ・大地", group:"小売・流通", industry:"EC・通販", emoji:"🛒" },
+  { name:"日本郵船", group:"小売・流通", industry:"物流・運輸", emoji:"🛒" },
+  { name:"商船三井", group:"小売・流通", industry:"物流・運輸", emoji:"🛒" },
+  { name:"川崎汽船", group:"小売・流通", industry:"物流・運輸", emoji:"🛒" },
+  { name:"NSユナイテッド海運", group:"小売・流通", industry:"物流・運輸", emoji:"🛒" },
+  { name:"飯野海運", group:"小売・流通", industry:"物流・運輸", emoji:"🛒" },
+  { name:"明治海運", group:"小売・流通", industry:"物流・運輸", emoji:"🛒" },
+  { name:"東京汽船", group:"小売・流通", industry:"物流・運輸", emoji:"🛒" },
+  { name:"名村造船所", group:"小売・流通", industry:"物流・運輸", emoji:"🛒" },
+  { name:"ヤマトホールディングス", group:"小売・流通", industry:"物流・運輸", emoji:"🛒" },
+  { name:"SGホールディングス", group:"小売・流通", industry:"物流・運輸", emoji:"🛒" },
+  { name:"佐川急便", group:"小売・流通", industry:"物流・運輸", emoji:"🛒" },
+  { name:"日本通運", group:"小売・流通", industry:"物流・運輸", emoji:"🛒" },
+  { name:"NIPPON EXPRESSホールディングス", group:"小売・流通", industry:"物流・運輸", emoji:"🛒" },
+  { name:"近鉄エクスプレス", group:"小売・流通", industry:"物流・運輸", emoji:"🛒" },
+  { name:"上組", group:"小売・流通", industry:"物流・運輸", emoji:"🛒" },
+  { name:"三井倉庫ホールディングス", group:"小売・流通", industry:"物流・運輸", emoji:"🛒" },
+  { name:"住友倉庫", group:"小売・流通", industry:"物流・運輸", emoji:"🛒" },
+  { name:"三菱倉庫", group:"小売・流通", industry:"物流・運輸", emoji:"🛒" },
+  { name:"澁澤倉庫", group:"小売・流通", industry:"物流・運輸", emoji:"🛒" },
+  { name:"安田倉庫", group:"小売・流通", industry:"物流・運輸", emoji:"🛒" },
+  { name:"日本梱包運輸倉庫", group:"小売・流通", industry:"物流・運輸", emoji:"🛒" },
+  { name:"C&Fロジホールディングス", group:"小売・流通", industry:"物流・運輸", emoji:"🛒" },
+  { name:"セイノーホールディングス", group:"小売・流通", industry:"物流・運輸", emoji:"🛒" },
+  { name:"セイノー", group:"小売・流通", industry:"物流・運輸", emoji:"🛒" },
+  { name:"福山通運", group:"小売・流通", industry:"物流・運輸", emoji:"🛒" },
+  { name:"トナミホールディングス", group:"小売・流通", industry:"物流・運輸", emoji:"🛒" },
+  { name:"ハマキョウレックス", group:"小売・流通", industry:"物流・運輸", emoji:"🛒" },
+  { name:"センコーグループホールディングス", group:"小売・流通", industry:"物流・運輸", emoji:"🛒" },
+  { name:"鴻池運輸", group:"小売・流通", industry:"物流・運輸", emoji:"🛒" },
+  { name:"関西エアポート", group:"小売・流通", industry:"物流・運輸", emoji:"🛒" },
+  { name:"成田国際空港", group:"小売・流通", industry:"物流・運輸", emoji:"🛒" },
+  { name:"羽田空港ターミナルサービス", group:"小売・流通", industry:"物流・運輸", emoji:"🛒" },
+  { name:"JR貨物", group:"小売・流通", industry:"物流・運輸", emoji:"🛒" },
+  { name:"JFEエンジニアリング", group:"小売・流通", industry:"物流・運輸", emoji:"🛒" },
+  { name:"リクルート", group:"サービス", industry:"人材・派遣", emoji:"📢" },
+  { name:"パーソルホールディングス", group:"サービス", industry:"人材・派遣", emoji:"📢" },
+  { name:"パソナグループ", group:"サービス", industry:"人材・派遣", emoji:"📢" },
+  { name:"エン・ジャパン", group:"サービス", industry:"人材・派遣", emoji:"📢" },
+  { name:"マイナビ", group:"サービス", industry:"人材・派遣", emoji:"📢" },
+  { name:"ディップ", group:"サービス", industry:"人材・派遣", emoji:"📢" },
+  { name:"レバレジーズ", group:"サービス", industry:"人材・派遣", emoji:"📢" },
+  { name:"インフォマート", group:"サービス", industry:"人材・派遣", emoji:"📢" },
+  { name:"クイック", group:"サービス", industry:"人材・派遣", emoji:"📢" },
+  { name:"JAC Recruitment", group:"サービス", industry:"人材・派遣", emoji:"📢" },
+  { name:"ヒューマンホールディングス", group:"サービス", industry:"人材・派遣", emoji:"📢" },
+  { name:"ニッソーネット", group:"サービス", industry:"人材・派遣", emoji:"📢" },
+  { name:"アウトソーシング", group:"サービス", industry:"人材・派遣", emoji:"📢" },
+  { name:"キャリアデザインセンター", group:"サービス", industry:"人材・派遣", emoji:"📢" },
+  { name:"UTグループ", group:"サービス", industry:"人材・派遣", emoji:"📢" },
+  { name:"アヴァンティスタッフ", group:"サービス", industry:"人材・派遣", emoji:"📢" },
+  { name:"ヒトコム", group:"サービス", industry:"人材・派遣", emoji:"📢" },
+  { name:"アイデムホールディングス", group:"サービス", industry:"人材・派遣", emoji:"📢" },
+  { name:"アクセス・ジャパン", group:"サービス", industry:"人材・派遣", emoji:"📢" },
+  { name:"ウィルグループ", group:"サービス", industry:"人材・派遣", emoji:"📢" },
+  { name:"電通グループ", group:"サービス", industry:"広告・PR", emoji:"📢" },
+  { name:"博報堂DYホールディングス", group:"サービス", industry:"広告・PR", emoji:"📢" },
+  { name:"ADKホールディングス", group:"サービス", industry:"広告・PR", emoji:"📢" },
+  { name:"東急エージェンシー", group:"サービス", industry:"広告・PR", emoji:"📢" },
+  { name:"デルフィス", group:"サービス", industry:"広告・PR", emoji:"📢" },
+  { name:"DAサーチ&リンク", group:"サービス", industry:"広告・PR", emoji:"📢" },
+  { name:"ジェイアール東日本企画", group:"サービス", industry:"広告・PR", emoji:"📢" },
+  { name:"読売広告社", group:"サービス", industry:"広告・PR", emoji:"📢" },
+  { name:"アサツー ディ・ケイ", group:"サービス", industry:"広告・PR", emoji:"📢" },
+  { name:"ベクトル", group:"サービス", industry:"広告・PR", emoji:"📢" },
+  { name:"プラップジャパン", group:"サービス", industry:"広告・PR", emoji:"📢" },
+  { name:"共同ピーアール", group:"サービス", industry:"広告・PR", emoji:"📢" },
+  { name:"電通PR", group:"サービス", industry:"広告・PR", emoji:"📢" },
+  { name:"オズマピーアール", group:"サービス", industry:"広告・PR", emoji:"📢" },
+  { name:"朝日新聞社", group:"サービス", industry:"メディア", emoji:"📢" },
+  { name:"読売新聞社", group:"サービス", industry:"メディア", emoji:"📢" },
+  { name:"毎日新聞社", group:"サービス", industry:"メディア", emoji:"📢" },
+  { name:"産業経済新聞社", group:"サービス", industry:"メディア", emoji:"📢" },
+  { name:"日本経済新聞社", group:"サービス", industry:"メディア", emoji:"📢" },
+  { name:"共同通信社", group:"サービス", industry:"メディア", emoji:"📢" },
+  { name:"時事通信社", group:"サービス", industry:"メディア", emoji:"📢" },
+  { name:"NHK", group:"サービス", industry:"メディア", emoji:"📢" },
+  { name:"日本テレビホールディングス", group:"サービス", industry:"メディア", emoji:"📢" },
+  { name:"TBSホールディングス", group:"サービス", industry:"メディア", emoji:"📢" },
+  { name:"フジ・メディア・ホールディングス", group:"サービス", industry:"メディア", emoji:"📢" },
+  { name:"テレビ朝日ホールディングス", group:"サービス", industry:"メディア", emoji:"📢" },
+  { name:"テレビ東京ホールディングス", group:"サービス", industry:"メディア", emoji:"📢" },
+  { name:"WOWOW", group:"サービス", industry:"メディア", emoji:"📢" },
+  { name:"スカパーJSAT", group:"サービス", industry:"メディア", emoji:"📢" },
+  { name:"TOKYO MX", group:"サービス", industry:"メディア", emoji:"📢" },
+  { name:"毎日放送", group:"サービス", industry:"メディア", emoji:"📢" },
+  { name:"朝日放送グループホールディングス", group:"サービス", industry:"メディア", emoji:"📢" },
+  { name:"関西テレビ放送", group:"サービス", industry:"メディア", emoji:"📢" },
+  { name:"読売テレビ放送", group:"サービス", industry:"メディア", emoji:"📢" },
+  { name:"東海テレビ放送", group:"サービス", industry:"メディア", emoji:"📢" },
+  { name:"中部日本放送", group:"サービス", industry:"メディア", emoji:"📢" },
+  { name:"北海道放送", group:"サービス", industry:"メディア", emoji:"📢" },
+  { name:"東北放送", group:"サービス", industry:"メディア", emoji:"📢" },
+  { name:"RKB毎日放送", group:"サービス", industry:"メディア", emoji:"📢" },
+  { name:"琉球放送", group:"サービス", industry:"メディア", emoji:"📢" },
+  { name:"琉球新報社", group:"サービス", industry:"メディア", emoji:"📢" },
+  { name:"沖縄タイムス社", group:"サービス", industry:"メディア", emoji:"📢" },
+  { name:"日本マクドナルドホールディングス", group:"サービス", industry:"外食", emoji:"📢" },
+  { name:"ゼンショーホールディングス", group:"サービス", industry:"外食", emoji:"📢" },
+  { name:"コロワイド", group:"サービス", industry:"外食", emoji:"📢" },
+  { name:"くら寿司", group:"サービス", industry:"外食", emoji:"📢" },
+  { name:"スシロー", group:"サービス", industry:"外食", emoji:"📢" },
+  { name:"FOOD&LIFE COMPANIES", group:"サービス", industry:"外食", emoji:"📢" },
+  { name:"王将フードサービス", group:"サービス", industry:"外食", emoji:"📢" },
+  { name:"松屋フーズホールディングス", group:"サービス", industry:"外食", emoji:"📢" },
+  { name:"吉野家ホールディングス", group:"サービス", industry:"外食", emoji:"📢" },
+  { name:"ロイヤルホールディングス", group:"サービス", industry:"外食", emoji:"📢" },
+  { name:"ロッテリア", group:"サービス", industry:"外食", emoji:"📢" },
+  { name:"モスフードサービス", group:"サービス", industry:"外食", emoji:"📢" },
+  { name:"ドトール・日レスホールディングス", group:"サービス", industry:"外食", emoji:"📢" },
+  { name:"スターバックスコーヒージャパン", group:"サービス", industry:"外食", emoji:"📢" },
+  { name:"タリーズコーヒージャパン", group:"サービス", industry:"外食", emoji:"📢" },
+  { name:"プロント コーポレーション", group:"サービス", industry:"外食", emoji:"📢" },
+  { name:"コメダ", group:"サービス", industry:"外食", emoji:"📢" },
+  { name:"ピザハット", group:"サービス", industry:"外食", emoji:"📢" },
+  { name:"ピザーラ", group:"サービス", industry:"外食", emoji:"📢" },
+  { name:"ドミノ・ピザ", group:"サービス", industry:"外食", emoji:"📢" },
+  { name:"フォーシーズ", group:"サービス", industry:"外食", emoji:"📢" },
+  { name:"クリエイト・レストランツ・ホールディングス", group:"サービス", industry:"外食", emoji:"📢" },
+  { name:"ワタミ", group:"サービス", industry:"外食", emoji:"📢" },
+  { name:"チムニー", group:"サービス", industry:"外食", emoji:"📢" },
+  { name:"ダイヤモンドダイニング", group:"サービス", industry:"外食", emoji:"📢" },
+  { name:"エスエルディー", group:"サービス", industry:"外食", emoji:"📢" },
+  { name:"和民", group:"サービス", industry:"外食", emoji:"📢" },
+  { name:"モンテローザ", group:"サービス", industry:"外食", emoji:"📢" },
+  { name:"金の蔵", group:"サービス", industry:"外食", emoji:"📢" },
+  { name:"白木屋", group:"サービス", industry:"外食", emoji:"📢" },
+  { name:"笑笑", group:"サービス", industry:"外食", emoji:"📢" },
+  { name:"ハイデイ日高", group:"サービス", industry:"外食", emoji:"📢" },
+  { name:"リンガーハット", group:"サービス", industry:"外食", emoji:"📢" },
+  { name:"幸楽苑ホールディングス", group:"サービス", industry:"外食", emoji:"📢" },
+  { name:"物語コーポレーション", group:"サービス", industry:"外食", emoji:"📢" },
+  { name:"あみやき亭", group:"サービス", industry:"外食", emoji:"📢" },
+  { name:"木曽路", group:"サービス", industry:"外食", emoji:"📢" },
+  { name:"アークランドサービスホールディングス", group:"サービス", industry:"外食", emoji:"📢" },
+  { name:"サイゼリヤ", group:"サービス", industry:"外食", emoji:"📢" },
+  { name:"フジオフードグループ本社", group:"サービス", industry:"外食", emoji:"📢" },
+  { name:"ジョイフル", group:"サービス", industry:"外食", emoji:"📢" },
+  { name:"ガスト", group:"サービス", industry:"外食", emoji:"📢" },
+  { name:"バーミヤン", group:"サービス", industry:"外食", emoji:"📢" },
+  { name:"ジョナサン", group:"サービス", industry:"外食", emoji:"📢" },
+  { name:"カフェ・ベローチェ", group:"サービス", industry:"外食", emoji:"📢" },
+  { name:"エクセルシオール カフェ", group:"サービス", industry:"外食", emoji:"📢" },
+  { name:"プロント", group:"サービス", industry:"外食", emoji:"📢" },
+  { name:"タリーズ", group:"サービス", industry:"外食", emoji:"📢" },
+  { name:"スタバ", group:"サービス", industry:"外食", emoji:"📢" },
+  { name:"コメダ珈琲店", group:"サービス", industry:"外食", emoji:"📢" },
+  { name:"コーヒーチェーン", group:"サービス", industry:"外食", emoji:"📢" },
+  { name:"ロイヤルホスト", group:"サービス", industry:"外食", emoji:"📢" },
+  { name:"びっくりドンキー", group:"サービス", industry:"外食", emoji:"📢" },
+  { name:"ステーキガスト", group:"サービス", industry:"外食", emoji:"📢" },
+  { name:"SMS", group:"医療・ヘルス", industry:"医療機器", emoji:"🏥" },
+  { name:"アイビー化粧品", group:"医療・ヘルス", industry:"医療機器", emoji:"🏥" },
+  { name:"ファンケル", group:"医療・ヘルス", industry:"医療機器", emoji:"🏥" },
+  { name:"DHC", group:"医療・ヘルス", industry:"医療機器", emoji:"🏥" },
+  { name:"ノエビアホールディングス", group:"医療・ヘルス", industry:"医療機器", emoji:"🏥" },
+  { name:"ポーラ", group:"医療・ヘルス", industry:"医療機器", emoji:"🏥" },
+  { name:"オルビス", group:"医療・ヘルス", industry:"医療機器", emoji:"🏥" },
+  { name:"アルビオン", group:"医療・ヘルス", industry:"医療機器", emoji:"🏥" },
+  { name:"カネボウ化粧品", group:"医療・ヘルス", industry:"医療機器", emoji:"🏥" },
+  { name:"アクセーヌ", group:"医療・ヘルス", industry:"医療機器", emoji:"🏥" },
+  { name:"クラブコスメチックス", group:"医療・ヘルス", industry:"医療機器", emoji:"🏥" },
+  { name:"シャネル", group:"医療・ヘルス", industry:"医療機器", emoji:"🏥" },
+  { name:"ディオール", group:"医療・ヘルス", industry:"医療機器", emoji:"🏥" },
+  { name:"ベネッセホールディングス", group:"教育・公共", industry:"学校・予備校", emoji:"📚" },
+  { name:"学研ホールディングス", group:"教育・公共", industry:"学校・予備校", emoji:"📚" },
+  { name:"ナガセ", group:"教育・公共", industry:"学校・予備校", emoji:"📚" },
+  { name:"東進ハイスクール", group:"教育・公共", industry:"学校・予備校", emoji:"📚" },
+  { name:"河合塾", group:"教育・公共", industry:"学校・予備校", emoji:"📚" },
+  { name:"駿台予備学校", group:"教育・公共", industry:"学校・予備校", emoji:"📚" },
+  { name:"代々木ゼミナール", group:"教育・公共", industry:"学校・予備校", emoji:"📚" },
+  { name:"Z会", group:"教育・公共", industry:"学校・予備校", emoji:"📚" },
+  { name:"早稲田アカデミー", group:"教育・公共", industry:"学校・予備校", emoji:"📚" },
+  { name:"臨海セミナー", group:"教育・公共", industry:"学校・予備校", emoji:"📚" },
+  { name:"TAC", group:"教育・公共", industry:"学校・予備校", emoji:"📚" },
+  { name:"資格の大原", group:"教育・公共", industry:"学校・予備校", emoji:"📚" },
+  { name:"LEC東京リーガルマインド", group:"教育・公共", industry:"学校・予備校", emoji:"📚" },
+  { name:"ECC", group:"教育・公共", industry:"学校・予備校", emoji:"📚" },
+  { name:"ベルリッツ", group:"教育・公共", industry:"学校・予備校", emoji:"📚" },
+  { name:"ステップ", group:"教育・公共", industry:"学校・予備校", emoji:"📚" },
+  { name:"明光ネットワークジャパン", group:"教育・公共", industry:"学校・予備校", emoji:"📚" },
+  { name:"リソー教育", group:"教育・公共", industry:"学校・予備校", emoji:"📚" },
+  { name:"幼児活動研究会", group:"教育・公共", industry:"学校・予備校", emoji:"📚" },
+  { name:"ヒューマンアカデミー", group:"教育・公共", industry:"学校・予備校", emoji:"📚" },
+  { name:"シナジア・キャピタル", group:"教育・公共", industry:"学校・予備校", emoji:"📚" },
+  { name:"リクルート(スタディサプリ)", group:"教育・公共", industry:"学校・予備校", emoji:"📚" },
+  { name:"バンダイナムコホールディングス", group:"エンタメ", industry:"ゲーム", emoji:"🎮" },
+  { name:"任天堂", group:"エンタメ", industry:"ゲーム", emoji:"🎮" },
+  { name:"カプコン", group:"エンタメ", industry:"ゲーム", emoji:"🎮" },
+  { name:"コナミグループ", group:"エンタメ", industry:"ゲーム", emoji:"🎮" },
+  { name:"スクウェア・エニックス・ホールディングス", group:"エンタメ", industry:"ゲーム", emoji:"🎮" },
+  { name:"コーエーテクモホールディングス", group:"エンタメ", industry:"ゲーム", emoji:"🎮" },
+  { name:"KLab", group:"エンタメ", industry:"ゲーム", emoji:"🎮" },
+  { name:"Aiming", group:"エンタメ", industry:"ゲーム", emoji:"🎮" },
+  { name:"gumi", group:"エンタメ", industry:"ゲーム", emoji:"🎮" },
+  { name:"フジ・スタートアップ・ベンチャーズ", group:"エンタメ", industry:"ゲーム", emoji:"🎮" },
+  { name:"ソニー・インタラクティブエンタテインメント", group:"エンタメ", industry:"ゲーム", emoji:"🎮" },
+  { name:"マイクロソフト", group:"エンタメ", industry:"ゲーム", emoji:"🎮" },
+  { name:"エレクトロニック・アーツ", group:"エンタメ", industry:"ゲーム", emoji:"🎮" },
+  { name:"ユービーアイソフト", group:"エンタメ", industry:"ゲーム", emoji:"🎮" },
+  { name:"ブリザード", group:"エンタメ", industry:"ゲーム", emoji:"🎮" },
+  { name:"東宝", group:"エンタメ", industry:"映像・音楽", emoji:"🎮" },
+  { name:"東映", group:"エンタメ", industry:"映像・音楽", emoji:"🎮" },
+  { name:"松竹", group:"エンタメ", industry:"映像・音楽", emoji:"🎮" },
+  { name:"角川映画", group:"エンタメ", industry:"映像・音楽", emoji:"🎮" },
+  { name:"ワーナー ブラザース", group:"エンタメ", industry:"映像・音楽", emoji:"🎮" },
+  { name:"ディズニー", group:"エンタメ", industry:"映像・音楽", emoji:"🎮" },
+  { name:"ジブリ", group:"エンタメ", industry:"映像・音楽", emoji:"🎮" },
+  { name:"ソニー・ミュージックエンタテインメント", group:"エンタメ", industry:"映像・音楽", emoji:"🎮" },
+  { name:"エイベックス", group:"エンタメ", industry:"映像・音楽", emoji:"🎮" },
+  { name:"ユニバーサル ミュージック", group:"エンタメ", industry:"映像・音楽", emoji:"🎮" },
+  { name:"ワーナーミュージック・ジャパン", group:"エンタメ", industry:"映像・音楽", emoji:"🎮" },
+  { name:"アミューズ", group:"エンタメ", industry:"映像・音楽", emoji:"🎮" },
+  { name:"ホリプロ", group:"エンタメ", industry:"映像・音楽", emoji:"🎮" },
+  { name:"研音", group:"エンタメ", industry:"映像・音楽", emoji:"🎮" },
+  { name:"スターダストプロモーション", group:"エンタメ", industry:"映像・音楽", emoji:"🎮" },
+  { name:"太田プロダクション", group:"エンタメ", industry:"映像・音楽", emoji:"🎮" },
+  { name:"吉本興業", group:"エンタメ", industry:"映像・音楽", emoji:"🎮" },
+  { name:"松竹芸能", group:"エンタメ", industry:"映像・音楽", emoji:"🎮" },
+  { name:"ナベプロ", group:"エンタメ", industry:"映像・音楽", emoji:"🎮" },
+  { name:"講談社", group:"エンタメ", industry:"出版", emoji:"🎮" },
+  { name:"集英社", group:"エンタメ", industry:"出版", emoji:"🎮" },
+  { name:"小学館", group:"エンタメ", industry:"出版", emoji:"🎮" },
+  { name:"新潮社", group:"エンタメ", industry:"出版", emoji:"🎮" },
+  { name:"文藝春秋", group:"エンタメ", industry:"出版", emoji:"🎮" },
+  { name:"幻冬舎", group:"エンタメ", industry:"出版", emoji:"🎮" },
+  { name:"早川書房", group:"エンタメ", industry:"出版", emoji:"🎮" },
+  { name:"東洋経済新報社", group:"エンタメ", industry:"出版", emoji:"🎮" },
+  { name:"ダイヤモンド社", group:"エンタメ", industry:"出版", emoji:"🎮" },
+  { name:"プレジデント社", group:"エンタメ", industry:"出版", emoji:"🎮" },
+  { name:"日経BP", group:"エンタメ", industry:"出版", emoji:"🎮" },
+  { name:"日本経済新聞出版", group:"エンタメ", industry:"出版", emoji:"🎮" },
+  { name:"日経BPマーケティング", group:"エンタメ", industry:"出版", emoji:"🎮" },
+  { name:"ベネッセコーポレーション", group:"エンタメ", industry:"出版", emoji:"🎮" },
+  { name:"学研プラス", group:"エンタメ", industry:"出版", emoji:"🎮" },
+  { name:"旺文社", group:"エンタメ", industry:"出版", emoji:"🎮" },
+  { name:"河出書房新社", group:"エンタメ", industry:"出版", emoji:"🎮" },
+  { name:"岩波書店", group:"エンタメ", industry:"出版", emoji:"🎮" },
+  { name:"三省堂", group:"エンタメ", industry:"出版", emoji:"🎮" },
+  { name:"学研ステイフル", group:"エンタメ", industry:"出版", emoji:"🎮" },
+  { name:"主婦の友社", group:"エンタメ", industry:"出版", emoji:"🎮" },
+  { name:"主婦と生活社", group:"エンタメ", industry:"出版", emoji:"🎮" },
+  { name:"光文社", group:"エンタメ", industry:"出版", emoji:"🎮" },
+  { name:"ANAホールディングス", group:"航空・交通", industry:"航空", emoji:"✈️" },
+  { name:"日本航空", group:"航空・交通", industry:"航空", emoji:"✈️" },
+  { name:"スカイマーク", group:"航空・交通", industry:"航空", emoji:"✈️" },
+  { name:"Peach Aviation", group:"航空・交通", industry:"航空", emoji:"✈️" },
+  { name:"ジェットスター・ジャパン", group:"航空・交通", industry:"航空", emoji:"✈️" },
+  { name:"春秋航空日本", group:"航空・交通", industry:"航空", emoji:"✈️" },
+  { name:"AIRDO", group:"航空・交通", industry:"航空", emoji:"✈️" },
+  { name:"ソラシドエア", group:"航空・交通", industry:"航空", emoji:"✈️" },
+  { name:"スターフライヤー", group:"航空・交通", industry:"航空", emoji:"✈️" },
+  { name:"アイベックスエアラインズ", group:"航空・交通", industry:"航空", emoji:"✈️" },
+  { name:"フジドリームエアラインズ", group:"航空・交通", industry:"航空", emoji:"✈️" },
+  { name:"オリエンタルエアブリッジ", group:"航空・交通", industry:"航空", emoji:"✈️" },
+  { name:"新中央航空", group:"航空・交通", industry:"航空", emoji:"✈️" },
+  { name:"天草エアライン", group:"航空・交通", industry:"航空", emoji:"✈️" },
+  { name:"琉球エアーコミューター", group:"航空・交通", industry:"航空", emoji:"✈️" },
+  { name:"JAL", group:"航空・交通", industry:"航空", emoji:"✈️" },
+  { name:"ANA", group:"航空・交通", industry:"航空", emoji:"✈️" },
+  { name:"JR東日本", group:"航空・交通", industry:"鉄道", emoji:"✈️" },
+  { name:"JR東海", group:"航空・交通", industry:"鉄道", emoji:"✈️" },
+  { name:"JR西日本", group:"航空・交通", industry:"鉄道", emoji:"✈️" },
+  { name:"JR北海道", group:"航空・交通", industry:"鉄道", emoji:"✈️" },
+  { name:"JR九州", group:"航空・交通", industry:"鉄道", emoji:"✈️" },
+  { name:"JR四国", group:"航空・交通", industry:"鉄道", emoji:"✈️" },
+  { name:"東京地下鉄(東京メトロ)", group:"航空・交通", industry:"鉄道", emoji:"✈️" },
+  { name:"東京都交通局", group:"航空・交通", industry:"鉄道", emoji:"✈️" },
+  { name:"小田急電鉄", group:"航空・交通", industry:"鉄道", emoji:"✈️" },
+  { name:"東急電鉄", group:"航空・交通", industry:"鉄道", emoji:"✈️" },
+  { name:"京王電鉄", group:"航空・交通", industry:"鉄道", emoji:"✈️" },
+  { name:"京急電鉄", group:"航空・交通", industry:"鉄道", emoji:"✈️" },
+  { name:"京成電鉄", group:"航空・交通", industry:"鉄道", emoji:"✈️" },
+  { name:"京浜急行電鉄", group:"航空・交通", industry:"鉄道", emoji:"✈️" },
+  { name:"西武鉄道", group:"航空・交通", industry:"鉄道", emoji:"✈️" },
+  { name:"東武鉄道", group:"航空・交通", industry:"鉄道", emoji:"✈️" },
+  { name:"名古屋鉄道", group:"航空・交通", industry:"鉄道", emoji:"✈️" },
+  { name:"近鉄", group:"航空・交通", industry:"鉄道", emoji:"✈️" },
+  { name:"南海電気鉄道", group:"航空・交通", industry:"鉄道", emoji:"✈️" },
+  { name:"阪急電鉄", group:"航空・交通", industry:"鉄道", emoji:"✈️" },
+  { name:"阪神電気鉄道", group:"航空・交通", industry:"鉄道", emoji:"✈️" },
+  { name:"京阪電気鉄道", group:"航空・交通", industry:"鉄道", emoji:"✈️" },
+  { name:"西日本鉄道", group:"航空・交通", industry:"鉄道", emoji:"✈️" },
+  { name:"新京成電鉄", group:"航空・交通", industry:"鉄道", emoji:"✈️" },
+  { name:"北総鉄道", group:"航空・交通", industry:"鉄道", emoji:"✈️" },
+  { name:"相模鉄道", group:"航空・交通", industry:"鉄道", emoji:"✈️" },
+  { name:"横浜市交通局", group:"航空・交通", industry:"鉄道", emoji:"✈️" },
+  { name:"名古屋市交通局", group:"航空・交通", industry:"鉄道", emoji:"✈️" },
+  { name:"大阪市高速電気軌道(Osaka Metro)", group:"航空・交通", industry:"鉄道", emoji:"✈️" },
+  { name:"京都市交通局", group:"航空・交通", industry:"鉄道", emoji:"✈️" },
+  { name:"札幌市交通局", group:"航空・交通", industry:"鉄道", emoji:"✈️" },
+  { name:"仙台市交通局", group:"航空・交通", industry:"鉄道", emoji:"✈️" },
+  { name:"九州旅客鉄道(JR九州)", group:"航空・交通", industry:"鉄道", emoji:"✈️" },
+  { name:"小田急バス", group:"航空・交通", industry:"鉄道", emoji:"✈️" },
+  { name:"JR東日本バス", group:"航空・交通", industry:"バス", emoji:"✈️" },
+  { name:"JRバス関東", group:"航空・交通", industry:"バス", emoji:"✈️" },
+  { name:"京王電鉄バス", group:"航空・交通", industry:"バス", emoji:"✈️" },
+  { name:"京急バス", group:"航空・交通", industry:"バス", emoji:"✈️" },
+  { name:"京成バス", group:"航空・交通", industry:"バス", emoji:"✈️" },
+  { name:"東急バス", group:"航空・交通", industry:"バス", emoji:"✈️" },
+  { name:"西武バス", group:"航空・交通", industry:"バス", emoji:"✈️" },
+  { name:"東武バス", group:"航空・交通", industry:"バス", emoji:"✈️" },
+  { name:"西鉄バス", group:"航空・交通", industry:"バス", emoji:"✈️" },
+  { name:"近鉄バス", group:"航空・交通", industry:"バス", emoji:"✈️" },
+  { name:"阪急バス", group:"航空・交通", industry:"バス", emoji:"✈️" },
+  { name:"南海バス", group:"航空・交通", industry:"バス", emoji:"✈️" },
+  { name:"京阪バス", group:"航空・交通", industry:"バス", emoji:"✈️" },
+  { name:"名鉄バス", group:"航空・交通", industry:"バス", emoji:"✈️" },
+  { name:"千葉中央バス", group:"航空・交通", industry:"バス", emoji:"✈️" },
+  { name:"関東バス", group:"航空・交通", industry:"バス", emoji:"✈️" },
+  { name:"横浜市営バス", group:"航空・交通", industry:"バス", emoji:"✈️" },
+];
+
 // ─── アプリ本体 ────────────────────────────────────────────────────────────────
 export default function App() {
   // Auth state
@@ -257,13 +1466,25 @@ export default function App() {
   useEffect(() => {
     (async () => {
       try {
-        const [c, p, r, s, j] = await Promise.all([
+        let [c, p, r, s, j] = await Promise.all([
           fsAll("companies"),
           fsAll("posts",       "createdAt"),
           fsAll("reviews",     "createdAt"),
           fsAll("salaries",    "createdAt"),
           fsAll("joblistings", "postedDate"),
         ]);
+        // 初回起動時にシード企業を投入
+        if (c.length === 0 && SEED_COMPANIES.length > 0) {
+          console.log("初回シードデータを投入中...");
+          const newCos = [];
+          for (const seed of SEED_COMPANIES) {
+            try {
+              const id = await fsAdd("companies", { ...seed, author: "システム", authorUid: null });
+              newCos.push({ id, ...seed });
+            } catch (e) { console.error("seed error:", e); }
+          }
+          c = newCos;
+        }
         setCompanies(c);
         setPosts(p);
         setReviews(r);
@@ -319,6 +1540,21 @@ export default function App() {
       return null;
     } catch (e) {
       return "メールアドレスまたはパスワードが正しくありません";
+    }
+  };
+
+  const resetPassword = async (email) => {
+    try {
+      await sendPasswordResetEmail(auth, email);
+      toast2("パスワードリセットメールを送信しました");
+      return null;
+    } catch (e) {
+      const m = {
+        "auth/user-not-found":  "このメールアドレスは登録されていません",
+        "auth/invalid-email":   "メールアドレスの形式が正しくありません",
+        "auth/missing-email":   "メールアドレスを入力してください",
+      };
+      return m[e.code] || ("エラー: " + e.message);
     }
   };
 
@@ -530,7 +1766,7 @@ export default function App() {
       <style>{CSS}</style>
       <AppNav {...sp} menuOpen={menuOpen} setMenuOpen={setMenuOpen} logout={logout} />
       {toast && <div style={S.toast} className="fadeUp">{toast}</div>}
-      {authMode && <AuthModal mode={authMode} setMode={setAuthMode} onLogin={login} onRegister={register} />}
+      {authMode && <AuthModal mode={authMode} setMode={setAuthMode} onLogin={login} onRegister={register} onReset={resetPassword} />}
       {editTgt  && <EditModal target={editTgt} setTarget={setEditTgt} onSave={adminEdit} />}
 
       {authUser && !authUser.emailVerified && (
@@ -544,7 +1780,7 @@ export default function App() {
       )}
 
       <main style={{ ...S.main, padding: isMobile ? "0 12px 60px" : "0 24px 72px" }}>
-        {page === "home"       && <HomePage       {...sp} coPosts={coPosts} coRevs={coRevs} coSals={coSals} />}
+        {page === "home"       && <HomePage       {...sp} coPosts={coPosts} coRevs={coRevs} coSals={coSals} setAuthMode={setAuthMode} />}
         {page === "companies"  && <CompaniesPage  {...sp} filtered={filteredCos} searchQ={searchQ} setSearchQ={setSearchQ} grpFilter={grpFilter} setGrpFilter={setGrpFilter} subFilter={subFilter} setSubFilter={setSubFilter} sortBy={sortBy} setSortBy={setSortBy} coPosts={coPosts} coRevs={coRevs} coSals={coSals} />}
         {page === "company"    && selCo && (
           <CompanyPage {...sp}
@@ -555,11 +1791,12 @@ export default function App() {
             onToggleLike={toggleLike} onAddComment={addComment}
             onAddPost={addPost}       onAddReview={addReview}
             onAddSalary={addSalary}   onAddJob={addJobListing}
+            sess={sess}
           />
         )}
         {page === "ranking"    && <RankingPage    {...sp} coPosts={coPosts} coRevs={coRevs} coSals={coSals} />}
         {page === "pricing"    && <PricingPage    {...sp} />}
-        {page === "addCompany" && <AddCompanyPage {...sp} onSubmit={addCompany} />}
+        {page === "addCompany" && <AddCompanyPage {...sp} onSubmit={addCompany} authUser={authUser} setAuthMode={setAuthMode} />}
         {page === "mypage"     && (
           <MyPage {...sp}
             diary={diary} saveDiary={saveDiary}
@@ -578,7 +1815,7 @@ export default function App() {
             <span style={{ ...S.logoText, fontSize:15 }}>CareerClub</span>
           </button>
           <div style={{ display:"flex", gap:16, flexWrap:"wrap" }}>
-            {[["ranking","ランキング"],["companies","企業一覧"],["pricing","料金プラン"]].map(([p,l]) => (
+            {[["ranking","ランキング"],["companies","企業一覧"]].map(([p,l]) => (
               <button key={p} style={{ background:"none", border:"none", color:C.sub, fontSize:12, fontFamily:"inherit", cursor:"pointer", textDecoration:"underline" }} onClick={() => go(p)}>{l}</button>
             ))}
           </div>
@@ -591,11 +1828,12 @@ export default function App() {
 }
 
 // ─── AuthModal（本物のFirebase Auth）────────────────────────────────────────
-function AuthModal({ mode, setMode, onLogin, onRegister }) {
+function AuthModal({ mode, setMode, onLogin, onRegister, onReset }) {
   const [email, setEmail] = useState("");
   const [dn,    setDn]    = useState("");
   const [pw,    setPw]    = useState("");
   const [err,   setErr]   = useState("");
+  const [msg,   setMsg]   = useState("");
   const [ld,    setLd]    = useState(false);
 
   const doLogin = async () => {
@@ -612,11 +1850,20 @@ function AuthModal({ mode, setMode, onLogin, onRegister }) {
     if (e) setErr(e);
     setLd(false);
   };
+  const doReset = async () => {
+    setErr(""); setMsg(""); setLd(true);
+    const e = await onReset(email.trim());
+    if (e) setErr(e);
+    else setMsg("メールを送信しました。受信トレイをご確認ください。");
+    setLd(false);
+  };
+
+  const titles = { login:"ログイン", register:"新規会員登録", forgot:"パスワード再発行" };
 
   return (
     <div style={S.overlay} onClick={e => { if (e.target === e.currentTarget) setMode(null); }}>
       <div style={S.modal} className="fadeUp">
-        <h2 style={S.modalTitle}>{mode === "login" ? "ログイン" : "新規会員登録"}</h2>
+        <h2 style={S.modalTitle}>{titles[mode]}</h2>
         <div style={S.modalHr} />
         {mode === "register" && (
           <div style={{ background:"#F0F9FF", border:"1px solid #BAE6FD", padding:"10px 14px", marginBottom:12, fontSize:12, lineHeight:1.7 }}>
@@ -624,26 +1871,42 @@ function AuthModal({ mode, setMode, onLogin, onRegister }) {
             登録後、すべての投稿・閲覧・企業追加機能をご利用いただけます。
           </div>
         )}
+        {mode === "forgot" && (
+          <div style={{ background:"#F0F9FF", border:"1px solid #BAE6FD", padding:"10px 14px", marginBottom:12, fontSize:12, lineHeight:1.7 }}>
+            登録時のメールアドレスを入力してください。<br />
+            パスワード再設定用のメールをお送りします。
+          </div>
+        )}
         {err && <div style={S.errBox}>{err}</div>}
+        {msg && <div style={{ background:"#F0FDF4", border:"1px solid #BBF7D0", color:"#166534", padding:"8px 12px", fontSize:12, marginBottom:12, borderRadius:4 }}>{msg}</div>}
         <Fld label="メールアドレス">
-          <input style={S.input} type="email" placeholder="example@email.com" value={email} onChange={e => setEmail(e.target.value)} />
+          <input style={S.input} type="email" placeholder="example@email.com" value={email} onChange={e => setEmail(e.target.value)} onKeyDown={e => { if (e.key === "Enter" && mode === "forgot") doReset(); }} />
         </Fld>
         {mode === "register" && (
           <Fld label="表示名（掲示板に表示される名前）">
             <input style={S.input} placeholder="例：転職中エンジニア" value={dn} onChange={e => setDn(e.target.value)} />
           </Fld>
         )}
-        <Fld label="パスワード（6文字以上）">
-          <input style={S.input} type="password" value={pw} onChange={e => setPw(e.target.value)} onKeyDown={e => { if (e.key === "Enter") (mode === "login" ? doLogin() : doReg()); }} />
-        </Fld>
-        <button style={{ ...S.primaryBtn, width:"100%", padding:"11px", opacity: ld ? 0.6 : 1 }} onClick={mode === "login" ? doLogin : doReg} disabled={ld}>
-          {ld ? "処理中..." : (mode === "login" ? "ログイン" : "登録する")}
+        {mode !== "forgot" && (
+          <Fld label="パスワード（6文字以上）">
+            <input style={S.input} type="password" value={pw} onChange={e => setPw(e.target.value)} onKeyDown={e => { if (e.key === "Enter") (mode === "login" ? doLogin() : doReg()); }} />
+          </Fld>
+        )}
+        <button style={{ ...S.primaryBtn, width:"100%", padding:"11px", opacity: ld ? 0.6 : 1 }}
+          onClick={mode === "login" ? doLogin : mode === "register" ? doReg : doReset} disabled={ld}>
+          {ld ? "処理中..." : mode === "login" ? "ログイン" : mode === "register" ? "登録する" : "メールを送信する"}
         </button>
+        {mode === "login" && (
+          <p style={{ textAlign:"center", marginTop:10, fontSize:12 }}>
+            <button style={S.textLink} onClick={() => { setMode("forgot"); setErr(""); setMsg(""); }}>
+              パスワードをお忘れの方はこちら
+            </button>
+          </p>
+        )}
         <p style={{ textAlign:"center", marginTop:14, fontSize:12, color:C.sub }}>
-          {mode === "login" ? "アカウントをお持ちでない方は" : "すでにアカウントをお持ちの方は"}
-          <button style={S.textLink} onClick={() => { setMode(mode === "login" ? "register" : "login"); setErr(""); }}>
-            {mode === "login" ? " 新規登録" : " ログイン"}
-          </button>
+          {mode === "login"   && <>アカウントをお持ちでない方は<button style={S.textLink} onClick={() => { setMode("register"); setErr(""); setMsg(""); }}> 新規登録</button></>}
+          {mode === "register"&& <>すでにアカウントをお持ちの方は<button style={S.textLink} onClick={() => { setMode("login");    setErr(""); setMsg(""); }}> ログイン</button></>}
+          {mode === "forgot"  && <button style={S.textLink} onClick={() => { setMode("login"); setErr(""); setMsg(""); }}>← ログイン画面に戻る</button>}
         </p>
       </div>
     </div>
@@ -687,7 +1950,7 @@ function AppNav({ sess, go, plan, isAdmin, setAuthMode, isMobile, menuOpen, setM
   const pl = PLANS[plan];
   return (
     <nav style={S.nav}>
-      <div style={{ height:4, background:C.accent }} />
+      <div style={{ height:3, background:"linear-gradient(90deg, #1E5A96 0%, #2B7BD1 100%)" }} />
       <div style={{ maxWidth:1160, margin:"0 auto", display:"flex", alignItems:"center", justifyContent:"space-between", padding: isMobile ? "8px 12px" : "10px 24px" }}>
         <button style={S.logoBtn} onClick={() => go("home")}>
           <span style={{ ...S.logoText, fontSize: isMobile ? 17 : 22 }}>CareerClub</span>
@@ -707,8 +1970,6 @@ function AppNav({ sess, go, plan, isAdmin, setAuthMode, isMobile, menuOpen, setM
                 <span style={{ color:C.border, fontSize:11 }}>|</span>
               </span>
             ))}
-            <button style={{ background:"none", border:"none", color:C.accent, fontWeight:"bold", fontSize:12, padding:"4px 10px", fontFamily:"inherit", cursor:"pointer" }} onClick={() => go("pricing")}>料金プラン</button>
-            <span style={{ color:C.border, fontSize:11 }}>|</span>
             <button style={{ background:"none", border:"none", color:C.ink, fontSize:12, padding:"4px 10px", fontFamily:"inherit", cursor:"pointer" }} onClick={() => go("addCompany")}>＋企業追加</button>
             <span style={{ color:C.border, fontSize:11 }}>|</span>
             {sess ? (
@@ -722,7 +1983,7 @@ function AppNav({ sess, go, plan, isAdmin, setAuthMode, isMobile, menuOpen, setM
                 </button>
                 {drop && (
                   <div style={{ position:"absolute", right:0, top:"calc(100% + 4px)", background:"#fff", border:"1px solid " + C.border, boxShadow:"0 4px 12px rgba(0,0,0,0.1)", minWidth:180, zIndex:300 }} className="fadeUp">
-                    {[["mypage","マイページ"],["addCompany","企業を追加"],["pricing","プランを変更"]].map(([p,l]) => (
+                    {[["mypage","マイページ"],["addCompany","企業を追加"]].map(([p,l]) => (
                       <button key={p} style={{ display:"block", width:"100%", textAlign:"left", background:"none", border:"none", padding:"9px 14px", fontSize:12, color:C.ink, fontFamily:"inherit", cursor:"pointer", borderBottom:"1px solid " + C.border }} onClick={() => { go(p); setDrop(false); }}>{l}</button>
                     ))}
                     {isAdmin && (
@@ -749,7 +2010,7 @@ function AppNav({ sess, go, plan, isAdmin, setAuthMode, isMobile, menuOpen, setM
       </div>
       {isMobile && menuOpen && (
         <div style={{ background:"#fff", borderBottom:"1px solid " + C.border, boxShadow:"0 4px 12px rgba(0,0,0,0.1)" }} className="fadeUp">
-          {[["home","ホーム"],["companies","企業一覧"],["ranking","ランキング"],["addCompany","＋企業追加"],["pricing","料金プラン"]].map(([p,l]) => (
+          {[["home","ホーム"],["companies","企業一覧"],["ranking","ランキング"],["addCompany","＋企業追加"]].map(([p,l]) => (
             <button key={p} style={{ display:"block", width:"100%", textAlign:"left", background:"none", border:"none", padding:"12px 16px", fontSize:13, color:C.ink, fontFamily:"inherit", cursor:"pointer", borderBottom:"1px solid " + C.border }} onClick={() => go(p)}>{l}</button>
           ))}
           {sess ? (
@@ -773,115 +2034,193 @@ function AppNav({ sess, go, plan, isAdmin, setAuthMode, isMobile, menuOpen, setM
 }
 
 // ─── ホームページ ──────────────────────────────────────────────────────────────
-function HomePage({ sess, go, companies, posts, reviews, salaries, isAdmin, adminDelete, setEditTgt, coPosts, coRevs, coSals, isMobile }) {
-  const recent   = posts.slice(0, 6);
-  const topCos   = [...companies].sort((a,b) => coRevs(b.id).length + coPosts(b.id).length - (coRevs(a.id).length + coPosts(a.id).length)).slice(0, 8);
+function HomePage({ sess, go, companies, posts, reviews, salaries, isAdmin, adminDelete, setEditTgt, coPosts, coRevs, coSals, isMobile, setAuthMode }) {
+  const recent   = posts.slice(0, 8);
+  const topCos   = [...companies].sort((a,b) => coRevs(b.id).length + coPosts(b.id).length - (coRevs(a.id).length + coPosts(a.id).length)).slice(0, 10);
   const weekAgo  = Date.now() - 7 * 86400000;
   const trending = [...posts].filter(p => {
     const ts = p.createdAt?.toDate?.()?.getTime() || 0;
     return ts > weekAgo;
-  }).sort((a,b) => (b.likes?.length || 0) - (a.likes?.length || 0)).slice(0, 3);
+  }).sort((a,b) => (b.likes?.length || 0) - (a.likes?.length || 0)).slice(0, 4);
 
   return (
     <div>
-      <section style={{ ...S.hero, flexDirection: isMobile ? "column" : "row", padding: isMobile ? "16px 0 20px" : "56px 0 40px" }}>
-        <div style={{ flex:"1 1 300px" }}>
-          <p style={{ fontSize:10, fontWeight:"bold", letterSpacing:"0.14em", textTransform:"uppercase", color:C.accent, marginBottom:10 }}>
-            メール登録で無料で使えます
+      {/* ヒーローセクション - 明るい青グラデーション */}
+      <section style={{
+        background: "linear-gradient(135deg, #1E5A96 0%, #2B7BD1 100%)",
+        color: "#fff",
+        padding: isMobile ? "32px 20px" : "56px 40px",
+        marginBottom: 24,
+        borderRadius: 12,
+        marginTop: 16,
+      }}>
+        <div style={{ maxWidth:900, margin:"0 auto", textAlign:"center" }}>
+          <p style={{ fontSize:11, fontWeight:"bold", letterSpacing:"0.18em", opacity:0.9, marginBottom:12 }}>
+            CAREER COMMUNITY
           </p>
-          <h1 style={{ fontWeight:"bold", lineHeight:1.5, marginBottom:10, fontFamily:"serif", fontSize: isMobile ? "clamp(18px,5vw,22px)" : "clamp(20px,3vw,28px)" }}>
-            面接体験談・年収・口コミ・求人情報を<br />みんなで共有するコミュニティ「キャリクラ」
+          <h1 style={{ fontSize: isMobile ? 22 : 32, fontWeight:"bold", lineHeight:1.5, marginBottom:14, fontFamily:"\"Noto Serif JP\", serif" }}>
+            転職・就活の<span style={{ color:"#FCD34D" }}>本音</span>が集まる<br />
+            キャリア情報コミュニティ
           </h1>
-          <p style={{ color:C.sub, lineHeight:1.9, fontSize: isMobile ? 12 : 13, marginBottom:16 }}>
-            無料会員登録（メールのみ）で投稿・閲覧・企業追加が可能。情報が集まるほど、みんなの役に立ちます。
+          <p style={{ fontSize: isMobile ? 13 : 15, lineHeight:1.9, opacity:0.95, marginBottom:24 }}>
+            面接体験談・年収・口コミ・選考情報を{!isMobile && <br />}
+            みんなで共有して、転職・就活を成功させよう
           </p>
-          <div style={{ display:"flex", gap:10, flexWrap:"wrap" }}>
-            <button style={S.primaryBtn} onClick={() => go("companies")}>企業一覧を見る</button>
-            <button style={{ ...S.primaryBtn, background:"none", border:"1px solid " + C.ink, color:C.ink }} onClick={() => go("addCompany")}>＋ 企業を追加</button>
-          </div>
-          <div style={{ marginTop:12, padding:"10px 14px", background:"#FFF8F0", border:"1px solid #E8C97A", fontSize:12, lineHeight:1.8 }}>
-            ベータ版提供中。早期登録ユーザーには正式リリース後も現行価格での継続利用を保証します。
-          </div>
-        </div>
-        <div style={{ display:"flex", flexDirection: isMobile ? "row" : "column", gap: isMobile ? 8 : 0, border: isMobile ? "none" : "1px solid " + C.border, alignSelf:"flex-start" }}>
-          {[[posts.length,"件","体験談"],[reviews.length,"件","口コミ"],[salaries.length,"件","年収情報"],[companies.length,"社","掲載企業"]].map(([n,u,l]) => (
-            <div key={l} style={{ padding: isMobile ? "8px 10px" : "12px 18px", background:C.surface, borderBottom: isMobile ? "none" : "1px solid " + C.border }}>
-              <div style={{ fontSize:20, fontWeight:"bold", color:C.accent, fontFamily:"serif" }}>{n}<span style={{ fontSize:11, fontWeight:"normal", marginLeft:2 }}>{u}</span></div>
-              <div style={{ fontSize:10, color:C.sub, marginTop:2 }}>{l}</div>
+          {!sess && (
+            <div style={{ display:"flex", gap:12, justifyContent:"center", flexWrap:"wrap" }}>
+              <button style={{
+                background:"#fff", color:"#1E5A96", border:"none",
+                padding:"12px 32px", fontSize:14, fontWeight:"bold",
+                fontFamily:"inherit", cursor:"pointer", borderRadius:6,
+                boxShadow:"0 4px 12px rgba(0,0,0,0.15)"
+              }} onClick={() => setAuthMode("register")}>
+                無料会員登録（30秒）
+              </button>
+              <button style={{
+                background:"rgba(255,255,255,0.15)", color:"#fff",
+                border:"2px solid rgba(255,255,255,0.5)",
+                padding:"10px 24px", fontSize:14, fontWeight:"bold",
+                fontFamily:"inherit", cursor:"pointer", borderRadius:6
+              }} onClick={() => setAuthMode("login")}>
+                ログイン
+              </button>
             </div>
-          ))}
+          )}
+          <div style={{ display:"flex", gap: isMobile ? 16 : 32, justifyContent:"center", marginTop:28, flexWrap:"wrap" }}>
+            {[[companies.length,"企業"],[posts.length,"体験談"],[reviews.length,"口コミ"],[salaries.length,"年収情報"]].map(([n,l]) => (
+              <div key={l} style={{ textAlign:"center" }}>
+                <div style={{ fontSize: isMobile ? 22 : 28, fontWeight:"bold", fontFamily:"\"Noto Serif JP\", serif" }}>{n.toLocaleString()}</div>
+                <div style={{ fontSize:11, opacity:0.85, marginTop:2 }}>{l}</div>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 
-      {posts.length < 20 && (
-        <div style={{ background:C.ink, color:"#fff", padding:"14px 20px", marginBottom:24, display:"flex", gap:12, alignItems:"center", flexWrap:"wrap" }}>
-          <span style={{ fontSize:20 }}>🔥</span>
-          <div style={{ flex:1 }}>
-            <div style={{ fontWeight:"bold", fontSize:13, marginBottom:3 }}>あなたの情報が次の転職者を助けます</div>
-            <div style={{ fontSize:12, opacity:0.8 }}>体験談を投稿すると、他社の情報が見やすくなります。</div>
+      {/* 未ログインユーザー向けの登録誘導 */}
+      {!sess && (
+        <section style={{
+          background:"#FFF8E7", border:"1px solid #F5D982", borderRadius:8,
+          padding: isMobile ? "16px 18px" : "20px 28px", marginBottom:24,
+          display:"flex", alignItems:"center", gap:16, flexWrap:"wrap"
+        }}>
+          <div style={{ fontSize:32, flexShrink:0 }}>🎁</div>
+          <div style={{ flex:1, minWidth:200 }}>
+            <div style={{ fontWeight:"bold", fontSize:15, color:"#92400E", marginBottom:4 }}>
+              会員登録（無料）でできること
+            </div>
+            <div style={{ fontSize:13, color:"#78350F", lineHeight:1.7 }}>
+              ✓ 企業の口コミ・年収を全文閲覧 &nbsp; ✓ 体験談・選考情報を投稿 &nbsp; ✓ お気に入り企業を保存
+            </div>
           </div>
-          <button style={{ ...S.primaryBtn, background:C.accent, border:"none", whiteSpace:"nowrap" }} onClick={() => go("companies")}>投稿する →</button>
-        </div>
+          <button style={{
+            background:"#1E5A96", color:"#fff", border:"none",
+            padding:"10px 24px", fontSize:13, fontWeight:"bold",
+            fontFamily:"inherit", cursor:"pointer", borderRadius:6, whiteSpace:"nowrap"
+          }} onClick={() => setAuthMode("register")}>
+            無料会員登録 →
+          </button>
+        </section>
       )}
 
-      <div style={{ display:"grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 280px", gap:28, alignItems:"start" }}>
+      {/* メインコンテンツ：2カラム */}
+      <div style={{ display:"grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 300px", gap:24, alignItems:"start" }}>
+        {/* 左カラム：トレンドと最新投稿 */}
         <section>
           {trending.length > 0 && (
-            <div>
-              <STitle label="今週のトレンド" />
-              {trending.map(p => (
-                <PostCard key={p.id} post={p} co={companies.find(c => c.id === p.companyId)} go={go} isAdmin={isAdmin} onDelete={adminDelete} onEdit={d => setEditTgt({ type:"post", data:d })} />
-              ))}
-              <div style={{ marginTop:24 }} />
+            <div style={{ marginBottom:24 }}>
+              <h2 style={{ fontSize:16, fontWeight:"bold", marginBottom:12, paddingBottom:8, borderBottom:"3px solid " + C.accent, color:C.ink, display:"flex", alignItems:"center", gap:8 }}>
+                <span style={{ background:C.accent, color:"#fff", padding:"3px 10px", fontSize:11, borderRadius:4 }}>HOT</span>
+                今週のトレンド
+              </h2>
+              <div style={{ display:"grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap:12 }}>
+                {trending.map(p => (
+                  <PostCard key={p.id} post={p} co={companies.find(c => c.id === p.companyId)} go={go} isAdmin={isAdmin} onDelete={adminDelete} onEdit={d => setEditTgt({ type:"post", data:d })} />
+                ))}
+              </div>
             </div>
           )}
-          <STitle label="最新の体験談" />
-          {recent.length === 0
-            ? <Empty text="まだ投稿がありません。最初の投稿をしてみましょう！" />
-            : recent.map(p => (
-                <PostCard key={p.id} post={p} co={companies.find(c => c.id === p.companyId)} go={go} isAdmin={isAdmin} onDelete={adminDelete} onEdit={d => setEditTgt({ type:"post", data:d })} />
-              ))
-          }
+
+          <div>
+            <h2 style={{ fontSize:16, fontWeight:"bold", marginBottom:12, paddingBottom:8, borderBottom:"3px solid " + C.accent, color:C.ink }}>
+              最新の体験談・口コミ
+            </h2>
+            {recent.length === 0
+              ? <Empty text="まだ投稿がありません。最初の投稿をしてみましょう！" />
+              : recent.map(p => (
+                  <PostCard key={p.id} post={p} co={companies.find(c => c.id === p.companyId)} go={go} isAdmin={isAdmin} onDelete={adminDelete} onEdit={d => setEditTgt({ type:"post", data:d })} />
+                ))
+            }
+          </div>
         </section>
+
+        {/* 右カラム：注目企業＋業種ナビ */}
         {!isMobile && (
           <aside>
-            <STitle label="注目の企業" />
-            <table style={{ width:"100%", borderCollapse:"collapse" }}>
-              <thead>
-                <tr>
-                  <th style={S.th}>企業名</th>
-                  <th style={{ ...S.th, textAlign:"right" }}>評価</th>
-                  <th style={{ ...S.th, textAlign:"right" }}>年収</th>
-                </tr>
-              </thead>
-              <tbody>
-                {topCos.map((co, i) => {
-                  const a   = calcAvg(coRevs(co.id));
-                  const sal = calcAvgSal(coSals(co.id));
-                  return (
-                    <tr key={co.id} style={{ ...S.tableRow, cursor:"pointer" }} onClick={() => go("company", co)}>
-                      <td style={S.td}><span style={{ fontSize:11, color:C.sub, marginRight:4 }}>{i + 1}.</span>{co.name}</td>
-                      <td style={{ ...S.td, textAlign:"right", color:C.accent, fontWeight:"bold", fontSize:12 }}>{a ? ("★" + a.overall.toFixed(1)) : "-"}</td>
-                      <td style={{ ...S.td, textAlign:"right", fontSize:12, color:"#1a5276", fontWeight:"bold" }}>{sal ? (sal + "万") : "-"}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-            <button style={{ ...S.secondaryBtn, width:"100%", marginTop:8, fontSize:12 }} onClick={() => go("ranking")}>ランキングを見る →</button>
-            <div style={{ marginTop:16 }} />
-            <STitle label="業種別に探す" />
-            {ALL_GROUPS.map(grp => (
-              <button key={grp} style={{ display:"block", width:"100%", textAlign:"left", background:"none", border:"1px solid " + C.border, padding:"7px 10px", marginBottom:4, fontSize:12, cursor:"pointer", fontFamily:"inherit" }} onClick={() => go("companies")}>
-                {grp}
+            <div style={{ background:"#fff", border:"1px solid " + C.border, borderRadius:8, padding:"16px 18px", marginBottom:16 }}>
+              <h3 style={{ fontSize:14, fontWeight:"bold", marginBottom:12, color:C.ink, paddingBottom:8, borderBottom:"2px solid " + C.accent }}>
+                ⭐ 注目の企業
+              </h3>
+              {topCos.slice(0,8).map((co,i) => {
+                const a   = calcAvg(coRevs(co.id));
+                const sal = calcAvgSal(coSals(co.id));
+                return (
+                  <div key={co.id} style={{ padding:"8px 0", borderBottom: i < 7 ? "1px solid " + C.border : "none", cursor:"pointer", display:"flex", alignItems:"center", gap:8 }} onClick={() => go("company", co)}>
+                    <span style={{ fontSize:11, color:C.accent, fontWeight:"bold", width:18 }}>{i+1}</span>
+                    <div style={{ flex:1, minWidth:0 }}>
+                      <div style={{ fontSize:13, fontWeight:"bold", color:C.ink, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{co.name}</div>
+                      <div style={{ fontSize:10, color:C.sub, marginTop:1 }}>
+                        {a && <span style={{ color:C.accent, fontWeight:"bold" }}>★{a.overall.toFixed(1)}</span>}
+                        {a && sal && " · "}
+                        {sal && <span>{sal}万円</span>}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+              <button style={{
+                width:"100%", background:"#fff", border:"1px solid " + C.accent,
+                color:C.accent, padding:"8px", fontSize:12, fontWeight:"bold",
+                marginTop:10, cursor:"pointer", fontFamily:"inherit", borderRadius:4
+              }} onClick={() => go("ranking")}>
+                ランキングをもっと見る →
               </button>
-            ))}
+            </div>
+
+            <div style={{ background:"#fff", border:"1px solid " + C.border, borderRadius:8, padding:"16px 18px" }}>
+              <h3 style={{ fontSize:14, fontWeight:"bold", marginBottom:12, color:C.ink, paddingBottom:8, borderBottom:"2px solid " + C.accent }}>
+                🏢 業種別に企業を探す
+              </h3>
+              {ALL_GROUPS.map(grp => {
+                const count = companies.filter(c => (c.group || getGroup(c.industry)) === grp).length;
+                return (
+                  <div key={grp} style={{ padding:"6px 0", display:"flex", justifyContent:"space-between", alignItems:"center", cursor:"pointer", fontSize:12 }} onClick={() => go("companies")}>
+                    <span style={{ color:C.ink }}>{grp}</span>
+                    <span style={{ color:C.sub, fontSize:11 }}>{count}社</span>
+                  </div>
+                );
+              })}
+            </div>
           </aside>
         )}
       </div>
+
+      {/* SEO用の隠しテキストではなく、フッター上部に検索キーワード関連のリンク集 */}
+      <section style={{ marginTop:32, padding:"20px 24px", background:"#fff", border:"1px solid " + C.border, borderRadius:8 }}>
+        <h2 style={{ fontSize:14, fontWeight:"bold", marginBottom:12, color:C.ink }}>転職・就活でよく検索されるキーワード</h2>
+        <div style={{ display:"flex", flexWrap:"wrap", gap:6 }}>
+          {["面接体験談","年収口コミ","選考フロー","中途採用","新卒採用","残業時間","内定","退職金","面接対策","志望動機","ES通過","年収比較","給料","ボーナス","働き方","企業研究"].map(kw => (
+            <span key={kw} style={{
+              background:C.light, color:C.accent, border:"1px solid " + C.border,
+              padding:"4px 10px", fontSize:11, borderRadius:14, cursor:"pointer"
+            }} onClick={() => go("companies")}>#{kw}</span>
+          ))}
+        </div>
+      </section>
     </div>
   );
 }
+
 
 // ─── 企業一覧 ─────────────────────────────────────────────────────────────────
 function CompaniesPage({ go, filtered, searchQ, setSearchQ, grpFilter, setGrpFilter, subFilter, setSubFilter, sortBy, setSortBy, coPosts, coRevs, coSals, isAdmin, adminDelete, setEditTgt, isMobile }) {
@@ -980,7 +2319,7 @@ function CompaniesPage({ go, filtered, searchQ, setSearchQ, grpFilter, setGrpFil
 }
 
 // ─── 企業ページ ───────────────────────────────────────────────────────────────
-function CompanyPage({ go, co, cposts, crevs, csals, cjobs, initTab, onToggleLike, onAddComment, onAddPost, onAddReview, onAddSalary, onAddJob, isAdmin, adminDelete, setEditTgt, plan, setAuthMode, isMobile, uName, favorites, toggleFavorite }) {
+function CompanyPage({ go, co, cposts, crevs, csals, cjobs, initTab, onToggleLike, onAddComment, onAddPost, onAddReview, onAddSalary, onAddJob, isAdmin, adminDelete, setEditTgt, plan, setAuthMode, isMobile, uName, favorites, toggleFavorite, sess }) {
   const [tab,     setTab]     = useState(initTab || "interview");
   const [jobCat,  setJobCat]  = useState("全職種");
   useEffect(() => { if (initTab) setTab(initTab); }, [initTab]);
@@ -993,9 +2332,11 @@ function CompanyPage({ go, co, cposts, crevs, csals, cjobs, initTab, onToggleLik
   const a   = calcAvg(crevs);
   const sal = calcAvgSal(csals);
 
+  const es = filterByJob(cposts.filter(p => p.ptype === "es"));
   const tabs = [
     ["interview", "面接体験談", iv.length],
     ["board",     "選考掲示板", bd.length],
+    ["es",        "ES例文",     es.length],
     ["review",    "口コミ",     crevs.length],
     ["salary",    "年収情報",   csals.length],
     ["jobs",      "募集要項",   cjobs.length],
@@ -1040,7 +2381,7 @@ function CompanyPage({ go, co, cposts, crevs, csals, cjobs, initTab, onToggleLik
       {/* 職種別フィルター */}
       <div style={{ overflowX:"auto", margin:"12px 0 0 0", paddingBottom:4 }}>
         <div style={{ display:"flex", gap:4, minWidth:"max-content" }}>
-          {JOB_CATEGORIES.map(jc => (
+          {getJobCategories(co.group || co.industry).map(jc => (
             <button key={jc} style={{ border:"1px solid " + C.border, background: jobCat===jc ? C.accent : "#F7F7F7", color: jobCat===jc ? "#fff" : C.sub, padding:"3px 10px", fontSize:11, cursor:"pointer", fontFamily:"inherit", whiteSpace:"nowrap" }} onClick={() => setJobCat(jc)}>{jc}</button>
           ))}
         </div>
@@ -1053,10 +2394,11 @@ function CompanyPage({ go, co, cposts, crevs, csals, cjobs, initTab, onToggleLik
         ))}
       </div>
       <div style={{ paddingTop:20 }}>
-        {tab === "interview" && <PostsTab posts={iv} ptype="interview" label="面接体験談" co={co} uName={uName} onAddPost={onAddPost} onToggleLike={onToggleLike} onAddComment={onAddComment} isAdmin={isAdmin} adminDelete={adminDelete} setEditTgt={setEditTgt} favorites={favorites} toggleFavorite={toggleFavorite} jobCat={jobCat} />}
-        {tab === "board"     && <PostsTab posts={bd} ptype="board"     label="選考掲示板" co={co} uName={uName} onAddPost={onAddPost} onToggleLike={onToggleLike} onAddComment={onAddComment} isAdmin={isAdmin} adminDelete={adminDelete} setEditTgt={setEditTgt} favorites={favorites} toggleFavorite={toggleFavorite} jobCat={jobCat} />}
-        {tab === "review"    && <ReviewsTab revs={crevs} avgData={a}   co={co} uName={uName} plan={plan} onAddReview={onAddReview} isAdmin={isAdmin} adminDelete={adminDelete} setEditTgt={setEditTgt} go={go} />}
-        {tab === "salary"    && <SalaryTab  sals={csals} avgSalary={sal} co={co} uName={uName} plan={plan} onAddSalary={onAddSalary} isAdmin={isAdmin} adminDelete={adminDelete} setEditTgt={setEditTgt} go={go} />}
+        {tab === "interview" && <PostsTab posts={iv} ptype="interview" label="面接体験談" co={co} uName={uName} onAddPost={onAddPost} onToggleLike={onToggleLike} onAddComment={onAddComment} isAdmin={isAdmin} adminDelete={adminDelete} setEditTgt={setEditTgt} favorites={favorites} toggleFavorite={toggleFavorite} jobCat={jobCat} sess={sess} setAuthMode={setAuthMode} />}
+        {tab === "board"     && <PostsTab posts={bd} ptype="board"     label="選考掲示板" co={co} uName={uName} onAddPost={onAddPost} onToggleLike={onToggleLike} onAddComment={onAddComment} isAdmin={isAdmin} adminDelete={adminDelete} setEditTgt={setEditTgt} favorites={favorites} toggleFavorite={toggleFavorite} jobCat={jobCat} sess={sess} setAuthMode={setAuthMode} />}
+        {tab === "es"        && <PostsTab posts={es} ptype="es"        label="ES例文"     co={co} uName={uName} onAddPost={onAddPost} onToggleLike={onToggleLike} onAddComment={onAddComment} isAdmin={isAdmin} adminDelete={adminDelete} setEditTgt={setEditTgt} favorites={favorites} toggleFavorite={toggleFavorite} jobCat={jobCat} sess={sess} setAuthMode={setAuthMode} />}
+        {tab === "review"    && <ReviewsTab revs={crevs} avgData={a}   co={co} uName={uName} plan={plan} onAddReview={onAddReview} isAdmin={isAdmin} adminDelete={adminDelete} setEditTgt={setEditTgt} go={go} sess={sess} setAuthMode={setAuthMode} />}
+        {tab === "salary"    && <SalaryTab  sals={csals} avgSalary={sal} co={co} uName={uName} plan={plan} onAddSalary={onAddSalary} isAdmin={isAdmin} adminDelete={adminDelete} setEditTgt={setEditTgt} go={go} sess={sess} setAuthMode={setAuthMode} />}
         {tab === "jobs"      && <JobsTab    jobs={cjobs} co={co} uName={uName} onAddJob={onAddJob} isAdmin={isAdmin} adminDelete={adminDelete} setEditTgt={setEditTgt} />}
       </div>
     </div>
@@ -1064,14 +2406,17 @@ function CompanyPage({ go, co, cposts, crevs, csals, cjobs, initTab, onToggleLik
 }
 
 // ─── 掲示板・体験談タブ ───────────────────────────────────────────────────────
-function PostsTab({ posts, ptype, label, co, uName, onAddPost, onToggleLike, onAddComment, isAdmin, adminDelete, setEditTgt, favorites, toggleFavorite, jobCat }) {
+function PostsTab({ posts, ptype, label, co, uName, onAddPost, onToggleLike, onAddComment, isAdmin, adminDelete, setEditTgt, favorites, toggleFavorite, jobCat, sess, setAuthMode }) {
   const [exp,  setExp]  = useState(null);
   const [cmt,  setCmt]  = useState("");
   const [form, setForm] = useState(null);
   const [customStage, setCustomStage] = useState("");
   const [showCustomStage, setShowCustomStage] = useState(false);
   const [stages, setStages] = useState([{ stage:"", content:"" }]);
-  const initF = { companyId:co.id, ptype, stage:"", title:"", content:"", jobCategory:"全職種", offerAmount:"", offerBase:"", offerBonus:"" };
+  const isES = ptype === "es";
+  const initF = isES
+    ? { companyId:co.id, ptype, stage:"内定", title:"", content:"", jobCategory:"全職種", esQuestion:"", year:new Date().getFullYear() }
+    : { companyId:co.id, ptype, stage:"", title:"", content:"", jobCategory:"全職種", offerAmount:"", offerBase:"", offerBonus:"" };
   const sorted = [...posts].sort((a,b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
 
   return (
@@ -1089,6 +2434,26 @@ function PostsTab({ posts, ptype, label, co, uName, onAddPost, onToggleLike, onA
               {getJobCategories(co.group || co.industry).map(j => <option key={j}>{j}</option>)}
             </select>
           </Fld>
+          {isES && (
+            <>
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
+                <Fld label="応募年（西暦）"><input style={S.input} type="number" placeholder="2025" value={form.year} onChange={e => setForm({ ...form, year:e.target.value })} /></Fld>
+                <Fld label="選考結果">
+                  <select style={S.input} value={form.stage} onChange={e => setForm({ ...form, stage:e.target.value })}>
+                    <option value="内定">内定</option>
+                    <option value="最終面接">最終面接まで</option>
+                    <option value="二次面接">二次面接まで</option>
+                    <option value="一次面接">一次面接まで</option>
+                    <option value="書類選考">書類で不通過</option>
+                  </select>
+                </Fld>
+              </div>
+              <Fld label="ES設問内容 *">
+                <textarea style={{ ...S.input, resize:"vertical" }} rows={2} placeholder="例：あなたが学生時代に最も力を入れて取り組んだことを教えてください。（400字以内）" value={form.esQuestion} onChange={e => setForm({ ...form, esQuestion:e.target.value })} />
+              </Fld>
+            </>
+          )}
+          {!isES && (
           <Fld label="選考段階 *">
             <div style={{ display:"flex", gap:8 }}>
               <select style={{...S.input, flex:1}} value={showCustomStage ? "custom" : form.stage} onChange={e => {
@@ -1104,7 +2469,8 @@ function PostsTab({ posts, ptype, label, co, uName, onAddPost, onToggleLike, onA
               )}
             </div>
           </Fld>
-          <Fld label="タイトル *">
+          )}
+          <Fld label={isES ? "回答タイトル *" : "タイトル *"}>
             <input style={S.input} placeholder="例：一次面接で聞かれたこと" value={form.title} onChange={e => setForm({ ...form, title:e.target.value })} />
           </Fld>
           <Fld label={`本文 *（最低30文字）　現在${form.content.length}文字`}>
@@ -1125,7 +2491,9 @@ function PostsTab({ posts, ptype, label, co, uName, onAddPost, onToggleLike, onA
             <AC>{ini(uName)}</AC>{uName} として投稿
           </div>
           <button style={{ ...S.primaryBtn, width:"100%", padding:"11px" }} onClick={async () => {
-            if (!form.stage || !form.title.trim() || !form.content.trim()) return;
+            if (!form.title.trim() || !form.content.trim()) return;
+            if (!isES && !form.stage) return;
+            if (isES && !form.esQuestion.trim()) { alert("ES設問内容を入力してください"); return; }
             if (form.content.length < 30) { alert("本文は30文字以上入力してください"); return; }
             await onAddPost(form);
             setForm(null);
@@ -1134,10 +2502,11 @@ function PostsTab({ posts, ptype, label, co, uName, onAddPost, onToggleLike, onA
           </button>
         </div>
       )}
-      {sorted.length === 0
-        ? <Empty text={"まだ" + label + "がありません。最初の投稿をしてみましょう！"} />
-        : sorted.map(p => (
-            <article key={p.id} style={{ background:C.surface, padding:"12px 0", borderBottom:"1px solid " + C.border }}>
+      {sorted.length === 0 && <Empty text={"まだ" + label + "がありません。最初の投稿をしてみましょう！"} />}
+      {sorted.map((p, idx) => {
+        const isLocked = !sess && idx >= 1;
+        return (
+            <article key={p.id} style={{ background:C.surface, padding:"12px 0", borderBottom:"1px solid " + C.border, position:"relative", filter: isLocked ? "blur(5px)" : "none", pointerEvents: isLocked ? "none" : "auto", userSelect: isLocked ? "none" : "auto" }}>
               {isAdmin && (
                 <div style={{ display:"flex", gap:4, justifyContent:"flex-end", marginBottom:6 }}>
                   <SmBtn onClick={() => setEditTgt({ type:"post", data:p })}>編集</SmBtn>
@@ -1151,7 +2520,16 @@ function PostsTab({ posts, ptype, label, co, uName, onAddPost, onToggleLike, onA
                 )}
                 <span style={{ fontSize:11, color:C.sub, marginLeft:"auto" }}>{ago(p.createdAt)}</span>
               </div>
+              {p.ptype === "es" && p.esQuestion && (
+                <div style={{ background:"#FFF8E7", borderLeft:"3px solid #F59E0B", padding:"8px 12px", marginBottom:8, fontSize:12, lineHeight:1.7 }}>
+                  <strong style={{ color:"#92400E", display:"block", marginBottom:2 }}>📝 設問：</strong>
+                  {p.esQuestion}
+                </div>
+              )}
               <h3 style={{ fontSize:15, fontWeight:"bold", marginBottom:8, lineHeight:1.55, fontFamily:"serif" }}>{p.title}</h3>
+              {p.year && p.ptype === "es" && (
+                <div style={{ fontSize:11, color:C.sub, marginBottom:6 }}>応募: {p.year}年 / 結果: {p.stage}</div>
+              )}
               {p.offerAmount && (
                 <div style={{ background:"#F0FDF4", border:"1px solid #BBF7D0", padding:"8px 12px", borderRadius:6, marginBottom:8, fontSize:13 }}>
                   内定オファー: <strong style={{ color:"#166534" }}>年収{p.offerAmount}万円</strong>
@@ -1195,39 +2573,150 @@ function PostsTab({ posts, ptype, label, co, uName, onAddPost, onToggleLike, onA
                 </div>
               )}
             </article>
-          ))
-      }
+        );
+      })}
+      {!sess && sorted.length > 1 && <LockedContent setAuthMode={setAuthMode} count={sorted.length - 1} type={label} />}
     </div>
   );
 }
 
 // ─── 口コミタブ ───────────────────────────────────────────────────────────────
-function ReviewsTab({ revs, avgData: a, co, uName, plan, onAddReview, isAdmin, adminDelete, setEditTgt, go }) {
+function ReviewsTab({ revs, avgData: a, co, uName, plan, onAddReview, isAdmin, adminDelete, setEditTgt, go, sess, setAuthMode }) {
   const [form, setForm] = useState(null);
+  const [deptFilter, setDeptFilter] = useState("全部門");
+  const [showStats, setShowStats] = useState(false);
   const canRead = ["standard","premium"].includes(plan);
-  const initF = { companyId:co.id, overall:3, rats:{salary:3,culture:3,wlb:3,career:3,mgmt:3}, empType:"正社員", tenure:"1~3年", dept:"", pros:"", cons:"", advice:"" };
+
+  // 部門別フィルタリング
+  const filteredRevs = deptFilter === "全部門" ? revs : revs.filter(r => r.dept === deptFilter);
+  const filteredAvg = calcAvg(filteredRevs);
+
+  // 残業時間の統計（数値中央値で集計）
+  const overtimeStats = OVERTIME_BUCKETS.map(b => ({
+    label: b.label,
+    value: b.value,
+    count: revs.filter(r => r.overtimeBucket === b.label).length
+  }));
+  const paidLeaveStats = PAID_LEAVE_BUCKETS.map(b => ({
+    label: b.label,
+    value: b.value,
+    count: revs.filter(r => r.paidLeaveBucket === b.label).length
+  }));
+  const quitReasonStats = QUIT_REASONS.filter(q => q !== "退職検討なし").map(q => ({
+    label: q,
+    count: revs.filter(r => r.quitReason === q).length
+  })).filter(s => s.count > 0).sort((a,b) => b.count - a.count);
+
+  // 部門別評価サマリー
+  const deptSummary = DEPARTMENTS.filter(d => d !== "全部門").map(d => {
+    const drs = revs.filter(r => r.dept === d);
+    return { dept: d, count: drs.length, avg: calcAvg(drs) };
+  }).filter(s => s.count > 0).sort((a,b) => b.count - a.count);
+  const initF = { companyId:co.id, overall:3, rats:{motivation:3,morale:3,relations:3,white:3,growth:3,wlb:3,salary:3,mgmt:3}, empType:"正社員", tenure:"1~3年", dept:"全部門", position:"一般社員", overtimeBucket:"", paidLeaveBucket:"", quitReason:"退職検討なし", prevJob:"", pros:"", cons:"", advice:"" };
 
   return (
     <div>
-      {a && (
+      {/* 部門フィルター */}
+      {revs.length > 0 && (
+        <div style={{ display:"flex", gap:6, flexWrap:"wrap", marginBottom:14, alignItems:"center" }}>
+          <span style={{ fontSize:11, color:C.sub, marginRight:4 }}>部門で絞り込み:</span>
+          {["全部門", ...deptSummary.map(d => d.dept)].map(d => (
+            <button key={d} style={{ border:"1px solid " + C.border, background: deptFilter === d ? C.accent : "#F7F7F7", color: deptFilter === d ? "#fff" : C.sub, padding:"3px 10px", fontSize:11, cursor:"pointer", fontFamily:"inherit", borderRadius:4 }} onClick={() => setDeptFilter(d)}>
+              {d}{d !== "全部門" && ` (${deptSummary.find(x => x.dept === d)?.count})`}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {filteredAvg && (
         <div style={{ display:"flex", gap:20, flexWrap:"wrap", padding:"14px 0", borderBottom:"1px solid " + C.border, marginBottom:16 }}>
           <div style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:4, minWidth:80, paddingRight:18, borderRight:"1px solid " + C.border }}>
             <div style={{ fontSize:11, color:C.sub, marginBottom:4 }}>総合評価</div>
-            <div style={{ fontSize:46, fontWeight:"bold", color:C.accent, lineHeight:1, fontFamily:"serif" }}>{a.overall.toFixed(1)}</div>
-            <Stars r={a.overall} size={14} />
-            <div style={{ fontSize:11, color:C.sub, marginTop:4 }}>{revs.length}件</div>
+            <div style={{ fontSize:46, fontWeight:"bold", color:C.accent, lineHeight:1, fontFamily:"serif" }}>{filteredAvg.overall.toFixed(1)}</div>
+            <Stars r={filteredAvg.overall} size={14} />
+            <div style={{ fontSize:11, color:C.sub, marginTop:4 }}>{filteredRevs.length}件</div>
+            {deptFilter !== "全部門" && <div style={{ fontSize:10, color:C.accent, marginTop:2 }}>{deptFilter}のみ</div>}
           </div>
-          <div style={{ flex:1, minWidth:180 }}>
+          <div style={{ flex:1, minWidth:240 }}>
             {RCATS.map(cat => (
-              <div key={cat.key} style={{ display:"flex", alignItems:"center", gap:10, marginBottom:9 }}>
-                <span style={{ fontSize:11, color:C.sub, width:134, flexShrink:0 }}>{cat.label}</span>
+              <div key={cat.key} style={{ display:"flex", alignItems:"center", gap:10, marginBottom:7 }}>
+                <span style={{ fontSize:11, color:C.sub, width:140, flexShrink:0 }}>{cat.label}</span>
                 <div style={{ flex:1, height:5, background:"#E5E7EB", position:"relative" }}>
-                  <div style={{ position:"absolute", left:0, top:0, height:"100%", width: ((a[cat.key] / 5) * 100) + "%", background:C.accent }} />
+                  <div style={{ position:"absolute", left:0, top:0, height:"100%", width: ((filteredAvg[cat.key] / 5) * 100) + "%", background:C.accent }} />
                 </div>
-                <span style={{ fontSize:12, fontWeight:"bold", width:24, textAlign:"right" }}>{parseFloat(a[cat.key]).toFixed(1)}</span>
+                <span style={{ fontSize:12, fontWeight:"bold", width:24, textAlign:"right" }}>{parseFloat(filteredAvg[cat.key]).toFixed(1)}</span>
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* 統計セクション（折りたたみ式） */}
+      {revs.length > 0 && (
+        <div style={{ marginBottom:16 }}>
+          <button style={{ background:"#F7FAFC", border:"1px solid " + C.border, padding:"8px 14px", fontSize:12, cursor:"pointer", fontFamily:"inherit", borderRadius:4, width:"100%", textAlign:"left", display:"flex", justifyContent:"space-between", alignItems:"center" }} onClick={() => setShowStats(!showStats)}>
+            <span style={{ fontWeight:"bold", color:C.ink }}>📊 残業時間・有給消化率・退職理由の統計を見る</span>
+            <span>{showStats ? "▴" : "▾"}</span>
+          </button>
+          {showStats && (
+            <div style={{ background:"#fff", border:"1px solid " + C.border, borderTop:"none", padding:"16px 18px", display:"grid", gridTemplateColumns: "1fr", gap:20 }}>
+              {/* 残業時間グラフ */}
+              {overtimeStats.some(s => s.count > 0) && (
+                <div>
+                  <h4 style={{ fontSize:13, fontWeight:"bold", marginBottom:10, color:C.ink }}>月間残業時間の分布</h4>
+                  {overtimeStats.map(s => {
+                    const maxCount = Math.max(...overtimeStats.map(x => x.count), 1);
+                    return (
+                      <div key={s.label} style={{ display:"flex", alignItems:"center", gap:10, marginBottom:6, fontSize:12 }}>
+                        <span style={{ width:80, color:C.sub, flexShrink:0 }}>{s.label}</span>
+                        <div style={{ flex:1, height:18, background:"#F0F0F0", position:"relative", borderRadius:2 }}>
+                          <div style={{ position:"absolute", left:0, top:0, height:"100%", width: ((s.count / maxCount) * 100) + "%", background:s.value > 45 ? "#DC2626" : s.value > 25 ? "#F59E0B" : "#16A34A", borderRadius:2 }} />
+                        </div>
+                        <span style={{ width:36, textAlign:"right", fontWeight:"bold", color:C.ink }}>{s.count}件</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+              {/* 有給消化率グラフ */}
+              {paidLeaveStats.some(s => s.count > 0) && (
+                <div>
+                  <h4 style={{ fontSize:13, fontWeight:"bold", marginBottom:10, color:C.ink }}>有給休暇消化率の分布</h4>
+                  {paidLeaveStats.map(s => {
+                    const maxCount = Math.max(...paidLeaveStats.map(x => x.count), 1);
+                    return (
+                      <div key={s.label} style={{ display:"flex", alignItems:"center", gap:10, marginBottom:6, fontSize:12 }}>
+                        <span style={{ width:80, color:C.sub, flexShrink:0 }}>{s.label}</span>
+                        <div style={{ flex:1, height:18, background:"#F0F0F0", position:"relative", borderRadius:2 }}>
+                          <div style={{ position:"absolute", left:0, top:0, height:"100%", width: ((s.count / maxCount) * 100) + "%", background:s.value < 30 ? "#DC2626" : s.value < 60 ? "#F59E0B" : "#16A34A", borderRadius:2 }} />
+                        </div>
+                        <span style={{ width:36, textAlign:"right", fontWeight:"bold", color:C.ink }}>{s.count}件</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+              {/* 退職検討理由ランキング */}
+              {quitReasonStats.length > 0 && (
+                <div>
+                  <h4 style={{ fontSize:13, fontWeight:"bold", marginBottom:10, color:C.ink }}>退職検討理由ランキング</h4>
+                  {quitReasonStats.slice(0, 5).map((s, i) => {
+                    const maxCount = quitReasonStats[0].count;
+                    return (
+                      <div key={s.label} style={{ display:"flex", alignItems:"center", gap:10, marginBottom:6, fontSize:12 }}>
+                        <span style={{ width:24, color:C.accent, fontWeight:"bold" }}>#{i + 1}</span>
+                        <span style={{ width:170, color:C.ink, flexShrink:0 }}>{s.label}</span>
+                        <div style={{ flex:1, height:18, background:"#F0F0F0", position:"relative", borderRadius:2 }}>
+                          <div style={{ position:"absolute", left:0, top:0, height:"100%", width: ((s.count / maxCount) * 100) + "%", background:C.accent, borderRadius:2 }} />
+                        </div>
+                        <span style={{ width:36, textAlign:"right", fontWeight:"bold", color:C.ink }}>{s.count}件</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
       <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:14, paddingBottom:10, borderBottom:"1px solid " + C.border, flexWrap:"wrap", gap:8 }}>
@@ -1250,6 +2739,28 @@ function ReviewsTab({ revs, avgData: a, co, uName, plan, onAddReview, isAdmin, a
             <Fld label="在籍形態"><select style={S.input} value={form.empType} onChange={e => setForm({ ...form, empType:e.target.value })}>{EMP_TYPES.map(t => <option key={t}>{t}</option>)}</select></Fld>
             <Fld label="在籍年数"><select style={S.input} value={form.tenure}  onChange={e => setForm({ ...form, tenure: e.target.value })}>{TENURES.map(t => <option key={t}>{t}</option>)}</select></Fld>
           </div>
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
+            <Fld label="部門"><select style={S.input} value={form.dept} onChange={e => setForm({ ...form, dept:e.target.value })}>{DEPARTMENTS.map(t => <option key={t}>{t}</option>)}</select></Fld>
+            <Fld label="役職"><select style={S.input} value={form.position} onChange={e => setForm({ ...form, position:e.target.value })}>{POSITIONS.map(t => <option key={t}>{t}</option>)}</select></Fld>
+          </div>
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
+            <Fld label="月間残業時間"><select style={S.input} value={form.overtimeBucket} onChange={e => setForm({ ...form, overtimeBucket:e.target.value })}>
+              <option value="">選択しない</option>
+              {OVERTIME_BUCKETS.map(t => <option key={t.label} value={t.label}>{t.label}</option>)}
+            </select></Fld>
+            <Fld label="有給消化率"><select style={S.input} value={form.paidLeaveBucket} onChange={e => setForm({ ...form, paidLeaveBucket:e.target.value })}>
+              <option value="">選択しない</option>
+              {PAID_LEAVE_BUCKETS.map(t => <option key={t.label} value={t.label}>{t.label}</option>)}
+            </select></Fld>
+          </div>
+          <Fld label="退職検討理由">
+            <select style={S.input} value={form.quitReason} onChange={e => setForm({ ...form, quitReason:e.target.value })}>
+              {QUIT_REASONS.map(t => <option key={t}>{t}</option>)}
+            </select>
+          </Fld>
+          <Fld label="前職（任意）">
+            <input style={S.input} placeholder="例：大手SIer / 同業他社 / 新卒入社" value={form.prevJob} onChange={e => setForm({ ...form, prevJob:e.target.value })} />
+          </Fld>
           <Fld label="良いところ *"><textarea style={{ ...S.input, resize:"vertical" }} rows={3} value={form.pros} onChange={e => setForm({ ...form, pros:e.target.value })} /></Fld>
           <Fld label="改善点 *"><textarea style={{ ...S.input, resize:"vertical" }} rows={3} value={form.cons} onChange={e => setForm({ ...form, cons:e.target.value })} /></Fld>
           <Fld label="アドバイス（任意）"><textarea style={{ ...S.input, resize:"vertical" }} rows={2} value={form.advice} onChange={e => setForm({ ...form, advice:e.target.value })} /></Fld>
@@ -1265,15 +2776,12 @@ function ReviewsTab({ revs, avgData: a, co, uName, plan, onAddReview, isAdmin, a
           </button>
         </div>
       )}
-      {!canRead && revs.length > 0 && (
-        <div style={{ background:"#FFF8F0", border:"1px solid #E8C97A", padding:"14px 16px", marginBottom:14 }}>
-          <div style={{ fontWeight:"bold", marginBottom:6, fontSize:14 }}>口コミ全文はスタンダードプラン以上で閲覧できます</div>
-          <button style={S.primaryBtn} onClick={() => go("pricing")}>プランを確認する →</button>
-        </div>
-      )}
       {revs.length === 0 && <Empty text="まだ口コミがありません" />}
-      {(canRead ? revs : []).sort((a,b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)).map(r => (
-        <div key={r.id} style={{ background:C.surface, border:"1px solid " + C.border, padding:"14px 16px", marginBottom:10 }}>
+      {filteredRevs.sort((a,b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)).map((r, idx) => {
+        // 未ログインの場合：最初の1件だけプレビュー、それ以降はぼかして登録誘導
+        const isLocked = !sess && idx >= 1;
+        return (
+        <div key={r.id} style={{ background:C.surface, border:"1px solid " + C.border, padding:"14px 16px", marginBottom:10, position:"relative", filter: isLocked ? "blur(5px)" : "none", pointerEvents: isLocked ? "none" : "auto", userSelect: isLocked ? "none" : "auto" }}>
           {isAdmin && (
             <div style={{ display:"flex", gap:4, justifyContent:"flex-end", marginBottom:8 }}>
               <SmBtn onClick={() => setEditTgt({ type:"review", data:r })}>編集</SmBtn>
@@ -1286,20 +2794,28 @@ function ReviewsTab({ revs, avgData: a, co, uName, plan, onAddReview, isAdmin, a
                 <Stars r={r.overall} size={13} />
                 <span style={{ fontWeight:"bold", fontSize:15, color:C.accent }}>{r.overall.toFixed(1)}</span>
               </div>
-              {[r.empType, r.tenure, r.dept].filter(Boolean).map(t => (
+              {[r.empType, r.tenure, r.dept, r.position].filter(Boolean).filter(t => t !== "全部門").map(t => (
                 <span key={t} style={{ fontSize:11, color:C.sub, border:"1px solid " + C.border, padding:"1px 6px", marginRight:4, marginBottom:3, display:"inline-block" }}>{t}</span>
               ))}
             </div>
             <span style={{ fontSize:11, color:C.sub }}>{ago(r.createdAt)}</span>
           </div>
-          <div style={{ display:"flex", flexWrap:"wrap", gap:14, padding:"8px 12px", background:"#F7F7F7", borderLeft:"3px solid " + C.border, marginBottom:12 }}>
+          <div style={{ display:"flex", flexWrap:"wrap", gap:10, padding:"8px 12px", background:"#F7F7F7", borderLeft:"3px solid " + C.border, marginBottom:12 }}>
             {RCATS.map(cat => (
-              <div key={cat.key} style={{ textAlign:"center" }}>
+              <div key={cat.key} style={{ textAlign:"center", minWidth:60 }}>
                 <div style={{ fontSize:9, color:C.sub, marginBottom:1 }}>{cat.label}</div>
-                <div style={{ fontSize:13, fontWeight:"bold" }}>{((r.rats && r.rats[cat.key]) || 0).toFixed(1)}</div>
+                <div style={{ fontSize:13, fontWeight:"bold", color: (r.rats && r.rats[cat.key] >= 4) ? C.accent : C.ink }}>{((r.rats && r.rats[cat.key]) || 0).toFixed(1)}</div>
               </div>
             ))}
           </div>
+          {(r.overtimeBucket || r.paidLeaveBucket || (r.quitReason && r.quitReason !== "退職検討なし") || r.prevJob) && (
+            <div style={{ display:"flex", flexWrap:"wrap", gap:6, marginBottom:10, padding:"8px 12px", background:"#FAFBFC", borderLeft:"3px solid " + C.accent, fontSize:11 }}>
+              {r.overtimeBucket && <span>残業: <strong>{r.overtimeBucket}</strong></span>}
+              {r.paidLeaveBucket && <span>有給消化: <strong>{r.paidLeaveBucket}</strong></span>}
+              {r.quitReason && r.quitReason !== "退職検討なし" && <span>退職検討: <strong>{r.quitReason}</strong></span>}
+              {r.prevJob && <span>前職: <strong>{r.prevJob}</strong></span>}
+            </div>
+          )}
           {r.pros   && <div style={{ marginBottom:10 }}><div style={{ fontSize:11, fontWeight:"bold", color:C.sub, marginBottom:3 }}>良いところ</div><p style={{ fontSize:13, lineHeight:1.9 }}>{r.pros}</p></div>}
           {r.cons   && <div style={{ marginBottom:10 }}><div style={{ fontSize:11, fontWeight:"bold", color:C.sub, marginBottom:3 }}>改善点</div><p style={{ fontSize:13, lineHeight:1.9 }}>{r.cons}</p></div>}
           {r.advice && <div style={{ marginBottom:10 }}><div style={{ fontSize:11, fontWeight:"bold", color:C.sub, marginBottom:3 }}>アドバイス</div><p style={{ fontSize:13, lineHeight:1.9 }}>{r.advice}</p></div>}
@@ -1307,13 +2823,16 @@ function ReviewsTab({ revs, avgData: a, co, uName, plan, onAddReview, isAdmin, a
             <AC>{ini(r.author)}</AC><span style={{ fontSize:12, color:C.sub }}>{r.author}</span>
           </div>
         </div>
-      ))}
+      );
+      })}
+      {/* 未ログイン時の登録誘導オーバーレイ */}
+      {!sess && filteredRevs.length > 1 && <LockedContent setAuthMode={setAuthMode} count={filteredRevs.length - 1} type="口コミ" />}
     </div>
   );
 }
 
 // ─── 年収タブ ─────────────────────────────────────────────────────────────────
-function SalaryTab({ sals, avgSalary, co, uName, plan, onAddSalary, isAdmin, adminDelete, setEditTgt, go }) {
+function SalaryTab({ sals, avgSalary, co, uName, plan, onAddSalary, isAdmin, adminDelete, setEditTgt, go, sess, setAuthMode }) {
   const [form, setForm] = useState(null);
   const canRead = ["standard","premium"].includes(plan);
   const byJob   = sals.reduce((acc, s) => { if (!acc[s.jobType]) acc[s.jobType] = []; acc[s.jobType].push(s); return acc; }, {});
@@ -1421,15 +2940,11 @@ function SalaryTab({ sals, avgSalary, co, uName, plan, onAddSalary, isAdmin, adm
           </button>
         </div>
       )}
-      {!canRead && sals.length > 0 && (
-        <div style={{ background:"#FFF8F0", border:"1px solid #E8C97A", padding:"14px 16px", marginBottom:14 }}>
-          <div style={{ fontWeight:"bold", marginBottom:6 }}>年収詳細はスタンダードプラン以上で閲覧できます</div>
-          <button style={S.primaryBtn} onClick={() => go("pricing")}>プランを確認する →</button>
-        </div>
-      )}
       {sals.length === 0 && <Empty text="まだ年収情報がありません" />}
-      {(canRead ? sals : []).sort((a,b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)).map(s => (
-        <div key={s.id} style={{ background:C.surface, border:"1px solid " + C.border, padding:"14px 16px", marginBottom:10 }}>
+      {sals.sort((a,b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)).map((s, idx) => {
+        const isLocked = !sess && idx >= 1;
+        return (
+        <div key={s.id} style={{ background:C.surface, border:"1px solid " + C.border, padding:"14px 16px", marginBottom:10, position:"relative", filter: isLocked ? "blur(5px)" : "none", pointerEvents: isLocked ? "none" : "auto", userSelect: isLocked ? "none" : "auto" }}>
           {isAdmin && (
             <div style={{ display:"flex", gap:4, justifyContent:"flex-end", marginBottom:8 }}>
               <SmBtn onClick={() => setEditTgt({ type:"salary", data:s })}>編集</SmBtn>
@@ -1463,7 +2978,9 @@ function SalaryTab({ sals, avgSalary, co, uName, plan, onAddSalary, isAdmin, adm
             <AC>{ini(s.author)}</AC><span style={{ fontSize:12, color:C.sub }}>{s.author}</span>
           </div>
         </div>
-      ))}
+        );
+      })}
+      {!sess && sals.length > 1 && <LockedContent setAuthMode={setAuthMode} count={sals.length - 1} type="年収情報" />}
     </div>
   );
 }
@@ -2154,6 +3671,52 @@ function AccessDenied({ go }) {
     </div>
   );
 }
+function LockedContent({ setAuthMode, count, type }) {
+  return (
+    <div style={{
+      position:"relative",
+      background:"linear-gradient(180deg, rgba(255,255,255,0.4) 0%, #fff 30%)",
+      marginTop:-100,
+      paddingTop:80,
+      paddingBottom:24,
+      paddingLeft:20,
+      paddingRight:20,
+      textAlign:"center",
+      zIndex:10,
+    }}>
+      <div style={{
+        background:"#fff",
+        border:"2px solid " + C.accent,
+        borderRadius:8,
+        padding:"24px 24px",
+        maxWidth:480,
+        margin:"0 auto",
+        boxShadow:"0 8px 28px rgba(30,90,150,0.18)"
+      }}>
+        <div style={{ fontSize:32, marginBottom:8 }}>🔒</div>
+        <h3 style={{ fontSize:16, fontWeight:"bold", marginBottom:8, color:C.ink }}>
+          続きを読むには無料会員登録
+        </h3>
+        <p style={{ fontSize:13, color:C.sub, marginBottom:18, lineHeight:1.7 }}>
+          残り <strong style={{ color:C.accent, fontSize:15 }}>{count}件</strong> の{type}が閲覧できます<br />
+          メールアドレスだけで30秒で完了
+        </p>
+        <button style={{
+          background:C.accent, color:"#fff", border:"none",
+          padding:"12px 36px", fontSize:14, fontWeight:"bold",
+          fontFamily:"inherit", cursor:"pointer", borderRadius:6,
+          boxShadow:"0 2px 8px rgba(30,90,150,0.3)"
+        }} onClick={() => setAuthMode("register")}>
+          無料会員登録して続きを読む →
+        </button>
+        <div style={{ fontSize:11, color:C.sub, marginTop:10 }}>
+          すでに会員の方は <button style={{...S.textLink, fontSize:11}} onClick={() => setAuthMode("login")}>ログイン</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function SmBtn({ onClick, red, children }) {
   return (
     <button style={{ background:"none", border:"1px solid " + (red ? "#FAA" : C.border), padding:"3px 8px", fontSize:11, cursor:"pointer", fontFamily:"inherit", color: red ? "#C00" : C.sub, marginLeft:4 }} onClick={onClick}>{children}</button>
@@ -2180,9 +3743,10 @@ const CSS = `
 
 const S = {
   root:        { fontFamily:"'Noto Sans JP',sans-serif", background:C.bg, minHeight:"100vh", color:C.ink, fontSize:14 },
+  pageWrap:    { background:C.bg },
   nav:         { background:"#fff", position:"sticky", top:0, zIndex:200, borderBottom:"1px solid " + C.border, boxShadow:"0 1px 4px rgba(0,0,0,0.06)" },
   logoBtn:     { background:"none", border:"none", textAlign:"left", cursor:"pointer" },
-  logoText:    { display:"block", fontWeight:"bold", color:C.ink, fontFamily:"'Noto Serif JP',serif", letterSpacing:"0.06em" },
+  logoText:    { display:"block", fontWeight:"bold", color:"#1E5A96", fontFamily:"'Noto Serif JP',serif", letterSpacing:"0.06em" },
   toast:       { position:"fixed", bottom:20, left:"50%", transform:"translateX(-50%)", background:C.ink, color:"#fff", padding:"9px 20px", fontSize:12, zIndex:600, boxShadow:"0 2px 10px rgba(0,0,0,0.25)", whiteSpace:"nowrap" },
   overlay:     { position:"fixed", inset:0, background:"rgba(0,0,0,0.45)", zIndex:400, display:"flex", alignItems:"center", justifyContent:"center", padding:16 },
   modal:       { background:"#fff", padding:"24px 22px", width:"100%", maxWidth:420, maxHeight:"94vh", overflowY:"auto", borderTop:"4px solid " + C.accent },
