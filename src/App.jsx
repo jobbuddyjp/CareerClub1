@@ -7,6 +7,8 @@ import {
   signOut,
   onAuthStateChanged,
   updateProfile,
+  GoogleAuthProvider,
+  signInWithPopup,
 } from "firebase/auth";
 import {
   collection,
@@ -59,7 +61,8 @@ const INDUSTRY_GROUPS = {
   "医療・ヘルス": ["病院・クリニック","医療機器","医薬品卸"],
   "教育・公共":   ["学校・予備校","官公庁・公務員","NPO・団体"],
   "エンタメ":     ["ゲーム","映像・音楽","スポーツ","出版"],
-  "航空・交通":   ["航空","鉄道","バス","海運"],
+  "航空":         ["航空会社","空港運営","ヘリコプター","航空整備"],
+  "交通・運輸":   ["鉄道","バス","海運","タクシー","物流"],
 };
 const ALL_GROUPS   = Object.keys(INDUSTRY_GROUPS);
 const STAGES       = ["書類選考","一次面接","二次面接","三次面接","最終面接","内定","内定辞退","不合格","辞退"];
@@ -97,7 +100,8 @@ const JOB_CATEGORIES_BY_GROUP = {
   "医療・ヘルス": ["全職種","MR","臨床開発","薬剤師","研究・開発","営業","管理・バックオフィス","その他"],
   "教育・公共":   ["全職種","総合職","技術職","行政職","教員・講師","その他"],
   "エンタメ":     ["全職種","総合職","エンジニア","クリエイター","プランナー","営業","その他"],
-  "航空・交通":   ["全職種","パイロット（自社養成）","パイロット（既卒）","キャビンアテンダント","グランドスタッフ","整備士","運航管理","その他"],
+  "航空":         ["全職種","パイロット（自社養成）","パイロット（既卒）","キャビンアテンダント","グランドスタッフ","整備士","運航管理","空港地上業務","その他"],
+  "交通・運輸":   ["全職種","運転士","車掌","駅員","運行管理","整備士","物流オペレーション","営業","その他"],
 };
 const DEFAULT_JOB_CATEGORIES = ["全職種","総合職","技術職","営業","管理・バックオフィス","その他"];
 const getJobCategories = (group) => JOB_CATEGORIES_BY_GROUP[group] || DEFAULT_JOB_CATEGORIES;
@@ -233,6 +237,10 @@ function useWidth() {
 // ─── Firestore ヘルパー ────────────────────────────────────────────────────────
 const col  = (name)     => collection(db, name);
 const dref = (c, id)    => doc(db, c, id);
+
+const fsSet = async (c, id, data) => {
+  await setDoc(doc(db, c, id), { ...data, createdAt: serverTimestamp() });
+};
 
 const fsAdd = async (c, data) => {
   const ref = await addDoc(col(c), { ...data, createdAt: serverTimestamp() });
@@ -1347,72 +1355,72 @@ const SEED_COMPANIES = [
   { name:"主婦の友社", group:"エンタメ", industry:"出版", emoji:"🎮", sortRank:1083 },
   { name:"主婦と生活社", group:"エンタメ", industry:"出版", emoji:"🎮", sortRank:1084 },
   { name:"光文社", group:"エンタメ", industry:"出版", emoji:"🎮", sortRank:1085 },
-  { name:"ANAホールディングス", group:"航空・交通", industry:"航空", emoji:"✈️", sortRank:1086 },
-  { name:"日本航空", group:"航空・交通", industry:"航空", emoji:"✈️", sortRank:1087 },
-  { name:"スカイマーク", group:"航空・交通", industry:"航空", emoji:"✈️", sortRank:1088 },
-  { name:"Peach Aviation", group:"航空・交通", industry:"航空", emoji:"✈️", sortRank:1089 },
-  { name:"ジェットスター・ジャパン", group:"航空・交通", industry:"航空", emoji:"✈️", sortRank:1090 },
-  { name:"春秋航空日本", group:"航空・交通", industry:"航空", emoji:"✈️", sortRank:1091 },
-  { name:"AIRDO", group:"航空・交通", industry:"航空", emoji:"✈️", sortRank:1092 },
-  { name:"ソラシドエア", group:"航空・交通", industry:"航空", emoji:"✈️", sortRank:1093 },
-  { name:"スターフライヤー", group:"航空・交通", industry:"航空", emoji:"✈️", sortRank:1094 },
-  { name:"アイベックスエアラインズ", group:"航空・交通", industry:"航空", emoji:"✈️", sortRank:1095 },
-  { name:"フジドリームエアラインズ", group:"航空・交通", industry:"航空", emoji:"✈️", sortRank:1096 },
-  { name:"オリエンタルエアブリッジ", group:"航空・交通", industry:"航空", emoji:"✈️", sortRank:1097 },
-  { name:"新中央航空", group:"航空・交通", industry:"航空", emoji:"✈️", sortRank:1098 },
-  { name:"天草エアライン", group:"航空・交通", industry:"航空", emoji:"✈️", sortRank:1099 },
-  { name:"琉球エアーコミューター", group:"航空・交通", industry:"航空", emoji:"✈️", sortRank:1100 },
-  { name:"JR東日本", group:"航空・交通", industry:"鉄道", emoji:"✈️", sortRank:1101 },
-  { name:"JR東海", group:"航空・交通", industry:"鉄道", emoji:"✈️", sortRank:1102 },
-  { name:"JR西日本", group:"航空・交通", industry:"鉄道", emoji:"✈️", sortRank:1103 },
-  { name:"JR北海道", group:"航空・交通", industry:"鉄道", emoji:"✈️", sortRank:1104 },
-  { name:"JR九州", group:"航空・交通", industry:"鉄道", emoji:"✈️", sortRank:1105 },
-  { name:"JR四国", group:"航空・交通", industry:"鉄道", emoji:"✈️", sortRank:1106 },
-  { name:"東京地下鉄(東京メトロ)", group:"航空・交通", industry:"鉄道", emoji:"✈️", sortRank:1107 },
-  { name:"東京都交通局", group:"航空・交通", industry:"鉄道", emoji:"✈️", sortRank:1108 },
-  { name:"小田急電鉄", group:"航空・交通", industry:"鉄道", emoji:"✈️", sortRank:1109 },
-  { name:"東急電鉄", group:"航空・交通", industry:"鉄道", emoji:"✈️", sortRank:1110 },
-  { name:"京王電鉄", group:"航空・交通", industry:"鉄道", emoji:"✈️", sortRank:1111 },
-  { name:"京急電鉄", group:"航空・交通", industry:"鉄道", emoji:"✈️", sortRank:1112 },
-  { name:"京成電鉄", group:"航空・交通", industry:"鉄道", emoji:"✈️", sortRank:1113 },
-  { name:"京浜急行電鉄", group:"航空・交通", industry:"鉄道", emoji:"✈️", sortRank:1114 },
-  { name:"西武鉄道", group:"航空・交通", industry:"鉄道", emoji:"✈️", sortRank:1115 },
-  { name:"東武鉄道", group:"航空・交通", industry:"鉄道", emoji:"✈️", sortRank:1116 },
-  { name:"名古屋鉄道", group:"航空・交通", industry:"鉄道", emoji:"✈️", sortRank:1117 },
-  { name:"近鉄", group:"航空・交通", industry:"鉄道", emoji:"✈️", sortRank:1118 },
-  { name:"南海電気鉄道", group:"航空・交通", industry:"鉄道", emoji:"✈️", sortRank:1119 },
-  { name:"阪急電鉄", group:"航空・交通", industry:"鉄道", emoji:"✈️", sortRank:1120 },
-  { name:"阪神電気鉄道", group:"航空・交通", industry:"鉄道", emoji:"✈️", sortRank:1121 },
-  { name:"京阪電気鉄道", group:"航空・交通", industry:"鉄道", emoji:"✈️", sortRank:1122 },
-  { name:"西日本鉄道", group:"航空・交通", industry:"鉄道", emoji:"✈️", sortRank:1123 },
-  { name:"新京成電鉄", group:"航空・交通", industry:"鉄道", emoji:"✈️", sortRank:1124 },
-  { name:"北総鉄道", group:"航空・交通", industry:"鉄道", emoji:"✈️", sortRank:1125 },
-  { name:"相模鉄道", group:"航空・交通", industry:"鉄道", emoji:"✈️", sortRank:1126 },
-  { name:"横浜市交通局", group:"航空・交通", industry:"鉄道", emoji:"✈️", sortRank:1127 },
-  { name:"名古屋市交通局", group:"航空・交通", industry:"鉄道", emoji:"✈️", sortRank:1128 },
-  { name:"大阪市高速電気軌道(Osaka Metro)", group:"航空・交通", industry:"鉄道", emoji:"✈️", sortRank:1129 },
-  { name:"京都市交通局", group:"航空・交通", industry:"鉄道", emoji:"✈️", sortRank:1130 },
-  { name:"札幌市交通局", group:"航空・交通", industry:"鉄道", emoji:"✈️", sortRank:1131 },
-  { name:"仙台市交通局", group:"航空・交通", industry:"鉄道", emoji:"✈️", sortRank:1132 },
-  { name:"九州旅客鉄道(JR九州)", group:"航空・交通", industry:"鉄道", emoji:"✈️", sortRank:1133 },
-  { name:"小田急バス", group:"航空・交通", industry:"鉄道", emoji:"✈️", sortRank:1134 },
-  { name:"JR東日本バス", group:"航空・交通", industry:"バス", emoji:"✈️", sortRank:1135 },
-  { name:"JRバス関東", group:"航空・交通", industry:"バス", emoji:"✈️", sortRank:1136 },
-  { name:"京王電鉄バス", group:"航空・交通", industry:"バス", emoji:"✈️", sortRank:1137 },
-  { name:"京急バス", group:"航空・交通", industry:"バス", emoji:"✈️", sortRank:1138 },
-  { name:"京成バス", group:"航空・交通", industry:"バス", emoji:"✈️", sortRank:1139 },
-  { name:"東急バス", group:"航空・交通", industry:"バス", emoji:"✈️", sortRank:1140 },
-  { name:"西武バス", group:"航空・交通", industry:"バス", emoji:"✈️", sortRank:1141 },
-  { name:"東武バス", group:"航空・交通", industry:"バス", emoji:"✈️", sortRank:1142 },
-  { name:"西鉄バス", group:"航空・交通", industry:"バス", emoji:"✈️", sortRank:1143 },
-  { name:"近鉄バス", group:"航空・交通", industry:"バス", emoji:"✈️", sortRank:1144 },
-  { name:"阪急バス", group:"航空・交通", industry:"バス", emoji:"✈️", sortRank:1145 },
-  { name:"南海バス", group:"航空・交通", industry:"バス", emoji:"✈️", sortRank:1146 },
-  { name:"京阪バス", group:"航空・交通", industry:"バス", emoji:"✈️", sortRank:1147 },
-  { name:"名鉄バス", group:"航空・交通", industry:"バス", emoji:"✈️", sortRank:1148 },
-  { name:"千葉中央バス", group:"航空・交通", industry:"バス", emoji:"✈️", sortRank:1149 },
-  { name:"関東バス", group:"航空・交通", industry:"バス", emoji:"✈️", sortRank:1150 },
-  { name:"横浜市営バス", group:"航空・交通", industry:"バス", emoji:"✈️", sortRank:1151 },
+  { name:"ANAホールディングス", group:"航空", industry:"航空会社", emoji:"✈️", sortRank:1086 },
+  { name:"日本航空", group:"航空", industry:"航空会社", emoji:"✈️", sortRank:1087 },
+  { name:"スカイマーク", group:"航空", industry:"航空会社", emoji:"✈️", sortRank:1088 },
+  { name:"Peach Aviation", group:"航空", industry:"航空会社", emoji:"✈️", sortRank:1089 },
+  { name:"ジェットスター・ジャパン", group:"航空", industry:"航空会社", emoji:"✈️", sortRank:1090 },
+  { name:"春秋航空日本", group:"航空", industry:"航空会社", emoji:"✈️", sortRank:1091 },
+  { name:"AIRDO", group:"航空", industry:"航空会社", emoji:"✈️", sortRank:1092 },
+  { name:"ソラシドエア", group:"航空", industry:"航空会社", emoji:"✈️", sortRank:1093 },
+  { name:"スターフライヤー", group:"航空", industry:"航空会社", emoji:"✈️", sortRank:1094 },
+  { name:"アイベックスエアラインズ", group:"航空", industry:"航空会社", emoji:"✈️", sortRank:1095 },
+  { name:"フジドリームエアラインズ", group:"航空", industry:"航空会社", emoji:"✈️", sortRank:1096 },
+  { name:"オリエンタルエアブリッジ", group:"航空", industry:"航空会社", emoji:"✈️", sortRank:1097 },
+  { name:"新中央航空", group:"航空", industry:"航空会社", emoji:"✈️", sortRank:1098 },
+  { name:"天草エアライン", group:"航空", industry:"航空会社", emoji:"✈️", sortRank:1099 },
+  { name:"琉球エアーコミューター", group:"航空", industry:"航空会社", emoji:"✈️", sortRank:1100 },
+  { name:"JR東日本", group:"交通・運輸", industry:"鉄道", emoji:"🚄", sortRank:1101 },
+  { name:"JR東海", group:"交通・運輸", industry:"鉄道", emoji:"🚄", sortRank:1102 },
+  { name:"JR西日本", group:"交通・運輸", industry:"鉄道", emoji:"🚄", sortRank:1103 },
+  { name:"JR北海道", group:"交通・運輸", industry:"鉄道", emoji:"🚄", sortRank:1104 },
+  { name:"JR九州", group:"交通・運輸", industry:"鉄道", emoji:"🚄", sortRank:1105 },
+  { name:"JR四国", group:"交通・運輸", industry:"鉄道", emoji:"🚄", sortRank:1106 },
+  { name:"東京地下鉄(東京メトロ)", group:"交通・運輸", industry:"鉄道", emoji:"🚄", sortRank:1107 },
+  { name:"東京都交通局", group:"交通・運輸", industry:"鉄道", emoji:"🚄", sortRank:1108 },
+  { name:"小田急電鉄", group:"交通・運輸", industry:"鉄道", emoji:"🚄", sortRank:1109 },
+  { name:"東急電鉄", group:"交通・運輸", industry:"鉄道", emoji:"🚄", sortRank:1110 },
+  { name:"京王電鉄", group:"交通・運輸", industry:"鉄道", emoji:"🚄", sortRank:1111 },
+  { name:"京急電鉄", group:"交通・運輸", industry:"鉄道", emoji:"🚄", sortRank:1112 },
+  { name:"京成電鉄", group:"交通・運輸", industry:"鉄道", emoji:"🚄", sortRank:1113 },
+  { name:"京浜急行電鉄", group:"交通・運輸", industry:"鉄道", emoji:"🚄", sortRank:1114 },
+  { name:"西武鉄道", group:"交通・運輸", industry:"鉄道", emoji:"🚄", sortRank:1115 },
+  { name:"東武鉄道", group:"交通・運輸", industry:"鉄道", emoji:"🚄", sortRank:1116 },
+  { name:"名古屋鉄道", group:"交通・運輸", industry:"鉄道", emoji:"🚄", sortRank:1117 },
+  { name:"近鉄", group:"交通・運輸", industry:"鉄道", emoji:"🚄", sortRank:1118 },
+  { name:"南海電気鉄道", group:"交通・運輸", industry:"鉄道", emoji:"🚄", sortRank:1119 },
+  { name:"阪急電鉄", group:"交通・運輸", industry:"鉄道", emoji:"🚄", sortRank:1120 },
+  { name:"阪神電気鉄道", group:"交通・運輸", industry:"鉄道", emoji:"🚄", sortRank:1121 },
+  { name:"京阪電気鉄道", group:"交通・運輸", industry:"鉄道", emoji:"🚄", sortRank:1122 },
+  { name:"西日本鉄道", group:"交通・運輸", industry:"鉄道", emoji:"🚄", sortRank:1123 },
+  { name:"新京成電鉄", group:"交通・運輸", industry:"鉄道", emoji:"🚄", sortRank:1124 },
+  { name:"北総鉄道", group:"交通・運輸", industry:"鉄道", emoji:"🚄", sortRank:1125 },
+  { name:"相模鉄道", group:"交通・運輸", industry:"鉄道", emoji:"🚄", sortRank:1126 },
+  { name:"横浜市交通局", group:"交通・運輸", industry:"鉄道", emoji:"🚄", sortRank:1127 },
+  { name:"名古屋市交通局", group:"交通・運輸", industry:"鉄道", emoji:"🚄", sortRank:1128 },
+  { name:"大阪市高速電気軌道(Osaka Metro)", group:"交通・運輸", industry:"鉄道", emoji:"🚄", sortRank:1129 },
+  { name:"京都市交通局", group:"交通・運輸", industry:"鉄道", emoji:"🚄", sortRank:1130 },
+  { name:"札幌市交通局", group:"交通・運輸", industry:"鉄道", emoji:"🚄", sortRank:1131 },
+  { name:"仙台市交通局", group:"交通・運輸", industry:"鉄道", emoji:"🚄", sortRank:1132 },
+  { name:"九州旅客鉄道(JR九州)", group:"交通・運輸", industry:"鉄道", emoji:"🚄", sortRank:1133 },
+  { name:"小田急バス", group:"交通・運輸", industry:"鉄道", emoji:"🚄", sortRank:1134 },
+  { name:"JR東日本バス", group:"交通・運輸", industry:"バス", emoji:"🚄", sortRank:1135 },
+  { name:"JRバス関東", group:"交通・運輸", industry:"バス", emoji:"🚄", sortRank:1136 },
+  { name:"京王電鉄バス", group:"交通・運輸", industry:"バス", emoji:"🚄", sortRank:1137 },
+  { name:"京急バス", group:"交通・運輸", industry:"バス", emoji:"🚄", sortRank:1138 },
+  { name:"京成バス", group:"交通・運輸", industry:"バス", emoji:"🚄", sortRank:1139 },
+  { name:"東急バス", group:"交通・運輸", industry:"バス", emoji:"🚄", sortRank:1140 },
+  { name:"西武バス", group:"交通・運輸", industry:"バス", emoji:"🚄", sortRank:1141 },
+  { name:"東武バス", group:"交通・運輸", industry:"バス", emoji:"🚄", sortRank:1142 },
+  { name:"西鉄バス", group:"交通・運輸", industry:"バス", emoji:"🚄", sortRank:1143 },
+  { name:"近鉄バス", group:"交通・運輸", industry:"バス", emoji:"🚄", sortRank:1144 },
+  { name:"阪急バス", group:"交通・運輸", industry:"バス", emoji:"🚄", sortRank:1145 },
+  { name:"南海バス", group:"交通・運輸", industry:"バス", emoji:"🚄", sortRank:1146 },
+  { name:"京阪バス", group:"交通・運輸", industry:"バス", emoji:"🚄", sortRank:1147 },
+  { name:"名鉄バス", group:"交通・運輸", industry:"バス", emoji:"🚄", sortRank:1148 },
+  { name:"千葉中央バス", group:"交通・運輸", industry:"バス", emoji:"🚄", sortRank:1149 },
+  { name:"関東バス", group:"交通・運輸", industry:"バス", emoji:"🚄", sortRank:1150 },
+  { name:"横浜市営バス", group:"交通・運輸", industry:"バス", emoji:"🚄", sortRank:1151 },
   { name:"ゴールドマン・サックス証券", group:"金融・銀行", industry:"外資系金融", emoji:"🏦", sortRank:1152 },
   { name:"モルガン・スタンレーMUFG証券", group:"金融・銀行", industry:"外資系金融", emoji:"🏦", sortRank:1153 },
   { name:"JPモルガン証券", group:"金融・銀行", industry:"外資系金融", emoji:"🏦", sortRank:1154 },
@@ -1736,6 +1744,7 @@ export default function App() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [searchQ,  setSearchQ]  = useState("");
   const [grpFilter,setGrpFilter]= useState("");
+  const [subTopGroup, setSubTopGroup] = useState(""); // サブトップに表示する業種
   const [subFilter,setSubFilter]= useState("");
   const [sortBy,   setSortBy]   = useState("posts");
   const [globalSearch, setGlobalSearch] = useState("");
@@ -1879,6 +1888,46 @@ export default function App() {
     }
   };
 
+  const loginWithGoogle = async () => {
+    try {
+      const provider = new GoogleAuthProvider();
+      const cred = await signInWithPopup(auth, provider);
+      // 既存ユーザーかチェック - なければ作成
+      let prof = await fsGet("users", cred.user.uid);
+      if (!prof) {
+        prof = {
+          uid: cred.user.uid,
+          displayName: cred.user.displayName || "ユーザー",
+          email: cred.user.email || "",
+          plan: "free",
+          isAdmin: false,
+          joinDate: today(),
+          viewUnlockUntil: 0,
+          postCount: 0,
+          provider: "google",
+          notifications: { email: true, comments: true, likes: true, weeklyDigest: true, followedCos: true },
+          followedCompanies: [],
+          lastLoginDate: today(),
+          streak: 0,
+          lastPostDate: null,
+          unreadNotifications: [],
+        };
+        await fsSet("users", cred.user.uid, prof);
+      }
+      setProfile(prof);
+      setAuthMode(null);
+      toast2("Googleアカウントでログインしました");
+      return null;
+    } catch (e) {
+      const m = {
+        "auth/popup-closed-by-user": null,
+        "auth/cancelled-popup-request": null,
+      };
+      if (e.code in m && m[e.code] === null) return null;
+      return "エラー: " + (e.message || e.code);
+    }
+  };
+
   const resetPassword = async (email) => {
     try {
       await sendPasswordResetEmail(auth, email);
@@ -1930,14 +1979,51 @@ export default function App() {
   // ───────────────────────────────────────────────────────────────────────────
 
   // ── 画面遷移
-  const go = (p, co = null, tab = null) => {
+  const go = (p, co = null, tab = null, fromPopstate = false) => {
     setPage(p);
     if (co  !== null) setSelCo(co);
     if (tab !== null) setSelTab(tab);
     else if (p === "company") setSelTab("interview");
     window.scrollTo(0, 0);
     setMenuOpen(false);
+    // ブラウザ履歴に追加
+    if (!fromPopstate && typeof window !== "undefined") {
+      const state = { p, coId: co?.id || null, tab };
+      window.history.pushState(state, "", "#" + p + (co?.id ? "/" + co.id : ""));
+    }
   };
+
+  // サブトップ（業種別ページ）に遷移
+  const goSubTop = (grp) => {
+    setSubTopGroup(grp);
+    setPage("subTop");
+    window.scrollTo(0, 0);
+    setMenuOpen(false);
+    if (typeof window !== "undefined") {
+      window.history.pushState({ p:"subTop", grp }, "", "#subtop/" + encodeURIComponent(grp));
+    }
+  };
+
+  // popstate（戻る/進むボタン）で内部状態を復元
+  useEffect(() => {
+    const handler = (e) => {
+      const s = e.state || { p:"home" };
+      if (s.p === "subTop" && s.grp) {
+        setSubTopGroup(s.grp);
+        setPage("subTop");
+        window.scrollTo(0, 0);
+        return;
+      }
+      const co = s.coId ? companies.find(c => c.id === s.coId) : null;
+      go(s.p, co, s.tab, true);
+    };
+    window.addEventListener("popstate", handler);
+    // 初期ステートを設定
+    if (window.history.state === null) {
+      window.history.replaceState({ p:"home" }, "", "");
+    }
+    return () => window.removeEventListener("popstate", handler);
+  }, [companies]);
 
   // ── 派生値
   const plan    = profile?.plan    || "free";
@@ -2174,7 +2260,7 @@ export default function App() {
     return getBadge(authorPostCounts[authorUid] || 0);
   };
 
-  const sp = { sess, go, companies, posts, reviews, salaries, jobListings, plan, isAdmin, adminDelete, adminEdit, setEditTgt, setAuthMode, isMobile, uName, upgradePlan, authUser, favorites, toggleFavorite, unlocked, profile, getAuthorBadge, authorPostCounts };
+  const sp = { sess, go, goSubTop, companies, posts, reviews, salaries, jobListings, plan, isAdmin, adminDelete, adminEdit, setEditTgt, setAuthMode, isMobile, uName, upgradePlan, authUser, favorites, toggleFavorite, unlocked, profile, getAuthorBadge, authorPostCounts };
 
   return (
     <ErrorBoundary>
@@ -2182,7 +2268,7 @@ export default function App() {
       <style>{CSS}</style>
       <AppNav {...sp} menuOpen={menuOpen} setMenuOpen={setMenuOpen} logout={logout} doGlobalSearch={doGlobalSearch} globalSearch={globalSearch} />
       {toast && <div style={S.toast} className="fadeUp">{toast}</div>}
-      {authMode && <AuthModal mode={authMode} setMode={setAuthMode} onLogin={login} onRegister={register} onReset={resetPassword} />}
+      {authMode && <AuthModal mode={authMode} setMode={setAuthMode} onLogin={login} onRegister={register} onReset={resetPassword} onGoogle={loginWithGoogle} />}
       {editTgt  && <EditModal target={editTgt} setTarget={setEditTgt} onSave={adminEdit} />}
 
       {authUser && !authUser.emailVerified && (
@@ -2198,6 +2284,7 @@ export default function App() {
       <main style={{ ...S.main, padding: isMobile ? "0 12px 60px" : "0 24px 72px" }}>
         {page === "home"       && <HomePage       {...sp} coPosts={coPosts} coRevs={coRevs} coSals={coSals} setAuthMode={setAuthMode} doGlobalSearch={doGlobalSearch} />}
         {page === "companies"  && <CompaniesPage  {...sp} filtered={filteredCos} searchQ={searchQ} setSearchQ={setSearchQ} grpFilter={grpFilter} setGrpFilter={setGrpFilter} subFilter={subFilter} setSubFilter={setSubFilter} sortBy={sortBy} setSortBy={setSortBy} coPosts={coPosts} coRevs={coRevs} coSals={coSals} />}
+        {page === "subTop"     && <SubTopPage     {...sp} grp={subTopGroup} setGrpFilter={setGrpFilter} setSubFilter={setSubFilter} coPosts={coPosts} coRevs={coRevs} coSals={coSals} />}
         {page === "company"    && selCo && (
           <CompanyPage {...sp}
             co={selCo}
@@ -2247,7 +2334,7 @@ export default function App() {
 }
 
 // ─── AuthModal（本物のFirebase Auth）────────────────────────────────────────
-function AuthModal({ mode, setMode, onLogin, onRegister, onReset }) {
+function AuthModal({ mode, setMode, onLogin, onRegister, onReset, onGoogle }) {
   const [email, setEmail] = useState("");
   const [dn,    setDn]    = useState("");
   const [pw,    setPw]    = useState("");
@@ -2315,6 +2402,20 @@ function AuthModal({ mode, setMode, onLogin, onRegister, onReset }) {
           onClick={mode === "login" ? doLogin : mode === "register" ? doReg : doReset} disabled={ld}>
           {ld ? "処理中..." : mode === "login" ? "ログイン" : mode === "register" ? "登録する" : "メールを送信する"}
         </button>
+        {mode !== "forgot" && onGoogle && (
+          <>
+            <div style={{ display:"flex", alignItems:"center", gap:8, margin:"14px 0", color:C.sub, fontSize:11 }}>
+              <div style={{ flex:1, height:1, background:C.border }} />
+              <span>または</span>
+              <div style={{ flex:1, height:1, background:C.border }} />
+            </div>
+            <button style={{ width:"100%", padding:"11px", background:"#fff", border:"1px solid " + C.border, borderRadius:6, fontSize:13, fontWeight:"bold", fontFamily:"inherit", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:8 }}
+              onClick={async () => { setLd(true); const e = await onGoogle(); if (e) setErr(e); setLd(false); }} disabled={ld}>
+              <svg width="18" height="18" viewBox="0 0 18 18"><path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84c-.21 1.13-.84 2.08-1.79 2.72v2.26h2.9c1.7-1.56 2.69-3.87 2.69-6.62z"/><path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.9-2.26c-.8.54-1.83.86-3.06.86-2.35 0-4.34-1.59-5.05-3.71H.96v2.33C2.44 15.98 5.48 18 9 18z"/><path fill="#FBBC05" d="M3.95 10.71c-.18-.54-.28-1.12-.28-1.71s.1-1.17.28-1.71V4.96H.96C.35 6.18 0 7.55 0 9s.35 2.82.96 4.04l2.99-2.33z"/><path fill="#EA4335" d="M9 3.58c1.32 0 2.51.45 3.44 1.35l2.58-2.58C13.46.89 11.43 0 9 0 5.48 0 2.44 2.02.96 4.96L3.95 7.29C4.66 5.17 6.65 3.58 9 3.58z"/></svg>
+              Googleでログイン
+            </button>
+          </>
+        )}
         {mode === "login" && (
           <p style={{ textAlign:"center", marginTop:10, fontSize:12 }}>
             <button style={S.textLink} onClick={() => { setMode("forgot"); setErr(""); setMsg(""); }}>
@@ -2471,7 +2572,336 @@ function AppNav({ sess, go, plan, isAdmin, setAuthMode, isMobile, menuOpen, setM
 }
 
 // ─── ホームページ ──────────────────────────────────────────────────────────────
-function HomePage({ sess, go, companies, posts, reviews, salaries, isAdmin, adminDelete, setEditTgt, coPosts, coRevs, coSals, isMobile, setAuthMode, doGlobalSearch }) {
+
+// 業種ごとのテーマ画像（SVGで生成、印象的なグラデーション + アイコン）
+const GROUP_THEMES = {
+  "航空": {
+    bg: "linear-gradient(180deg, #FFB87C 0%, #FF8C5A 30%, #FFCC88 50%, #B0D8FF 100%)",
+    emoji: "✈️",
+    catch: "雲の上のキャリアを目指す方へ",
+    desc: "パイロット・CA・整備士・グランドスタッフなど、空の仕事の選考情報・年収・口コミ",
+    svg: <svg viewBox="0 0 800 200" style={{width:"100%", height:"100%", display:"block"}}>
+      <defs>
+        <linearGradient id="skyGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" stopColor="#FF6B35"/>
+          <stop offset="40%" stopColor="#FFB87C"/>
+          <stop offset="70%" stopColor="#FFCC88"/>
+          <stop offset="100%" stopColor="#B8DDF5"/>
+        </linearGradient>
+      </defs>
+      <rect width="800" height="200" fill="url(#skyGradient)"/>
+      <circle cx="650" cy="60" r="25" fill="#FFEB3B" opacity="0.9"/>
+      <circle cx="650" cy="60" r="40" fill="#FFEB3B" opacity="0.3"/>
+      <ellipse cx="100" cy="160" rx="120" ry="20" fill="white" opacity="0.5"/>
+      <ellipse cx="350" cy="170" rx="180" ry="15" fill="white" opacity="0.4"/>
+      <ellipse cx="600" cy="160" rx="140" ry="22" fill="white" opacity="0.5"/>
+      <text x="400" y="115" fontSize="60" textAnchor="middle">✈️</text>
+    </svg>
+  },
+  "交通・運輸": {
+    bg: "linear-gradient(135deg, #4FACFE 0%, #00F2FE 100%)",
+    emoji: "🚄",
+    catch: "人と物の流れを支える仕事",
+    desc: "鉄道・バス・海運・物流の選考情報・年収・口コミ",
+  },
+  "金融・銀行": {
+    bg: "linear-gradient(135deg, #1E3C72 0%, #2A5298 100%)",
+    emoji: "🏦",
+    catch: "経済の中枢で活躍する",
+    desc: "メガバンク・証券・保険・外資金融の選考情報・年収・口コミ",
+  },
+  "商社": {
+    bg: "linear-gradient(135deg, #134E5E 0%, #71B280 100%)",
+    emoji: "🌐",
+    catch: "世界を舞台に働く",
+    desc: "総合商社・専門商社の選考情報・年収・口コミ",
+  },
+  "メーカー": {
+    bg: "linear-gradient(135deg, #5B86E5 0%, #36D1DC 100%)",
+    emoji: "🏭",
+    catch: "ものづくり日本を担う",
+    desc: "自動車・電機・化学・食品・医薬品メーカーの選考情報・年収・口コミ",
+  },
+  "IT・テック": {
+    bg: "linear-gradient(135deg, #667EEA 0%, #764BA2 100%)",
+    emoji: "💻",
+    catch: "テクノロジーで未来を創る",
+    desc: "SIer・Web・スタートアップ・外資ITの選考情報・年収・口コミ",
+  },
+  "コンサル": {
+    bg: "linear-gradient(135deg, #2C3E50 0%, #4CA1AF 100%)",
+    emoji: "💡",
+    catch: "知力で企業を変革する",
+    desc: "戦略コンサル・ITコンサル・監査法人・税理士の選考情報・年収・口コミ",
+  },
+  "不動産・建設": {
+    bg: "linear-gradient(135deg, #8E2DE2 0%, #4A00E0 100%)",
+    emoji: "🏢",
+    catch: "街と建物を創る仕事",
+    desc: "デベロッパー・ゼネコン・ハウスメーカーの選考情報・年収・口コミ",
+  },
+  "小売・流通": {
+    bg: "linear-gradient(135deg, #FFA17F 0%, #00223E 100%)",
+    emoji: "🛒",
+    catch: "暮らしを支える販売・流通",
+    desc: "百貨店・SPA・EC・ドラッグストア・物流の選考情報・年収・口コミ",
+  },
+  "サービス": {
+    bg: "linear-gradient(135deg, #FF6B6B 0%, #FFE66D 100%)",
+    emoji: "📢",
+    catch: "人と人をつなぐ仕事",
+    desc: "広告・人材・メディア・外食の選考情報・年収・口コミ",
+  },
+  "医療・ヘルス": {
+    bg: "linear-gradient(135deg, #56AB2F 0%, #A8E063 100%)",
+    emoji: "🏥",
+    catch: "人々の健康を守る",
+    desc: "医療機器・製薬・ヘルスケアの選考情報・年収・口コミ",
+  },
+  "教育・公共": {
+    bg: "linear-gradient(135deg, #F2994A 0%, #F2C94C 100%)",
+    emoji: "📚",
+    catch: "学びと社会を支える",
+    desc: "教育・予備校・人材育成の選考情報・年収・口コミ",
+  },
+  "エンタメ": {
+    bg: "linear-gradient(135deg, #DA22FF 0%, #9733EE 100%)",
+    emoji: "🎮",
+    catch: "感動と楽しみを生み出す",
+    desc: "ゲーム・映像・音楽・出版の選考情報・年収・口コミ",
+  },
+};
+
+function NaiteiTimeline({ posts, companies, go, isMobile }) {
+  // 最終結果が内定/内定辞退の interview だけ抽出（最新10件）
+  const naiteiPosts = posts
+    .filter(p => p.ptype === "interview" && (p.finalResult === "内定" || p.finalResult === "内定辞退"))
+    .sort((a,b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0))
+    .slice(0, 10);
+
+  if (naiteiPosts.length === 0) return null;
+
+  const fmtTime = (ts) => {
+    if (!ts) return "";
+    const d = ts.toDate ? ts.toDate() : new Date(ts);
+    const now = new Date();
+    const diff = (now - d) / 1000;
+    if (diff < 60) return Math.floor(diff) + "秒前";
+    if (diff < 3600) return Math.floor(diff/60) + "分前";
+    if (diff < 86400) return Math.floor(diff/3600) + "時間前";
+    if (diff < 604800) return Math.floor(diff/86400) + "日前";
+    return d.toLocaleDateString("ja-JP", { month:"numeric", day:"numeric" });
+  };
+
+  return (
+    <section style={{
+      background:"linear-gradient(135deg, #FFF8E7 0%, #FEF3C7 100%)",
+      border:"2px solid #F59E0B",
+      borderRadius:12,
+      padding: isMobile ? "16px 18px" : "20px 24px",
+      marginBottom:20,
+      position:"relative",
+      overflow:"hidden",
+    }}>
+      <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:14 }}>
+        <span style={{ fontSize:24 }}>🎉</span>
+        <h2 style={{ fontSize:isMobile ? 14 : 16, fontWeight:"bold", color:"#92400E", flex:1 }}>
+          内定速報タイムライン
+        </h2>
+        <span style={{ background:"#DC2626", color:"#fff", fontSize:10, padding:"3px 10px", fontWeight:"bold", borderRadius:14, display:"flex", alignItems:"center", gap:4 }}>
+          <span style={{ width:6, height:6, background:"#fff", borderRadius:"50%", animation:"pulse 1.5s ease-in-out infinite" }} />
+          LIVE
+        </span>
+      </div>
+      <div style={{ display:"flex", flexDirection:"column", gap:8, maxHeight:isMobile ? 280 : 320, overflowY:"auto" }}>
+        {naiteiPosts.map(p => {
+          const co = companies.find(c => c.id === p.companyId);
+          if (!co) return null;
+          return (
+            <div key={p.id} style={{
+              background:"rgba(255,255,255,0.85)",
+              border:"1px solid rgba(245,158,11,0.3)",
+              borderRadius:8,
+              padding:"10px 14px",
+              cursor:"pointer",
+              display:"flex",
+              alignItems:"center",
+              gap:10,
+              flexWrap:"wrap",
+            }} onClick={() => go("company", co, "interview")}>
+              <span style={{ fontSize:11, color:"#92400E", fontWeight:"bold", minWidth:64 }}>{fmtTime(p.createdAt)}</span>
+              <span style={{
+                background: p.finalResult === "内定" ? "#16A34A" : "#0891B2",
+                color:"#fff",
+                fontSize:10,
+                padding:"2px 8px",
+                fontWeight:"bold",
+                borderRadius:4,
+              }}>
+                {p.finalResult === "内定" ? "🎉 内定" : "💼 内定辞退"}
+              </span>
+              <span style={{ fontSize:13, fontWeight:"bold", color:C.ink }}>{co.name}</span>
+              {p.jobCategory && p.jobCategory !== "全職種" && (
+                <span style={{ fontSize:10, background:"#EFF6FF", color:"#1E40AF", padding:"1px 7px", borderRadius:3 }}>{p.jobCategory}</span>
+              )}
+              {p.offerAmount && (
+                <span style={{ fontSize:11, color:"#16A34A", fontWeight:"bold" }}>
+                  年収{p.offerAmount}万円
+                </span>
+              )}
+              {p.prevSalary && p.offerAmount && (
+                <span style={{ fontSize:10, color:C.sub }}>
+                  ({p.prevSalary}万円→{p.offerAmount}万円)
+                </span>
+              )}
+              <span style={{ fontSize:18, marginLeft:"auto" }}>🎊</span>
+            </div>
+          );
+        })}
+      </div>
+      <p style={{ fontSize:10, color:"#92400E", marginTop:10, textAlign:"center" }}>
+        ↑ 最新の内定情報をリアルタイム表示中
+      </p>
+      <style>{`@keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.4; } }`}</style>
+    </section>
+  );
+}
+
+function SubTopPage({ go, goSubTop, grp, companies, posts, reviews, salaries, coPosts, coRevs, coSals, isAdmin, adminDelete, setEditTgt, setGrpFilter, setSubFilter, isMobile, sess, setAuthMode }) {
+  const theme = GROUP_THEMES[grp] || { bg:"linear-gradient(135deg, #2B7BD1 0%, #4A95E5 100%)", emoji:"🏢", catch:grp, desc:grp + "の選考情報" };
+  const grpCos = companies.filter(c => (c.group || getGroup(c.industry)) === grp);
+  const grpPosts = posts.filter(p => grpCos.some(c => c.id === p.companyId));
+  const grpReviews = reviews.filter(r => grpCos.some(c => c.id === r.companyId));
+
+  // 業種内人気企業（投稿数 + sortRank）
+  const topInGroup = [...grpCos].sort((a,b) => {
+    const aAct = (coPosts(a.id).length + coRevs(a.id).length) * 100 - (a.sortRank || 99999);
+    const bAct = (coPosts(b.id).length + coRevs(b.id).length) * 100 - (b.sortRank || 99999);
+    return bAct - aAct;
+  }).slice(0, 12);
+
+  // サブカテゴリ
+  const subs = INDUSTRY_GROUPS[grp] || [];
+
+  return (
+    <div>
+      {/* ヒーロー */}
+      <section style={{
+        background: theme.bg,
+        padding: isMobile ? "32px 20px" : "56px 40px",
+        borderRadius: 14,
+        marginTop: 12,
+        marginBottom: 24,
+        color: "#fff",
+        position: "relative",
+        overflow: "hidden",
+      }}>
+        {theme.svg && (
+          <div style={{ position:"absolute", inset:0, zIndex:0, opacity:0.7 }}>
+            {theme.svg}
+          </div>
+        )}
+        <div style={{ position:"relative", zIndex:1, maxWidth:760, margin:"0 auto", textAlign:"center", textShadow:"0 2px 8px rgba(0,0,0,0.3)" }}>
+          <div style={{ fontSize:60, marginBottom:12 }}>{theme.emoji}</div>
+          <p style={{ fontSize:11, letterSpacing:"0.2em", marginBottom:8, opacity:0.9, fontWeight:"bold" }}>CAREER COMMUNITY ｜ {grp}</p>
+          <h1 style={{ fontSize: isMobile ? 22 : 30, fontWeight:"bold", lineHeight:1.4, marginBottom:14, fontFamily:"\"M PLUS Rounded 1c\", sans-serif" }}>
+            {theme.catch}
+          </h1>
+          <p style={{ fontSize: isMobile ? 12 : 14, lineHeight:1.8, opacity:0.95, marginBottom:18 }}>
+            {theme.desc}
+          </p>
+          <div style={{ display:"flex", gap:isMobile ? 14 : 24, justifyContent:"center", flexWrap:"wrap" }}>
+            <div style={{ textAlign:"center" }}>
+              <div style={{ fontSize:isMobile ? 18 : 24, fontWeight:"bold", fontFamily:"\"M PLUS Rounded 1c\", sans-serif" }}>{grpCos.length}</div>
+              <div style={{ fontSize:10, opacity:0.85 }}>掲載企業</div>
+            </div>
+            <div style={{ textAlign:"center" }}>
+              <div style={{ fontSize:isMobile ? 18 : 24, fontWeight:"bold", fontFamily:"\"M PLUS Rounded 1c\", sans-serif" }}>{grpPosts.length}</div>
+              <div style={{ fontSize:10, opacity:0.85 }}>体験談</div>
+            </div>
+            <div style={{ textAlign:"center" }}>
+              <div style={{ fontSize:isMobile ? 18 : 24, fontWeight:"bold", fontFamily:"\"M PLUS Rounded 1c\", sans-serif" }}>{grpReviews.length}</div>
+              <div style={{ fontSize:10, opacity:0.85 }}>口コミ</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* サブカテゴリで絞り込み */}
+      {subs.length > 0 && (
+        <section style={{ marginBottom:24 }}>
+          <h2 style={{ fontSize:14, fontWeight:"bold", marginBottom:10, color:C.ink }}>業種で絞り込む</h2>
+          <div style={{ display:"flex", flexWrap:"wrap", gap:6 }}>
+            <button style={{ ...S.chip, ...S.chipOn }} onClick={() => { setGrpFilter(grp); setSubFilter(""); go("companies"); }}>すべて</button>
+            {subs.map(s => (
+              <button key={s} style={{ ...S.chip }} onClick={() => { setGrpFilter(grp); setSubFilter(s); go("companies"); }}>{s}</button>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* 注目企業（業種内Top） */}
+      <section style={{ marginBottom:24 }}>
+        <h2 style={{ fontSize:16, fontWeight:"bold", marginBottom:12, paddingBottom:8, borderBottom:"3px solid " + C.accent, color:C.ink }}>
+          注目の企業
+        </h2>
+        <div style={{ display:"grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr 1fr", gap:12 }}>
+          {topInGroup.map(co => {
+            const a = calcAvg(coRevs(co.id));
+            const sal = calcAvgSal(coSals(co.id));
+            const postCount = coPosts(co.id).length;
+            return (
+              <div key={co.id} style={{ background:"#fff", border:"1px solid " + C.border, borderRadius:8, padding:"14px 16px", cursor:"pointer", transition:"all .15s" }} onClick={() => go("company", co)}>
+                <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:8 }}>
+                  <span style={{ fontSize:24 }}>{co.emoji || theme.emoji}</span>
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <div style={{ fontSize:14, fontWeight:"bold", color:C.ink, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{co.name}</div>
+                    <div style={{ fontSize:10, color:C.sub }}>{co.industry}</div>
+                  </div>
+                </div>
+                <div style={{ display:"flex", gap:8, fontSize:11, color:C.sub }}>
+                  {a && <span>★ <strong style={{ color:C.accent }}>{a.overall.toFixed(1)}</strong></span>}
+                  {sal && <span>{sal}万円</span>}
+                  {postCount > 0 && <span>体験談{postCount}件</span>}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        <button style={{ ...S.secondaryBtn, marginTop:12 }} onClick={() => { setGrpFilter(grp); setSubFilter(""); go("companies"); }}>
+          {grp}の企業をすべて見る →
+        </button>
+      </section>
+
+      {/* 最新の体験談・口コミ */}
+      <section style={{ marginBottom:24 }}>
+        <h2 style={{ fontSize:16, fontWeight:"bold", marginBottom:12, paddingBottom:8, borderBottom:"3px solid " + C.accent, color:C.ink }}>
+          {grp}の最新投稿
+        </h2>
+        {grpPosts.slice(0, 5).length === 0
+          ? <Empty text="まだ投稿がありません" />
+          : grpPosts.slice(0, 5).map(p => (
+              <PostCard key={p.id} post={p} co={companies.find(c => c.id === p.companyId)} go={go} isAdmin={isAdmin} onDelete={adminDelete} onEdit={d => setEditTgt({ type:"post", data:d })} />
+            ))
+        }
+      </section>
+
+      {/* 他の業種へ */}
+      <section style={{ marginBottom:24, background:"#FAFCFE", padding:"20px 24px", borderRadius:12, border:"1px solid " + C.border }}>
+        <h2 style={{ fontSize:14, fontWeight:"bold", marginBottom:12, color:C.ink }}>他の業界も見る</h2>
+        <div style={{ display:"flex", flexWrap:"wrap", gap:8 }}>
+          {ALL_GROUPS.filter(g => g !== grp).map(g => (
+            <button key={g} style={{ background:"#fff", border:"1px solid " + C.border, padding:"6px 14px", fontSize:12, cursor:"pointer", fontFamily:"inherit", borderRadius:18, color:C.ink }} onClick={() => goSubTop(g)}>
+              {GROUP_THEMES[g]?.emoji || "🏢"} {g}
+            </button>
+          ))}
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function HomePage({ sess, go, goSubTop, companies, posts, reviews, salaries, isAdmin, adminDelete, setEditTgt, coPosts, coRevs, coSals, isMobile, setAuthMode, doGlobalSearch }) {
   const recent   = posts.slice(0, 8);
   const topCos   = [...companies].sort((a,b) => {
     const aAct = coRevs(a.id).length + coPosts(a.id).length;
@@ -2574,6 +3004,9 @@ function HomePage({ sess, go, companies, posts, reviews, salaries, isAdmin, admi
         </section>
       )}
 
+      {/* 🎉 内定速報タイムライン */}
+      <NaiteiTimeline posts={posts} companies={companies} go={go} isMobile={isMobile} />
+
       {/* メインコンテンツ：2カラム */}
       <div style={{ display:"grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 300px", gap:24, alignItems:"start" }}>
         {/* 左カラム：トレンドと最新投稿 */}
@@ -2649,7 +3082,7 @@ function HomePage({ sess, go, companies, posts, reviews, salaries, isAdmin, admi
               {ALL_GROUPS.map(grp => {
                 const count = companies.filter(c => (c.group || getGroup(c.industry)) === grp).length;
                 return (
-                  <div key={grp} style={{ padding:"6px 0", display:"flex", justifyContent:"space-between", alignItems:"center", cursor:"pointer", fontSize:12 }} onClick={() => go("companies")}>
+                  <div key={grp} style={{ padding:"6px 0", display:"flex", justifyContent:"space-between", alignItems:"center", cursor:"pointer", fontSize:12 }} onClick={() => goSubTop(grp)}>
                     <span style={{ color:C.ink }}>{grp}</span>
                     <span style={{ color:C.sub, fontSize:11 }}>{count}社</span>
                   </div>
@@ -2687,7 +3120,7 @@ function CompaniesPage({ go, filtered, searchQ, setSearchQ, grpFilter, setGrpFil
         <div style={{ display:"flex", gap:4, paddingBottom:4, minWidth:"max-content" }}>
           <button style={{ ...S.chip, ...(grpFilter === "" ? S.chipOn : {}) }} onClick={() => { setGrpFilter(""); setSubFilter(""); }}>すべて</button>
           {ALL_GROUPS.map(grp => (
-            <button key={grp} style={{ ...S.chip, ...(grpFilter === grp ? S.chipOn : {}) }} onClick={() => setGrpFilter(g => g === grp ? "" : grp)}>{grp}</button>
+            <button key={grp} style={{ ...S.chip, ...(grpFilter === grp ? S.chipOn : {}) }} onClick={() => setGrpFilter(g => g === grp ? "" : grp)}>{(GROUP_THEMES[grp]?.emoji || "🏢") + " " + grp}</button>
           ))}
         </div>
       </div>
