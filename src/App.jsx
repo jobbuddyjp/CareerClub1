@@ -246,9 +246,6 @@ const fsAdd = async (c, data) => {
   const ref = await addDoc(col(c), { ...data, createdAt: serverTimestamp() });
   return ref.id;
 };
-const fsSet = async (c, id, data) => {
-  await setDoc(dref(c, id), { ...data, updatedAt: serverTimestamp() }, { merge: true });
-};
 const fsDel = async (c, id) => {
   await deleteDoc(dref(c, id));
 };
