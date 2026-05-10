@@ -64,6 +64,21 @@ const INDUSTRY_GROUPS = {
 const ALL_GROUPS   = Object.keys(INDUSTRY_GROUPS);
 const STAGES       = ["書類選考","一次面接","二次面接","三次面接","最終面接","内定","内定辞退","不合格","辞退"];
 const BOARD_STAGES = ["書類選考中","書類通過","一次選考","二次選考","三次選考","四次選考","最終選考","内定","内定辞退","不合格","辞退"];
+// 投稿者バッジ
+const BADGES = [
+  { name:"プラチナ",  emoji:"💎", min:50, color:"#0EA5E9", bg:"#E0F2FE" },
+  { name:"ゴールド",  emoji:"🥇", min:20, color:"#D97706", bg:"#FEF3C7" },
+  { name:"シルバー",  emoji:"🥈", min:5,  color:"#64748B", bg:"#F1F5F9" },
+  { name:"ブロンズ",  emoji:"🥉", min:1,  color:"#92400E", bg:"#FEF3C7" },
+];
+const STREAK_BADGES = [
+  { name:"殿堂入り",   emoji:"👑", min:30, color:"#9333EA", bg:"#F3E8FF" },
+  { name:"週間連投",   emoji:"🌟", min:7,  color:"#EA580C", bg:"#FFEDD5" },
+  { name:"3日連投",    emoji:"🔥", min:3,  color:"#DC2626", bg:"#FEE2E2" },
+];
+const getStreakBadge = (streak) => STREAK_BADGES.find(b => streak >= b.min) || null;
+const getBadge = (count) => BADGES.find(b => count >= b.min) || null;
+
 const APPLY_METHODS = ["転職エージェント経由","ビズリーチ経由","企業ホームページから直接","リファラル(社員紹介)","求人サイト経由","ヘッドハンター経由","SNS経由","その他"];
 const HOUSING_TYPES = ["なし","あり（金額不明）","あり（月1万円未満）","あり（月1~3万円）","あり（月3~5万円）","あり（月5万円以上）"];
 const EMP_TYPES    = ["正社員","契約社員","派遣社員","アルバイト","インターン","元社員"];
@@ -1398,6 +1413,301 @@ const SEED_COMPANIES = [
   { name:"千葉中央バス", group:"航空・交通", industry:"バス", emoji:"✈️", sortRank:1149 },
   { name:"関東バス", group:"航空・交通", industry:"バス", emoji:"✈️", sortRank:1150 },
   { name:"横浜市営バス", group:"航空・交通", industry:"バス", emoji:"✈️", sortRank:1151 },
+  { name:"ゴールドマン・サックス証券", group:"金融・銀行", industry:"外資系金融", emoji:"🏦", sortRank:1152 },
+  { name:"モルガン・スタンレーMUFG証券", group:"金融・銀行", industry:"外資系金融", emoji:"🏦", sortRank:1153 },
+  { name:"JPモルガン証券", group:"金融・銀行", industry:"外資系金融", emoji:"🏦", sortRank:1154 },
+  { name:"メリルリンチ日本証券", group:"金融・銀行", industry:"外資系金融", emoji:"🏦", sortRank:1155 },
+  { name:"バンク・オブ・アメリカ", group:"金融・銀行", industry:"外資系金融", emoji:"🏦", sortRank:1156 },
+  { name:"シティグループ証券", group:"金融・銀行", industry:"外資系金融", emoji:"🏦", sortRank:1157 },
+  { name:"UBS証券", group:"金融・銀行", industry:"外資系金融", emoji:"🏦", sortRank:1158 },
+  { name:"ドイツ証券", group:"金融・銀行", industry:"外資系金融", emoji:"🏦", sortRank:1159 },
+  { name:"クレディ・スイス証券", group:"金融・銀行", industry:"外資系金融", emoji:"🏦", sortRank:1160 },
+  { name:"バークレイズ証券", group:"金融・銀行", industry:"外資系金融", emoji:"🏦", sortRank:1161 },
+  { name:"BNPパリバ証券", group:"金融・銀行", industry:"外資系金融", emoji:"🏦", sortRank:1162 },
+  { name:"HSBC証券", group:"金融・銀行", industry:"外資系金融", emoji:"🏦", sortRank:1163 },
+  { name:"ジェフリーズ証券", group:"金融・銀行", industry:"外資系金融", emoji:"🏦", sortRank:1164 },
+  { name:"ナティクシス・ジャパン証券", group:"金融・銀行", industry:"外資系金融", emoji:"🏦", sortRank:1165 },
+  { name:"ソシエテジェネラル証券", group:"金融・銀行", industry:"外資系金融", emoji:"🏦", sortRank:1166 },
+  { name:"ノムラ・インターナショナル", group:"金融・銀行", industry:"外資系金融", emoji:"🏦", sortRank:1167 },
+  { name:"Citadel Securities Japan", group:"金融・銀行", industry:"外資系金融", emoji:"🏦", sortRank:1168 },
+  { name:"ジェーン・ストリート", group:"金融・銀行", industry:"外資系金融", emoji:"🏦", sortRank:1169 },
+  { name:"オプティバー", group:"金融・銀行", industry:"外資系金融", emoji:"🏦", sortRank:1170 },
+  { name:"Two Sigma", group:"金融・銀行", industry:"外資系金融", emoji:"🏦", sortRank:1171 },
+  { name:"ブラックロック・ジャパン", group:"金融・銀行", industry:"外資系金融", emoji:"🏦", sortRank:1172 },
+  { name:"ステート・ストリート信託銀行", group:"金融・銀行", industry:"外資系金融", emoji:"🏦", sortRank:1173 },
+  { name:"ヴァンガード・インベストメンツ・ジャパン", group:"金融・銀行", industry:"外資系金融", emoji:"🏦", sortRank:1174 },
+  { name:"JPモルガン・アセット・マネジメント", group:"金融・銀行", industry:"外資系金融", emoji:"🏦", sortRank:1175 },
+  { name:"フィデリティ投信", group:"金融・銀行", industry:"外資系金融", emoji:"🏦", sortRank:1176 },
+  { name:"ピムコジャパン", group:"金融・銀行", industry:"外資系金融", emoji:"🏦", sortRank:1177 },
+  { name:"ピクテ・ジャパン", group:"金融・銀行", industry:"外資系金融", emoji:"🏦", sortRank:1178 },
+  { name:"アライアンス・バーンスタイン", group:"金融・銀行", industry:"外資系金融", emoji:"🏦", sortRank:1179 },
+  { name:"ウエリントン・マネージメント", group:"金融・銀行", industry:"外資系金融", emoji:"🏦", sortRank:1180 },
+  { name:"インベスコ・アセット・マネジメント", group:"金融・銀行", industry:"外資系金融", emoji:"🏦", sortRank:1181 },
+  { name:"シュローダー・インベストメント・マネジメント", group:"金融・銀行", industry:"外資系金融", emoji:"🏦", sortRank:1182 },
+  { name:"ニューバーガー・バーマン", group:"金融・銀行", industry:"外資系金融", emoji:"🏦", sortRank:1183 },
+  { name:"アムンディ・ジャパン", group:"金融・銀行", industry:"外資系金融", emoji:"🏦", sortRank:1184 },
+  { name:"アクサ・インベストメント・マネージャーズ", group:"金融・銀行", industry:"外資系金融", emoji:"🏦", sortRank:1185 },
+  { name:"ニューヨーク・ライフ・インベストメンツ", group:"金融・銀行", industry:"外資系金融", emoji:"🏦", sortRank:1186 },
+  { name:"ニッセイアセットマネジメント", group:"金融・銀行", industry:"外資系金融", emoji:"🏦", sortRank:1187 },
+  { name:"三菱UFJアセットマネジメント", group:"金融・銀行", industry:"外資系金融", emoji:"🏦", sortRank:1188 },
+  { name:"野村アセットマネジメント", group:"金融・銀行", industry:"外資系金融", emoji:"🏦", sortRank:1189 },
+  { name:"大和アセットマネジメント", group:"金融・銀行", industry:"外資系金融", emoji:"🏦", sortRank:1190 },
+  { name:"三井住友DSアセットマネジメント", group:"金融・銀行", industry:"外資系金融", emoji:"🏦", sortRank:1191 },
+  { name:"アセットマネジメントOne", group:"金融・銀行", industry:"外資系金融", emoji:"🏦", sortRank:1192 },
+  { name:"カーライル・ジャパン", group:"金融・銀行", industry:"外資系金融", emoji:"🏦", sortRank:1193 },
+  { name:"KKRジャパン", group:"金融・銀行", industry:"外資系金融", emoji:"🏦", sortRank:1194 },
+  { name:"ベインキャピタル・ジャパン", group:"金融・銀行", industry:"外資系金融", emoji:"🏦", sortRank:1195 },
+  { name:"アドベント・インターナショナル", group:"金融・銀行", industry:"外資系金融", emoji:"🏦", sortRank:1196 },
+  { name:"TPGキャピタル", group:"金融・銀行", industry:"外資系金融", emoji:"🏦", sortRank:1197 },
+  { name:"CVCキャピタルパートナーズ", group:"金融・銀行", industry:"外資系金融", emoji:"🏦", sortRank:1198 },
+  { name:"ブラックストーン・グループ・ジャパン", group:"金融・銀行", industry:"外資系金融", emoji:"🏦", sortRank:1199 },
+  { name:"アポロ・グローバル・マネジメント", group:"金融・銀行", industry:"外資系金融", emoji:"🏦", sortRank:1200 },
+  { name:"ローンスター", group:"金融・銀行", industry:"外資系金融", emoji:"🏦", sortRank:1201 },
+  { name:"ジャパン・インダストリアル・パートナーズ", group:"金融・銀行", industry:"外資系金融", emoji:"🏦", sortRank:1202 },
+  { name:"アント・キャピタル・パートナーズ", group:"金融・銀行", industry:"外資系金融", emoji:"🏦", sortRank:1203 },
+  { name:"アドバンテッジパートナーズ", group:"金融・銀行", industry:"外資系金融", emoji:"🏦", sortRank:1204 },
+  { name:"MBKパートナーズ", group:"金融・銀行", industry:"外資系金融", emoji:"🏦", sortRank:1205 },
+  { name:"ユニゾン・キャピタル", group:"金融・銀行", industry:"外資系金融", emoji:"🏦", sortRank:1206 },
+  { name:"インテグラル", group:"金融・銀行", industry:"外資系金融", emoji:"🏦", sortRank:1207 },
+  { name:"ニューホライズンキャピタル", group:"金融・銀行", industry:"外資系金融", emoji:"🏦", sortRank:1208 },
+  { name:"ポラリス・キャピタル・グループ", group:"金融・銀行", industry:"外資系金融", emoji:"🏦", sortRank:1209 },
+  { name:"丸の内キャピタル", group:"金融・銀行", industry:"外資系金融", emoji:"🏦", sortRank:1210 },
+  { name:"日本産業パートナーズ", group:"金融・銀行", industry:"外資系金融", emoji:"🏦", sortRank:1211 },
+  { name:"産業革新投資機構", group:"金融・銀行", industry:"外資系金融", emoji:"🏦", sortRank:1212 },
+  { name:"DBJキャピタル", group:"金融・銀行", industry:"外資系金融", emoji:"🏦", sortRank:1213 },
+  { name:"三菱UFJキャピタル", group:"金融・銀行", industry:"外資系金融", emoji:"🏦", sortRank:1214 },
+  { name:"SMBCベンチャーキャピタル", group:"金融・銀行", industry:"外資系金融", emoji:"🏦", sortRank:1215 },
+  { name:"みずほキャピタル", group:"金融・銀行", industry:"外資系金融", emoji:"🏦", sortRank:1216 },
+  { name:"グロービス・キャピタル・パートナーズ", group:"金融・銀行", industry:"外資系金融", emoji:"🏦", sortRank:1217 },
+  { name:"JAFCO", group:"金融・銀行", industry:"外資系金融", emoji:"🏦", sortRank:1218 },
+  { name:"コーラルキャピタル", group:"金融・銀行", industry:"外資系金融", emoji:"🏦", sortRank:1219 },
+  { name:"DCMベンチャーズ", group:"金融・銀行", industry:"外資系金融", emoji:"🏦", sortRank:1220 },
+  { name:"セコイア・ジャパン", group:"金融・銀行", industry:"外資系金融", emoji:"🏦", sortRank:1221 },
+  { name:"有限責任あずさ監査法人", group:"コンサル", industry:"監査法人", emoji:"💡", sortRank:1222 },
+  { name:"EY新日本有限責任監査法人", group:"コンサル", industry:"監査法人", emoji:"💡", sortRank:1223 },
+  { name:"有限責任監査法人トーマツ", group:"コンサル", industry:"監査法人", emoji:"💡", sortRank:1224 },
+  { name:"PwC Japan有限責任監査法人", group:"コンサル", industry:"監査法人", emoji:"💡", sortRank:1225 },
+  { name:"PwC あらた有限責任監査法人", group:"コンサル", industry:"監査法人", emoji:"💡", sortRank:1226 },
+  { name:"BDO三優監査法人", group:"コンサル", industry:"監査法人", emoji:"💡", sortRank:1227 },
+  { name:"太陽有限責任監査法人", group:"コンサル", industry:"監査法人", emoji:"💡", sortRank:1228 },
+  { name:"RSM清和監査法人", group:"コンサル", industry:"監査法人", emoji:"💡", sortRank:1229 },
+  { name:"仰星監査法人", group:"コンサル", industry:"監査法人", emoji:"💡", sortRank:1230 },
+  { name:"監査法人A&Aパートナーズ", group:"コンサル", industry:"監査法人", emoji:"💡", sortRank:1231 },
+  { name:"東陽監査法人", group:"コンサル", industry:"監査法人", emoji:"💡", sortRank:1232 },
+  { name:"応用監査法人", group:"コンサル", industry:"監査法人", emoji:"💡", sortRank:1233 },
+  { name:"アーク有限責任監査法人", group:"コンサル", industry:"監査法人", emoji:"💡", sortRank:1234 },
+  { name:"大手前監査法人", group:"コンサル", industry:"監査法人", emoji:"💡", sortRank:1235 },
+  { name:"明治監査法人", group:"コンサル", industry:"監査法人", emoji:"💡", sortRank:1236 },
+  { name:"KPMG税理士法人", group:"コンサル", industry:"税理士法人", emoji:"💡", sortRank:1237 },
+  { name:"EY税理士法人", group:"コンサル", industry:"税理士法人", emoji:"💡", sortRank:1238 },
+  { name:"デロイト トーマツ税理士法人", group:"コンサル", industry:"税理士法人", emoji:"💡", sortRank:1239 },
+  { name:"PwC税理士法人", group:"コンサル", industry:"税理士法人", emoji:"💡", sortRank:1240 },
+  { name:"ベーカー&マッケンジー外国法事務弁護士事務所", group:"コンサル", industry:"税理士法人", emoji:"💡", sortRank:1241 },
+  { name:"税理士法人山田&パートナーズ", group:"コンサル", industry:"税理士法人", emoji:"💡", sortRank:1242 },
+  { name:"辻・本郷税理士法人", group:"コンサル", industry:"税理士法人", emoji:"💡", sortRank:1243 },
+  { name:"アクタス税理士法人", group:"コンサル", industry:"税理士法人", emoji:"💡", sortRank:1244 },
+  { name:"西村あさひ法律事務所", group:"コンサル", industry:"法律事務所", emoji:"💡", sortRank:1245 },
+  { name:"森・濱田松本法律事務所", group:"コンサル", industry:"法律事務所", emoji:"💡", sortRank:1246 },
+  { name:"アンダーソン・毛利・友常法律事務所", group:"コンサル", industry:"法律事務所", emoji:"💡", sortRank:1247 },
+  { name:"長島・大野・常松法律事務所", group:"コンサル", industry:"法律事務所", emoji:"💡", sortRank:1248 },
+  { name:"TMI総合法律事務所", group:"コンサル", industry:"法律事務所", emoji:"💡", sortRank:1249 },
+  { name:"ベーカー&マッケンジー法律事務所", group:"コンサル", industry:"法律事務所", emoji:"💡", sortRank:1250 },
+  { name:"ホワイト&ケース法律事務所", group:"コンサル", industry:"法律事務所", emoji:"💡", sortRank:1251 },
+  { name:"ラサール法律事務所", group:"コンサル", industry:"法律事務所", emoji:"💡", sortRank:1252 },
+  { name:"ジョーンズ・デイ法律事務所", group:"コンサル", industry:"法律事務所", emoji:"💡", sortRank:1253 },
+  { name:"シャーマン・アンド・スターリング外国法共同事業法律事務所", group:"コンサル", industry:"法律事務所", emoji:"💡", sortRank:1254 },
+  { name:"デービス・ポーク・アンド・ウォードウェル法律事務所", group:"コンサル", industry:"法律事務所", emoji:"💡", sortRank:1255 },
+  { name:"クリフォード・チャンス法律事務所", group:"コンサル", industry:"法律事務所", emoji:"💡", sortRank:1256 },
+  { name:"シティ・ユーワ法律事務所", group:"コンサル", industry:"法律事務所", emoji:"💡", sortRank:1257 },
+  { name:"渥美坂井法律事務所・外国法共同事業", group:"コンサル", industry:"法律事務所", emoji:"💡", sortRank:1258 },
+  { name:"マッキンゼー・アンド・カンパニー・ジャパン", group:"コンサル", industry:"経営コンサル", emoji:"💡", sortRank:1259 },
+  { name:"ボストン コンサルティング グループ ジャパン", group:"コンサル", industry:"経営コンサル", emoji:"💡", sortRank:1260 },
+  { name:"ベイン・アンド・カンパニー・ジャパン", group:"コンサル", industry:"経営コンサル", emoji:"💡", sortRank:1261 },
+  { name:"A.T. カーニー ジャパン", group:"コンサル", industry:"経営コンサル", emoji:"💡", sortRank:1262 },
+  { name:"アーサー・D・リトル・ジャパン", group:"コンサル", industry:"経営コンサル", emoji:"💡", sortRank:1263 },
+  { name:"ローランド・ベルガー・ジャパン", group:"コンサル", industry:"経営コンサル", emoji:"💡", sortRank:1264 },
+  { name:"オリバー・ワイマン・ジャパン", group:"コンサル", industry:"経営コンサル", emoji:"💡", sortRank:1265 },
+  { name:"ストラテジーアンド", group:"コンサル", industry:"経営コンサル", emoji:"💡", sortRank:1266 },
+  { name:"L.E.K.コンサルティング", group:"コンサル", industry:"経営コンサル", emoji:"💡", sortRank:1267 },
+  { name:"ZSアソシエイツ", group:"コンサル", industry:"経営コンサル", emoji:"💡", sortRank:1268 },
+  { name:"Strategy& (PwC)", group:"コンサル", industry:"経営コンサル", emoji:"💡", sortRank:1269 },
+  { name:"EYパルテノン", group:"コンサル", industry:"経営コンサル", emoji:"💡", sortRank:1270 },
+  { name:"コーン・フェリー", group:"コンサル", industry:"経営コンサル", emoji:"💡", sortRank:1271 },
+  { name:"ヘイ・グループ", group:"コンサル", industry:"経営コンサル", emoji:"💡", sortRank:1272 },
+  { name:"マーサー・ジャパン", group:"コンサル", industry:"経営コンサル", emoji:"💡", sortRank:1273 },
+  { name:"ウイリス・タワーズワトソン", group:"コンサル", industry:"経営コンサル", emoji:"💡", sortRank:1274 },
+  { name:"エーオン", group:"コンサル", industry:"経営コンサル", emoji:"💡", sortRank:1275 },
+  { name:"ガートナー・ジャパン", group:"コンサル", industry:"経営コンサル", emoji:"💡", sortRank:1276 },
+  { name:"IDC Japan", group:"コンサル", industry:"経営コンサル", emoji:"💡", sortRank:1277 },
+  { name:"フロスト&サリバン", group:"コンサル", industry:"経営コンサル", emoji:"💡", sortRank:1278 },
+  { name:"アクセンチュア・ストラテジー", group:"コンサル", industry:"経営コンサル", emoji:"💡", sortRank:1279 },
+  { name:"シグマクシス・ホールディングス", group:"コンサル", industry:"経営コンサル", emoji:"💡", sortRank:1280 },
+  { name:"AGSコンサルティング", group:"コンサル", industry:"経営コンサル", emoji:"💡", sortRank:1281 },
+  { name:"コーポレイト ディレクション", group:"コンサル", industry:"経営コンサル", emoji:"💡", sortRank:1282 },
+  { name:"タナベコンサルティング", group:"コンサル", industry:"経営コンサル", emoji:"💡", sortRank:1283 },
+  { name:"山田ビジネスコンサルティング", group:"コンサル", industry:"経営コンサル", emoji:"💡", sortRank:1284 },
+  { name:"識学", group:"コンサル", industry:"経営コンサル", emoji:"💡", sortRank:1285 },
+  { name:"プロレド・パートナーズ", group:"コンサル", industry:"経営コンサル", emoji:"💡", sortRank:1286 },
+  { name:"野村総合研究所(コンサル部門)", group:"コンサル", industry:"経営コンサル", emoji:"💡", sortRank:1287 },
+  { name:"三菱総合研究所", group:"コンサル", industry:"経営コンサル", emoji:"💡", sortRank:1288 },
+  { name:"三菱UFJリサーチ&コンサルティング", group:"コンサル", industry:"経営コンサル", emoji:"💡", sortRank:1289 },
+  { name:"みずほリサーチ&テクノロジーズ", group:"コンサル", industry:"経営コンサル", emoji:"💡", sortRank:1290 },
+  { name:"日本総合研究所", group:"コンサル", industry:"経営コンサル", emoji:"💡", sortRank:1291 },
+  { name:"大和総研", group:"コンサル", industry:"経営コンサル", emoji:"💡", sortRank:1292 },
+  { name:"電通総研", group:"コンサル", industry:"経営コンサル", emoji:"💡", sortRank:1293 },
+  { name:"NTTデータ経営研究所", group:"コンサル", industry:"経営コンサル", emoji:"💡", sortRank:1294 },
+  { name:"NRIサイバーパテント", group:"コンサル", industry:"経営コンサル", emoji:"💡", sortRank:1295 },
+  { name:"Google合同会社", group:"IT・テック", industry:"外資IT", emoji:"💻", sortRank:1296 },
+  { name:"アマゾン ウェブ サービス ジャパン", group:"IT・テック", industry:"外資IT", emoji:"💻", sortRank:1297 },
+  { name:"Amazon Japan合同会社", group:"IT・テック", industry:"外資IT", emoji:"💻", sortRank:1298 },
+  { name:"メタ・プラットフォームズ ジャパン", group:"IT・テック", industry:"外資IT", emoji:"💻", sortRank:1299 },
+  { name:"アップル ジャパン", group:"IT・テック", industry:"外資IT", emoji:"💻", sortRank:1300 },
+  { name:"日本マイクロソフト", group:"IT・テック", industry:"外資IT", emoji:"💻", sortRank:1301 },
+  { name:"Salesforce Japan", group:"IT・テック", industry:"外資IT", emoji:"💻", sortRank:1302 },
+  { name:"Oracle Japan", group:"IT・テック", industry:"外資IT", emoji:"💻", sortRank:1303 },
+  { name:"SAP Japan", group:"IT・テック", industry:"外資IT", emoji:"💻", sortRank:1304 },
+  { name:"アドビ システムズ", group:"IT・テック", industry:"外資IT", emoji:"💻", sortRank:1305 },
+  { name:"ServiceNow Japan", group:"IT・テック", industry:"外資IT", emoji:"💻", sortRank:1306 },
+  { name:"Workday Japan", group:"IT・テック", industry:"外資IT", emoji:"💻", sortRank:1307 },
+  { name:"シスコシステムズ合同会社", group:"IT・テック", industry:"外資IT", emoji:"💻", sortRank:1308 },
+  { name:"VMware Japan", group:"IT・テック", industry:"外資IT", emoji:"💻", sortRank:1309 },
+  { name:"デル・テクノロジーズ", group:"IT・テック", industry:"外資IT", emoji:"💻", sortRank:1310 },
+  { name:"ヒューレット・パッカード ジャパン", group:"IT・テック", industry:"外資IT", emoji:"💻", sortRank:1311 },
+  { name:"IBM Japan", group:"IT・テック", industry:"外資IT", emoji:"💻", sortRank:1312 },
+  { name:"EMCジャパン", group:"IT・テック", industry:"外資IT", emoji:"💻", sortRank:1313 },
+  { name:"ZScaler Japan", group:"IT・テック", industry:"外資IT", emoji:"💻", sortRank:1314 },
+  { name:"Palo Alto Networks Japan", group:"IT・テック", industry:"外資IT", emoji:"💻", sortRank:1315 },
+  { name:"CrowdStrike Japan", group:"IT・テック", industry:"外資IT", emoji:"💻", sortRank:1316 },
+  { name:"Splunk Japan", group:"IT・テック", industry:"外資IT", emoji:"💻", sortRank:1317 },
+  { name:"Datadog Japan", group:"IT・テック", industry:"外資IT", emoji:"💻", sortRank:1318 },
+  { name:"MongoDB Japan", group:"IT・テック", industry:"外資IT", emoji:"💻", sortRank:1319 },
+  { name:"Confluent Japan", group:"IT・テック", industry:"外資IT", emoji:"💻", sortRank:1320 },
+  { name:"Snowflake合同会社", group:"IT・テック", industry:"外資IT", emoji:"💻", sortRank:1321 },
+  { name:"Databricks Japan", group:"IT・テック", industry:"外資IT", emoji:"💻", sortRank:1322 },
+  { name:"GitHub Japan", group:"IT・テック", industry:"外資IT", emoji:"💻", sortRank:1323 },
+  { name:"GitLab Japan", group:"IT・テック", industry:"外資IT", emoji:"💻", sortRank:1324 },
+  { name:"Atlassian Japan", group:"IT・テック", industry:"外資IT", emoji:"💻", sortRank:1325 },
+  { name:"Slack Japan", group:"IT・テック", industry:"外資IT", emoji:"💻", sortRank:1326 },
+  { name:"Zoom Japan", group:"IT・テック", industry:"外資IT", emoji:"💻", sortRank:1327 },
+  { name:"Box Japan", group:"IT・テック", industry:"外資IT", emoji:"💻", sortRank:1328 },
+  { name:"Dropbox Japan", group:"IT・テック", industry:"外資IT", emoji:"💻", sortRank:1329 },
+  { name:"Stripe Japan", group:"IT・テック", industry:"外資IT", emoji:"💻", sortRank:1330 },
+  { name:"Square Japan", group:"IT・テック", industry:"外資IT", emoji:"💻", sortRank:1331 },
+  { name:"PayPal Pte. Ltd.", group:"IT・テック", industry:"外資IT", emoji:"💻", sortRank:1332 },
+  { name:"Coinbase Japan", group:"IT・テック", industry:"外資IT", emoji:"💻", sortRank:1333 },
+  { name:"Tesla Japan", group:"IT・テック", industry:"外資IT", emoji:"💻", sortRank:1334 },
+  { name:"OpenAI Japan", group:"IT・テック", industry:"外資IT", emoji:"💻", sortRank:1335 },
+  { name:"Anthropic Japan", group:"IT・テック", industry:"外資IT", emoji:"💻", sortRank:1336 },
+  { name:"Hugging Face", group:"IT・テック", industry:"外資IT", emoji:"💻", sortRank:1337 },
+  { name:"NVIDIA Japan", group:"IT・テック", industry:"外資IT", emoji:"💻", sortRank:1338 },
+  { name:"AMD Japan", group:"IT・テック", industry:"外資IT", emoji:"💻", sortRank:1339 },
+  { name:"Intel Japan", group:"IT・テック", industry:"外資IT", emoji:"💻", sortRank:1340 },
+  { name:"Qualcomm Japan", group:"IT・テック", industry:"外資IT", emoji:"💻", sortRank:1341 },
+  { name:"Arm Japan", group:"IT・テック", industry:"外資IT", emoji:"💻", sortRank:1342 },
+  { name:"TSMC Japan", group:"IT・テック", industry:"外資IT", emoji:"💻", sortRank:1343 },
+  { name:"Bloomberg L.P.", group:"IT・テック", industry:"外資IT", emoji:"💻", sortRank:1344 },
+  { name:"Refinitiv Japan", group:"IT・テック", industry:"外資IT", emoji:"💻", sortRank:1345 },
+  { name:"S&P Global Japan", group:"IT・テック", industry:"外資IT", emoji:"💻", sortRank:1346 },
+  { name:"Moody's Japan", group:"IT・テック", industry:"外資IT", emoji:"💻", sortRank:1347 },
+  { name:"FactSet Japan", group:"IT・テック", industry:"外資IT", emoji:"💻", sortRank:1348 },
+  { name:"MSCI Japan", group:"IT・テック", industry:"外資IT", emoji:"💻", sortRank:1349 },
+  { name:"ICE Japan", group:"IT・テック", industry:"外資IT", emoji:"💻", sortRank:1350 },
+  { name:"ナレッジソサエティ", group:"IT・テック", industry:"外資IT", emoji:"💻", sortRank:1351 },
+  { name:"WPP Japan", group:"サービス", industry:"広告・PR", emoji:"📢", sortRank:1352 },
+  { name:"オムニコム ジャパン", group:"サービス", industry:"広告・PR", emoji:"📢", sortRank:1353 },
+  { name:"ピュブリシスグループ・ジャパン", group:"サービス", industry:"広告・PR", emoji:"📢", sortRank:1354 },
+  { name:"デンツウ・グループ", group:"サービス", industry:"広告・PR", emoji:"📢", sortRank:1355 },
+  { name:"サイバー・コミュニケーションズ", group:"サービス", industry:"広告・PR", emoji:"📢", sortRank:1356 },
+  { name:"アサツーディ・ケイ", group:"サービス", industry:"広告・PR", emoji:"📢", sortRank:1357 },
+  { name:"イニシアティブ", group:"サービス", industry:"広告・PR", emoji:"📢", sortRank:1358 },
+  { name:"オプト", group:"サービス", industry:"広告・PR", emoji:"📢", sortRank:1359 },
+  { name:"メンバーズ", group:"サービス", industry:"広告・PR", emoji:"📢", sortRank:1360 },
+  { name:"GMOアドパートナーズ", group:"サービス", industry:"広告・PR", emoji:"📢", sortRank:1361 },
+  { name:"ジオロジック", group:"サービス", industry:"広告・PR", emoji:"📢", sortRank:1362 },
+  { name:"電通デジタル", group:"サービス", industry:"広告・PR", emoji:"📢", sortRank:1363 },
+  { name:"博報堂DYメディアパートナーズ", group:"サービス", industry:"広告・PR", emoji:"📢", sortRank:1364 },
+  { name:"日経BP社", group:"サービス", industry:"広告・PR", emoji:"📢", sortRank:1365 },
+  { name:"リクルートメディアコミュニケーションズ", group:"サービス", industry:"広告・PR", emoji:"📢", sortRank:1366 },
+  { name:"ナガセ(東進)", group:"教育・公共", industry:"人材・学校", emoji:"📚", sortRank:1367 },
+  { name:"リクルートマーケティングパートナーズ(スタディサプリ)", group:"教育・公共", industry:"人材・学校", emoji:"📚", sortRank:1368 },
+  { name:"ベルリッツ・ジャパン", group:"教育・公共", industry:"人材・学校", emoji:"📚", sortRank:1369 },
+  { name:"GABA", group:"教育・公共", industry:"人材・学校", emoji:"📚", sortRank:1370 },
+  { name:"イーオン", group:"教育・公共", industry:"人材・学校", emoji:"📚", sortRank:1371 },
+  { name:"シェーン英会話", group:"教育・公共", industry:"人材・学校", emoji:"📚", sortRank:1372 },
+  { name:"アゴス・ジャパン", group:"教育・公共", industry:"人材・学校", emoji:"📚", sortRank:1373 },
+  { name:"プログリット", group:"教育・公共", industry:"人材・学校", emoji:"📚", sortRank:1374 },
+  { name:"TORAIZ", group:"教育・公共", industry:"人材・学校", emoji:"📚", sortRank:1375 },
+  { name:"DMM英会話", group:"教育・公共", industry:"人材・学校", emoji:"📚", sortRank:1376 },
+  { name:"レアジョブ", group:"教育・公共", industry:"人材・学校", emoji:"📚", sortRank:1377 },
+  { name:"ネイティブキャンプ", group:"教育・公共", industry:"人材・学校", emoji:"📚", sortRank:1378 },
+  { name:"ビザビ", group:"教育・公共", industry:"人材・学校", emoji:"📚", sortRank:1379 },
+  { name:"ECCジュニア", group:"教育・公共", industry:"人材・学校", emoji:"📚", sortRank:1380 },
+  { name:"公文教育研究会", group:"教育・公共", industry:"人材・学校", emoji:"📚", sortRank:1381 },
+  { name:"学研教室", group:"教育・公共", industry:"人材・学校", emoji:"📚", sortRank:1382 },
+  { name:"栄光ゼミナール", group:"教育・公共", industry:"人材・学校", emoji:"📚", sortRank:1383 },
+  { name:"市進学院", group:"教育・公共", industry:"人材・学校", emoji:"📚", sortRank:1384 },
+  { name:"京進", group:"教育・公共", industry:"人材・学校", emoji:"📚", sortRank:1385 },
+  { name:"誠文堂新光社", group:"教育・公共", industry:"人材・学校", emoji:"📚", sortRank:1386 },
+  { name:"ZUU", group:"教育・公共", industry:"人材・学校", emoji:"📚", sortRank:1387 },
+  { name:"Schoo", group:"教育・公共", industry:"人材・学校", emoji:"📚", sortRank:1388 },
+  { name:"弁護士ドットコム", group:"IT・テック", industry:"スタートアップ", emoji:"💻", sortRank:1389 },
+  { name:"メドピア", group:"IT・テック", industry:"スタートアップ", emoji:"💻", sortRank:1390 },
+  { name:"PR TIMES", group:"IT・テック", industry:"スタートアップ", emoji:"💻", sortRank:1391 },
+  { name:"オープンドア(トラベルコ)", group:"IT・テック", industry:"スタートアップ", emoji:"💻", sortRank:1392 },
+  { name:"じげん", group:"IT・テック", industry:"スタートアップ", emoji:"💻", sortRank:1393 },
+  { name:"MIXI", group:"IT・テック", industry:"スタートアップ", emoji:"💻", sortRank:1394 },
+  { name:"ラクサス", group:"IT・テック", industry:"スタートアップ", emoji:"💻", sortRank:1395 },
+  { name:"メルペイ", group:"IT・テック", industry:"スタートアップ", emoji:"💻", sortRank:1396 },
+  { name:"atama plus", group:"IT・テック", industry:"スタートアップ", emoji:"💻", sortRank:1397 },
+  { name:"エクサウィザーズ", group:"IT・テック", industry:"スタートアップ", emoji:"💻", sortRank:1398 },
+  { name:"FastDOCTOR", group:"IT・テック", industry:"スタートアップ", emoji:"💻", sortRank:1399 },
+  { name:"カケハシ", group:"IT・テック", industry:"スタートアップ", emoji:"💻", sortRank:1400 },
+  { name:"Ubie", group:"IT・テック", industry:"スタートアップ", emoji:"💻", sortRank:1401 },
+  { name:"Smartround", group:"IT・テック", industry:"スタートアップ", emoji:"💻", sortRank:1402 },
+  { name:"10X", group:"IT・テック", industry:"スタートアップ", emoji:"💻", sortRank:1403 },
+  { name:"LayerX", group:"IT・テック", industry:"スタートアップ", emoji:"💻", sortRank:1404 },
+  { name:"MNTSQ", group:"IT・テック", industry:"スタートアップ", emoji:"💻", sortRank:1405 },
+  { name:"ウェルスナビ", group:"IT・テック", industry:"スタートアップ", emoji:"💻", sortRank:1406 },
+  { name:"FOLIO", group:"IT・テック", industry:"スタートアップ", emoji:"💻", sortRank:1407 },
+  { name:"クラウドクレジット", group:"IT・テック", industry:"スタートアップ", emoji:"💻", sortRank:1408 },
+  { name:"SBIインベストメント", group:"IT・テック", industry:"スタートアップ", emoji:"💻", sortRank:1409 },
+  { name:"ファインデックス", group:"IT・テック", industry:"スタートアップ", emoji:"💻", sortRank:1410 },
+  { name:"ニューラルポケット", group:"IT・テック", industry:"スタートアップ", emoji:"💻", sortRank:1411 },
+  { name:"PKSHA Technology", group:"IT・テック", industry:"スタートアップ", emoji:"💻", sortRank:1412 },
+  { name:"Hmcomm", group:"IT・テック", industry:"スタートアップ", emoji:"💻", sortRank:1413 },
+  { name:"ABEJA", group:"IT・テック", industry:"スタートアップ", emoji:"💻", sortRank:1414 },
+  { name:"ストックマーク", group:"IT・テック", industry:"スタートアップ", emoji:"💻", sortRank:1415 },
+  { name:"プレイド", group:"IT・テック", industry:"スタートアップ", emoji:"💻", sortRank:1416 },
+  { name:"Kaizen Platform", group:"IT・テック", industry:"スタートアップ", emoji:"💻", sortRank:1417 },
+  { name:"ヤプリ", group:"IT・テック", industry:"スタートアップ", emoji:"💻", sortRank:1418 },
+  { name:"AnyMind Group", group:"IT・テック", industry:"スタートアップ", emoji:"💻", sortRank:1419 },
+  { name:"Magic Moment", group:"IT・テック", industry:"スタートアップ", emoji:"💻", sortRank:1420 },
+  { name:"SmartHR", group:"IT・テック", industry:"スタートアップ", emoji:"💻", sortRank:1421 },
+  { name:"カミナシ", group:"IT・テック", industry:"スタートアップ", emoji:"💻", sortRank:1422 },
+  { name:"ROUTE06", group:"IT・テック", industry:"スタートアップ", emoji:"💻", sortRank:1423 },
+  { name:"Algomatic", group:"IT・テック", industry:"スタートアップ", emoji:"💻", sortRank:1424 },
+  { name:"アンドパッド", group:"IT・テック", industry:"スタートアップ", emoji:"💻", sortRank:1425 },
+  { name:"Visional", group:"IT・テック", industry:"スタートアップ", emoji:"💻", sortRank:1426 },
+  { name:"GMOペパボ", group:"IT・テック", industry:"スタートアップ", emoji:"💻", sortRank:1427 },
+  { name:"GMOグローバルサインHD", group:"IT・テック", industry:"スタートアップ", emoji:"💻", sortRank:1428 },
+  { name:"GMOペイメントゲートウェイ", group:"IT・テック", industry:"スタートアップ", emoji:"💻", sortRank:1429 },
+  { name:"GMOクラウド", group:"IT・テック", industry:"スタートアップ", emoji:"💻", sortRank:1430 },
+  { name:"ABCash Technologies", group:"IT・テック", industry:"スタートアップ", emoji:"💻", sortRank:1431 },
+  { name:"MoneyForward X", group:"IT・テック", industry:"スタートアップ", emoji:"💻", sortRank:1432 },
+  { name:"JX金属", group:"メーカー", industry:"エネルギー", emoji:"🏭", sortRank:1433 },
+  { name:"JOGMEC", group:"メーカー", industry:"エネルギー", emoji:"🏭", sortRank:1434 },
+  { name:"INPEX", group:"メーカー", industry:"エネルギー", emoji:"🏭", sortRank:1435 },
+  { name:"石油資源開発", group:"メーカー", industry:"エネルギー", emoji:"🏭", sortRank:1436 },
+  { name:"ENEOSホールディングス", group:"メーカー", industry:"エネルギー", emoji:"🏭", sortRank:1437 },
+  { name:"出光興産", group:"メーカー", industry:"エネルギー", emoji:"🏭", sortRank:1438 },
+  { name:"コスモエネルギーホールディングス", group:"メーカー", industry:"エネルギー", emoji:"🏭", sortRank:1439 },
+  { name:"東京ガス", group:"メーカー", industry:"エネルギー", emoji:"🏭", sortRank:1440 },
+  { name:"電源開発(J-POWER)", group:"メーカー", industry:"エネルギー", emoji:"🏭", sortRank:1441 },
+  { name:"東京エネシス", group:"メーカー", industry:"エネルギー", emoji:"🏭", sortRank:1442 },
+  { name:"九電工", group:"メーカー", industry:"エネルギー", emoji:"🏭", sortRank:1443 },
+  { name:"関電工", group:"メーカー", industry:"エネルギー", emoji:"🏭", sortRank:1444 },
+  { name:"きんでん", group:"メーカー", industry:"エネルギー", emoji:"🏭", sortRank:1445 },
+  { name:"三機工業", group:"メーカー", industry:"エネルギー", emoji:"🏭", sortRank:1446 },
 ];
 
 // ─── アプリ本体 ────────────────────────────────────────────────────────────────
@@ -1456,6 +1766,20 @@ export default function App() {
             plan: "free",
             isAdmin: false,
             joinDate: today(),
+            viewUnlockUntil: 0,
+            postCount: 0,
+            notifications: {
+              email: true,        // メール通知のオン/オフ
+              comments: true,     // 自分の投稿へのコメント
+              likes: true,        // 自分の投稿へのいいね（マイルストーンのみ）
+              weeklyDigest: true, // 週次ダイジェスト
+              followedCos: true,  // フォロー中企業の新着
+            },
+            followedCompanies: [], // フォローしている企業ID
+            lastLoginDate: today(),
+            streak: 0,             // 連続投稿日数
+            lastPostDate: null,
+            unreadNotifications: [], // サイト内通知（未読）
           };
           await fsSet("users", user.uid, prof);
         }
@@ -1630,12 +1954,55 @@ export default function App() {
   };
 
   // ── CRUD（Firestore）
+  // 投稿者にunlock権を付与（30日全閲覧可能）+ 連続投稿日数を更新
+  const grantUnlock = async () => {
+    if (!authUser || !profile) return;
+    const newUnlock = Date.now() + 30 * 86400000;
+    const newCount = (profile.postCount || 0) + 1;
+    // 連続投稿日数（streak）の計算
+    const td = today();
+    const last = profile.lastPostDate;
+    let streak = profile.streak || 0;
+    if (!last) streak = 1;
+    else {
+      const yest = new Date(); yest.setDate(yest.getDate() - 1);
+      const ystr = yest.toISOString().slice(0,10);
+      if (last === td) {} // 同日 → 維持
+      else if (last === ystr) streak = streak + 1; // 昨日 → +1
+      else streak = 1; // それ以外 → リセット
+    }
+    await fsUpdate("users", authUser.uid, { viewUnlockUntil: newUnlock, postCount: newCount, lastPostDate: td, streak });
+    setProfile(p => ({ ...p, viewUnlockUntil: newUnlock, postCount: newCount, lastPostDate: td, streak }));
+    // 連続投稿のマイルストーン通知
+    if (streak === 3)       toast2("🔥 3日連続投稿達成！");
+    else if (streak === 7)  toast2("🌟 7日連続投稿達成！週間バッジを獲得！");
+    else if (streak === 30) toast2("👑 30日連続投稿達成！殿堂入りバッジを獲得！");
+  };
+
+  // 通知設定を更新
+  const updateNotifications = async (notifications) => {
+    if (!authUser || !profile) return;
+    await fsUpdate("users", authUser.uid, { notifications });
+    setProfile(p => ({ ...p, notifications }));
+  };
+
+  // 企業フォローのトグル
+  const toggleFollowCompany = async (coId) => {
+    if (!authUser || !profile) { setAuthMode("login"); toast2("ログイン後にフォローできます"); return; }
+    const current = profile.followedCompanies || [];
+    const newList = current.includes(coId) ? current.filter(c => c !== coId) : [...current, coId];
+    await fsUpdate("users", authUser.uid, { followedCompanies: newList });
+    setProfile(p => ({ ...p, followedCompanies: newList }));
+    toast2(current.includes(coId) ? "フォローを解除しました" : "企業をフォローしました");
+  };
+
   const addCompany = async (d) => {
     if (!authUser) { setAuthMode("login"); toast2("ログイン後に企業追加できます"); return; }
     const data = { ...d, group: d.group || getGroup(d.industry), author: uName, authorUid: authUser?.uid || null };
     const id   = await fsAdd("companies", data);
     setCompanies(prev => [{ id, ...data, createdAt: null }, ...prev]);
-    toast2("「" + d.name + "」を追加しました");
+    await grantUnlock();
+    toast2("「" + d.name + "」を追加しました（30日間 全コンテンツ閲覧可能になりました）");
     go("company", { id, ...data }, "interview");
   };
 
@@ -1644,7 +2011,8 @@ export default function App() {
     const data = { ...d, author: uName, authorUid: authUser?.uid || null, likes: [], comments: [] };
     const id   = await fsAdd("posts", data);
     setPosts(prev => [{ id, ...data, createdAt: null }, ...prev]);
-    toast2("投稿しました");
+    await grantUnlock();
+    toast2("投稿ありがとうございます！30日間 全コンテンツが閲覧可能になりました");
     go("company", companies.find(c => c.id === d.companyId), d.ptype);
   };
 
@@ -1653,7 +2021,8 @@ export default function App() {
     const data = { ...d, author: uName, authorUid: authUser?.uid || null };
     const id   = await fsAdd("reviews", data);
     setReviews(prev => [{ id, ...data, createdAt: null }, ...prev]);
-    toast2("口コミを投稿しました");
+    await grantUnlock();
+    toast2("口コミありがとうございます！30日間 全コンテンツが閲覧可能になりました");
     go("company", companies.find(c => c.id === d.companyId), "review");
   };
 
@@ -1662,7 +2031,8 @@ export default function App() {
     const data = { ...d, author: uName, authorUid: authUser?.uid || null };
     const id   = await fsAdd("salaries", data);
     setSalaries(prev => [{ id, ...data, createdAt: null }, ...prev]);
-    toast2("年収情報を投稿しました");
+    await grantUnlock();
+    toast2("年収情報ありがとうございます！30日間 全コンテンツが閲覧可能になりました");
     go("company", companies.find(c => c.id === d.companyId), "salary");
   };
 
@@ -1671,7 +2041,8 @@ export default function App() {
     const data = { ...d, author: uName, authorUid: authUser?.uid || null };
     const id   = await fsAdd("joblistings", data);
     setJobListings(prev => [{ id, ...data }, ...prev]);
-    toast2("募集要項を追加しました");
+    await grantUnlock();
+    toast2("募集要項ありがとうございます！30日間 全コンテンツが閲覧可能になりました");
     go("company", companies.find(c => c.id === d.companyId), "jobs");
   };
 
@@ -1788,7 +2159,22 @@ export default function App() {
     );
   }
 
-  const sp = { sess, go, companies, posts, reviews, salaries, jobListings, plan, isAdmin, adminDelete, adminEdit, setEditTgt, setAuthMode, isMobile, uName, upgradePlan, authUser, favorites, toggleFavorite };
+  const unlocked = !!authUser && profile && (profile.viewUnlockUntil || 0) > Date.now();
+
+  // 投稿者ごとの投稿数集計（authorUid -> count）
+  const authorPostCounts = (() => {
+    const m = {};
+    [...posts, ...reviews, ...salaries].forEach(item => {
+      if (item.authorUid) m[item.authorUid] = (m[item.authorUid] || 0) + 1;
+    });
+    return m;
+  })();
+  const getAuthorBadge = (authorUid) => {
+    if (!authorUid) return null;
+    return getBadge(authorPostCounts[authorUid] || 0);
+  };
+
+  const sp = { sess, go, companies, posts, reviews, salaries, jobListings, plan, isAdmin, adminDelete, adminEdit, setEditTgt, setAuthMode, isMobile, uName, upgradePlan, authUser, favorites, toggleFavorite, unlocked, profile, getAuthorBadge, authorPostCounts };
 
   return (
     <ErrorBoundary>
@@ -1822,6 +2208,9 @@ export default function App() {
             onAddPost={addPost}       onAddReview={addReview}
             onAddSalary={addSalary}   onAddJob={addJobListing}
             sess={sess}
+            unlocked={unlocked}
+            profile={profile}
+            toggleFollowCompany={toggleFollowCompany}
           />
         )}
         {page === "ranking"    && <RankingPage    {...sp} coPosts={coPosts} coRevs={coRevs} coSals={coSals} />}
@@ -2112,7 +2501,7 @@ function HomePage({ sess, go, companies, posts, reviews, salaries, isAdmin, admi
             <p style={{ fontSize:10, fontWeight:"bold", letterSpacing:"0.18em", color:C.accent, marginBottom:6, opacity:0.85 }}>
               CAREER COMMUNITY
             </p>
-            <h1 style={{ fontSize: isMobile ? 18 : 24, fontWeight:"bold", lineHeight:1.4, color:C.ink, fontFamily:"\"Noto Serif JP\", serif" }}>
+            <h1 style={{ fontSize: isMobile ? 18 : 24, fontWeight:"bold", lineHeight:1.4, color:C.ink, fontFamily:"\"M PLUS Rounded 1c\", sans-serif" }}>
               転職・就活の<span style={{ color:C.accent }}>リアル</span>がわかる
             </h1>
             <p style={{ fontSize: isMobile ? 12 : 13, color:C.sub, marginTop:6, lineHeight:1.7 }}>
@@ -2139,7 +2528,7 @@ function HomePage({ sess, go, companies, posts, reviews, salaries, isAdmin, admi
           <div style={{ display:"flex", gap: isMobile ? 12 : 24, justifyContent:"center", marginTop: isMobile ? 14 : 20, flexWrap:"wrap", alignItems:"center" }}>
             {[[companies.length,"企業"],[posts.length,"体験談"],[reviews.length,"口コミ"]].map(([n,l]) => (
               <div key={l} style={{ textAlign:"center" }}>
-                <div style={{ fontSize: isMobile ? 16 : 20, fontWeight:"bold", color:C.accent, fontFamily:"\"Noto Serif JP\", serif", lineHeight:1 }}>{n.toLocaleString()}<span style={{ fontSize:11, color:C.sub, fontWeight:"normal", marginLeft:2 }}>件</span></div>
+                <div style={{ fontSize: isMobile ? 16 : 20, fontWeight:"bold", color:C.accent, fontFamily:"\"M PLUS Rounded 1c\", sans-serif", lineHeight:1 }}>{n.toLocaleString()}<span style={{ fontSize:11, color:C.sub, fontWeight:"normal", marginLeft:2 }}>件</span></div>
                 <div style={{ fontSize:10, color:C.sub, marginTop:2 }}>{l}</div>
               </div>
             ))}
@@ -2249,6 +2638,10 @@ function HomePage({ sess, go, companies, posts, reviews, salaries, isAdmin, admi
               </button>
             </div>
 
+            {/* 投稿者ランキング */}
+            <TopContributors posts={posts} reviews={reviews} salaries={salaries} />
+            <PopularPosters posts={posts} reviews={reviews} />
+            <div style={{ marginTop:16 }} />
             <div style={{ background:"#fff", border:"1px solid " + C.border, borderRadius:8, padding:"16px 18px" }}>
               <h3 style={{ fontSize:14, fontWeight:"bold", marginBottom:12, color:C.ink, paddingBottom:8, borderBottom:"2px solid " + C.accent }}>
                 🏢 業種別に企業を探す
@@ -2381,7 +2774,7 @@ function CompaniesPage({ go, filtered, searchQ, setSearchQ, grpFilter, setGrpFil
 }
 
 // ─── 企業ページ ───────────────────────────────────────────────────────────────
-function CompanyPage({ go, co, cposts, crevs, csals, cjobs, initTab, onToggleLike, onAddComment, onAddPost, onAddReview, onAddSalary, onAddJob, isAdmin, adminDelete, setEditTgt, plan, setAuthMode, isMobile, uName, favorites, toggleFavorite, sess }) {
+function CompanyPage({ go, co, cposts, crevs, csals, cjobs, initTab, onToggleLike, onAddComment, onAddPost, onAddReview, onAddSalary, onAddJob, isAdmin, adminDelete, setEditTgt, plan, setAuthMode, isMobile, uName, favorites, toggleFavorite, sess, unlocked, getAuthorBadge, authUser, profile, toggleFollowCompany }) {
   const [tab,     setTab]     = useState(initTab || "interview");
   const [jobCat,  setJobCat]  = useState("全職種");
   useEffect(() => { if (initTab) setTab(initTab); }, [initTab]);
@@ -2419,21 +2812,21 @@ function CompanyPage({ go, co, cposts, crevs, csals, cjobs, initTab, onToggleLik
         <div style={{ display:"flex", alignItems:"center", gap:16, flexWrap:"wrap" }}>
           <span style={{ fontSize: isMobile ? 28 : 40 }}>{co.emoji}</span>
           <div style={{ flex:1 }}>
-            <h1 style={{ fontWeight:"bold", fontFamily:"serif", fontSize: isMobile ? 18 : 24 }}>{co.name}</h1>
+            <h1 style={{ fontWeight:"bold", fontFamily:"'M PLUS Rounded 1c', sans-serif", fontSize: isMobile ? 18 : 24 }}>{co.name}</h1>
             <p style={{ fontSize:12, color:C.sub, marginTop:3 }}>{co.group || getGroup(co.industry)} &gt; {co.industry}</p>
           </div>
           <div style={{ display:"flex", gap:10, flexWrap:"wrap" }}>
             {a && (
               <div style={{ textAlign:"center", border:"1px solid " + C.border, padding:"10px 14px", minWidth:90 }}>
                 <div style={{ fontSize:10, color:C.sub, marginBottom:3 }}>総合評価</div>
-                <div style={{ fontSize:26, fontWeight:"bold", color:C.accent, fontFamily:"serif", lineHeight:1 }}>{a.overall.toFixed(1)}</div>
+                <div style={{ fontSize:26, fontWeight:"bold", color:C.accent, fontFamily:"'M PLUS Rounded 1c', sans-serif", lineHeight:1 }}>{a.overall.toFixed(1)}</div>
                 <Stars r={a.overall} size={11} />
               </div>
             )}
             {sal && (
               <div style={{ textAlign:"center", border:"1px solid " + C.border, padding:"10px 14px", minWidth:90 }}>
                 <div style={{ fontSize:10, color:C.sub, marginBottom:3 }}>平均年収</div>
-                <div style={{ fontSize:22, fontWeight:"bold", color:"#1a5276", fontFamily:"serif", lineHeight:1 }}>{sal}<span style={{ fontSize:12, fontWeight:"normal" }}>万円</span></div>
+                <div style={{ fontSize:22, fontWeight:"bold", color:"#1a5276", fontFamily:"'M PLUS Rounded 1c', sans-serif", lineHeight:1 }}>{sal}<span style={{ fontSize:12, fontWeight:"normal" }}>万円</span></div>
                 <div style={{ fontSize:10, color:C.sub, marginTop:3 }}>{csals.length}件</div>
               </div>
             )}
@@ -2460,44 +2853,76 @@ function CompanyPage({ go, co, cposts, crevs, csals, cjobs, initTab, onToggleLik
           })()}
         </div>
       </div>
-      {/* タブグループ：選考者向け（オレンジ系）/ 在籍者向け（青系）/ その他 */}
+      {/* タブグループ - スマホは縦に分割表示、PCは横並び */}
       <div style={{ marginTop:14, marginBottom:0 }}>
-        <div style={{ display:"flex", flexWrap:"wrap", gap:0, borderBottom:"2px solid " + C.ink }}>
-          {/* 選考者向け */}
-          <div style={{ display:"flex", paddingRight:14, borderRight:"1px solid " + C.border, position:"relative" }}>
-            <span style={{ position:"absolute", top:-14, left:0, fontSize:9, color:"#C2410C", fontWeight:"bold", letterSpacing:"0.06em", whiteSpace:"nowrap" }}>📝 選考を受けた人の情報</span>
-            {tabsCandidate.map(([k,l,n]) => (
-              <button key={k} style={{ background:"none", border:"none", padding:"9px 12px", fontSize:12, fontFamily:"inherit", cursor:"pointer", color: tab===k ? "#C2410C" : C.sub, borderBottom:"3px solid " + (tab===k ? "#F59E0B" : "transparent"), marginBottom:-2, fontWeight: tab===k ? "bold" : "500", whiteSpace:"nowrap" }} onClick={() => setTab(k)}>
-                {l}<span style={{ fontSize:10, background: tab===k ? "#F59E0B" : "#eee", color: tab===k ? "#fff" : C.sub, padding:"1px 5px", marginLeft:3, borderRadius:2 }}>{n}</span>
-              </button>
-            ))}
+        {isMobile ? (
+          <>
+            {/* スマホ：選考者向けセクション */}
+            <div style={{ marginBottom:8 }}>
+              <div style={{ fontSize:10, color:"#C2410C", fontWeight:"bold", letterSpacing:"0.06em", marginBottom:4 }}>📝 選考を受けた人の情報</div>
+              <div style={{ display:"flex", overflowX:"auto", borderBottom:"2px solid #FDBA74" }}>
+                {tabsCandidate.map(([k,l,n]) => (
+                  <button key={k} style={{ background:"none", border:"none", padding:"8px 10px", fontSize:12, fontFamily:"inherit", cursor:"pointer", color: tab===k ? "#C2410C" : C.sub, borderBottom:"3px solid " + (tab===k ? "#F59E0B" : "transparent"), marginBottom:-2, fontWeight: tab===k ? "bold" : "500", whiteSpace:"nowrap" }} onClick={() => setTab(k)}>
+                    {l}<span style={{ fontSize:10, background: tab===k ? "#F59E0B" : "#eee", color: tab===k ? "#fff" : C.sub, padding:"1px 5px", marginLeft:3, borderRadius:2 }}>{n}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div style={{ marginBottom:8 }}>
+              <div style={{ fontSize:10, color:C.accent, fontWeight:"bold", letterSpacing:"0.06em", marginBottom:4 }}>🏢 在籍者・元社員の情報</div>
+              <div style={{ display:"flex", overflowX:"auto", borderBottom:"2px solid " + C.accent }}>
+                {tabsEmployee.map(([k,l,n]) => (
+                  <button key={k} style={{ background:"none", border:"none", padding:"8px 10px", fontSize:12, fontFamily:"inherit", cursor:"pointer", color: tab===k ? C.accent : C.sub, borderBottom:"3px solid " + (tab===k ? C.accent : "transparent"), marginBottom:-2, fontWeight: tab===k ? "bold" : "500", whiteSpace:"nowrap" }} onClick={() => setTab(k)}>
+                    {l}<span style={{ fontSize:10, background: tab===k ? C.accent : "#eee", color: tab===k ? "#fff" : C.sub, padding:"1px 5px", marginLeft:3, borderRadius:2 }}>{n}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div style={{ marginBottom:8 }}>
+              <div style={{ display:"flex", overflowX:"auto", borderBottom:"2px solid " + C.ink }}>
+                {tabsOther.map(([k,l,n]) => (
+                  <button key={k} style={{ background:"none", border:"none", padding:"8px 10px", fontSize:12, fontFamily:"inherit", cursor:"pointer", color: tab===k ? C.ink : C.sub, borderBottom:"3px solid " + (tab===k ? C.ink : "transparent"), marginBottom:-2, fontWeight: tab===k ? "bold" : "500", whiteSpace:"nowrap" }} onClick={() => setTab(k)}>
+                    {l}<span style={{ fontSize:10, background: tab===k ? C.ink : "#eee", color: tab===k ? "#fff" : C.sub, padding:"1px 5px", marginLeft:3, borderRadius:2 }}>{n}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </>
+        ) : (
+          <div style={{ display:"flex", flexWrap:"wrap", gap:0, borderBottom:"2px solid " + C.ink, paddingTop:18 }}>
+            <div style={{ display:"flex", paddingRight:14, borderRight:"1px solid " + C.border, position:"relative" }}>
+              <span style={{ position:"absolute", top:-14, left:0, fontSize:9, color:"#C2410C", fontWeight:"bold", letterSpacing:"0.06em", whiteSpace:"nowrap" }}>📝 選考を受けた人の情報</span>
+              {tabsCandidate.map(([k,l,n]) => (
+                <button key={k} style={{ background:"none", border:"none", padding:"9px 12px", fontSize:12, fontFamily:"inherit", cursor:"pointer", color: tab===k ? "#C2410C" : C.sub, borderBottom:"3px solid " + (tab===k ? "#F59E0B" : "transparent"), marginBottom:-2, fontWeight: tab===k ? "bold" : "500", whiteSpace:"nowrap" }} onClick={() => setTab(k)}>
+                  {l}<span style={{ fontSize:10, background: tab===k ? "#F59E0B" : "#eee", color: tab===k ? "#fff" : C.sub, padding:"1px 5px", marginLeft:3, borderRadius:2 }}>{n}</span>
+                </button>
+              ))}
+            </div>
+            <div style={{ display:"flex", paddingLeft:14, paddingRight:14, borderRight:"1px solid " + C.border, position:"relative" }}>
+              <span style={{ position:"absolute", top:-14, left:14, fontSize:9, color:C.accent, fontWeight:"bold", letterSpacing:"0.06em", whiteSpace:"nowrap" }}>🏢 在籍者・元社員の情報</span>
+              {tabsEmployee.map(([k,l,n]) => (
+                <button key={k} style={{ background:"none", border:"none", padding:"9px 12px", fontSize:12, fontFamily:"inherit", cursor:"pointer", color: tab===k ? C.accent : C.sub, borderBottom:"3px solid " + (tab===k ? C.accent : "transparent"), marginBottom:-2, fontWeight: tab===k ? "bold" : "500", whiteSpace:"nowrap" }} onClick={() => setTab(k)}>
+                  {l}<span style={{ fontSize:10, background: tab===k ? C.accent : "#eee", color: tab===k ? "#fff" : C.sub, padding:"1px 5px", marginLeft:3, borderRadius:2 }}>{n}</span>
+                </button>
+              ))}
+            </div>
+            <div style={{ display:"flex", paddingLeft:14 }}>
+              {tabsOther.map(([k,l,n]) => (
+                <button key={k} style={{ background:"none", border:"none", padding:"9px 12px", fontSize:12, fontFamily:"inherit", cursor:"pointer", color: tab===k ? C.ink : C.sub, borderBottom:"3px solid " + (tab===k ? C.ink : "transparent"), marginBottom:-2, fontWeight: tab===k ? "bold" : "500", whiteSpace:"nowrap" }} onClick={() => setTab(k)}>
+                  {l}<span style={{ fontSize:10, background: tab===k ? C.ink : "#eee", color: tab===k ? "#fff" : C.sub, padding:"1px 5px", marginLeft:3, borderRadius:2 }}>{n}</span>
+                </button>
+              ))}
+            </div>
           </div>
-          {/* 在籍者向け */}
-          <div style={{ display:"flex", paddingLeft:14, paddingRight:14, borderRight:"1px solid " + C.border, position:"relative" }}>
-            <span style={{ position:"absolute", top:-14, left:14, fontSize:9, color:C.accent, fontWeight:"bold", letterSpacing:"0.06em", whiteSpace:"nowrap" }}>🏢 在籍者・元社員の情報</span>
-            {tabsEmployee.map(([k,l,n]) => (
-              <button key={k} style={{ background:"none", border:"none", padding:"9px 12px", fontSize:12, fontFamily:"inherit", cursor:"pointer", color: tab===k ? C.accent : C.sub, borderBottom:"3px solid " + (tab===k ? C.accent : "transparent"), marginBottom:-2, fontWeight: tab===k ? "bold" : "500", whiteSpace:"nowrap" }} onClick={() => setTab(k)}>
-                {l}<span style={{ fontSize:10, background: tab===k ? C.accent : "#eee", color: tab===k ? "#fff" : C.sub, padding:"1px 5px", marginLeft:3, borderRadius:2 }}>{n}</span>
-              </button>
-            ))}
-          </div>
-          {/* その他 */}
-          <div style={{ display:"flex", paddingLeft:14 }}>
-            {tabsOther.map(([k,l,n]) => (
-              <button key={k} style={{ background:"none", border:"none", padding:"9px 12px", fontSize:12, fontFamily:"inherit", cursor:"pointer", color: tab===k ? C.ink : C.sub, borderBottom:"3px solid " + (tab===k ? C.ink : "transparent"), marginBottom:-2, fontWeight: tab===k ? "bold" : "500", whiteSpace:"nowrap" }} onClick={() => setTab(k)}>
-                {l}<span style={{ fontSize:10, background: tab===k ? C.ink : "#eee", color: tab===k ? "#fff" : C.sub, padding:"1px 5px", marginLeft:3, borderRadius:2 }}>{n}</span>
-              </button>
-            ))}
-          </div>
-        </div>
+        )}
       </div>
-      <div style={{ marginTop:18 }} />
+      <div style={{ marginTop:14 }} />
       <div style={{ paddingTop:20 }}>
-        {tab === "interview" && <PostsTab posts={iv} ptype="interview" label="面接体験談" co={co} uName={uName} onAddPost={onAddPost} onToggleLike={onToggleLike} onAddComment={onAddComment} isAdmin={isAdmin} adminDelete={adminDelete} setEditTgt={setEditTgt} favorites={favorites} toggleFavorite={toggleFavorite} jobCat={jobCat} sess={sess} setAuthMode={setAuthMode} />}
-        {tab === "board"     && <PostsTab posts={bd} ptype="board"     label="選考掲示板" co={co} uName={uName} onAddPost={onAddPost} onToggleLike={onToggleLike} onAddComment={onAddComment} isAdmin={isAdmin} adminDelete={adminDelete} setEditTgt={setEditTgt} favorites={favorites} toggleFavorite={toggleFavorite} jobCat={jobCat} sess={sess} setAuthMode={setAuthMode} />}
-        {tab === "es"        && <PostsTab posts={es} ptype="es"        label="ES例文"     co={co} uName={uName} onAddPost={onAddPost} onToggleLike={onToggleLike} onAddComment={onAddComment} isAdmin={isAdmin} adminDelete={adminDelete} setEditTgt={setEditTgt} favorites={favorites} toggleFavorite={toggleFavorite} jobCat={jobCat} sess={sess} setAuthMode={setAuthMode} />}
-        {tab === "review"    && <ReviewsTab revs={crevs} avgData={a}   co={co} uName={uName} plan={plan} onAddReview={onAddReview} isAdmin={isAdmin} adminDelete={adminDelete} setEditTgt={setEditTgt} go={go} sess={sess} setAuthMode={setAuthMode} />}
-        {tab === "salary"    && <SalaryTab  sals={csals} avgSalary={sal} co={co} uName={uName} plan={plan} onAddSalary={onAddSalary} isAdmin={isAdmin} adminDelete={adminDelete} setEditTgt={setEditTgt} go={go} sess={sess} setAuthMode={setAuthMode} />}
+        {tab === "interview" && <PostsTab posts={iv} ptype="interview" label="面接体験談" co={co} uName={uName} onAddPost={onAddPost} onToggleLike={onToggleLike} onAddComment={onAddComment} isAdmin={isAdmin} adminDelete={adminDelete} setEditTgt={setEditTgt} favorites={favorites} toggleFavorite={toggleFavorite} jobCat={jobCat} sess={sess} setAuthMode={setAuthMode} unlocked={unlocked} getAuthorBadge={getAuthorBadge} authUser={authUser} />}
+        {tab === "board"     && <PostsTab posts={bd} ptype="board"     label="選考掲示板" co={co} uName={uName} onAddPost={onAddPost} onToggleLike={onToggleLike} onAddComment={onAddComment} isAdmin={isAdmin} adminDelete={adminDelete} setEditTgt={setEditTgt} favorites={favorites} toggleFavorite={toggleFavorite} jobCat={jobCat} sess={sess} setAuthMode={setAuthMode} unlocked={unlocked} getAuthorBadge={getAuthorBadge} authUser={authUser} />}
+        {tab === "es"        && <PostsTab posts={es} ptype="es"        label="ES例文"     co={co} uName={uName} onAddPost={onAddPost} onToggleLike={onToggleLike} onAddComment={onAddComment} isAdmin={isAdmin} adminDelete={adminDelete} setEditTgt={setEditTgt} favorites={favorites} toggleFavorite={toggleFavorite} jobCat={jobCat} sess={sess} setAuthMode={setAuthMode} unlocked={unlocked} getAuthorBadge={getAuthorBadge} authUser={authUser} />}
+        {tab === "review"    && <ReviewsTab revs={crevs} avgData={a}   co={co} uName={uName} plan={plan} onAddReview={onAddReview} isAdmin={isAdmin} adminDelete={adminDelete} setEditTgt={setEditTgt} go={go} sess={sess} setAuthMode={setAuthMode} unlocked={unlocked} getAuthorBadge={getAuthorBadge} />}
+        {tab === "salary"    && <SalaryTab  sals={csals} avgSalary={sal} co={co} uName={uName} plan={plan} onAddSalary={onAddSalary} isAdmin={isAdmin} adminDelete={adminDelete} setEditTgt={setEditTgt} go={go} sess={sess} setAuthMode={setAuthMode} unlocked={unlocked} getAuthorBadge={getAuthorBadge} />}
         {tab === "jobs"      && <JobsTab    jobs={cjobs} co={co} uName={uName} onAddJob={onAddJob} isAdmin={isAdmin} adminDelete={adminDelete} setEditTgt={setEditTgt} />}
       </div>
     </div>
@@ -2505,7 +2930,8 @@ function CompanyPage({ go, co, cposts, crevs, csals, cjobs, initTab, onToggleLik
 }
 
 // ─── 掲示板・体験談タブ ───────────────────────────────────────────────────────
-function PostsTab({ posts, ptype, label, co, uName, onAddPost, onToggleLike, onAddComment, isAdmin, adminDelete, setEditTgt, favorites, toggleFavorite, jobCat, sess, setAuthMode }) {
+function PostsTab({ posts, ptype, label, co, uName, onAddPost, onToggleLike, onAddComment, isAdmin, adminDelete, setEditTgt, favorites, toggleFavorite, jobCat, sess, setAuthMode, unlocked, getAuthorBadge, authUser }) {
+  const authUserKey = authUser?.uid || ("guest:" + uName);
   const [exp,  setExp]  = useState(null);
   const [cmt,  setCmt]  = useState("");
   const [form, setForm] = useState(null);
@@ -2514,26 +2940,33 @@ function PostsTab({ posts, ptype, label, co, uName, onAddPost, onToggleLike, onA
   const [stages, setStages] = useState([{ stage:"", content:"" }]);
   const isES = ptype === "es";
   const isInterview = ptype === "interview";
+  const isBoard = ptype === "board";
   const initF = isES
     ? { companyId:co.id, ptype, stage:"内定", title:"", content:"", jobCategory:"全職種", esQuestion:"", year:new Date().getFullYear() }
     : isInterview
     ? {
         companyId:co.id, ptype, stage:"", title:"", content:"", jobCategory:"全職種",
         applyMethod:"", prevJobType:"", prevSalary:"", prevAge:"",
-        progressStage:"",   // どこまで進んだか（書類選考、一次面接、…、内定、内定辞退）
-        stages:[],          // 自動生成される
-        extraStages:[],     // オプションの自由入力（カジュアル面接など）
+        progressStage:"",
+        stages:[],
+        extraStages:[],
         finalResult:"", offerAmount:"", offerBase:"", offerBonus:""
+      }
+    : isBoard
+    ? {
+        companyId:co.id, ptype, stage:"掲示板", title:"", content:"", jobCategory:"全職種",
+        guestEmail:"", guestName:""  // 未ログイン投稿用
       }
     : { companyId:co.id, ptype, stage:"", title:"", content:"", jobCategory:"全職種", offerAmount:"", offerBase:"", offerBonus:"" };
   const sorted = [...posts].sort((a,b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
 
   return (
     <div>
+      {ptype === "interview" && <AISummary posts={posts} type="interview" />}
       {ptype === "board" && (
         <div style={{ background:"#FFFBEB", border:"1px solid #FDE68A", padding:"10px 14px", borderRadius:6, marginBottom:14, fontSize:12, color:"#92400E", lineHeight:1.7 }}>
           <strong>📋 職種ごとに掲示板が分かれています</strong><br />
-          上部の「職種カテゴリ」から選びたい職種を選んでください。投稿時も職種を選んでください。
+          上部の「職種カテゴリ」で絞り込めます。投稿時も職種を選んでください。
         </div>
       )}
       <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:14, paddingBottom:10, borderBottom:"1px solid " + C.border, flexWrap:"wrap", gap:8 }}>
@@ -2544,6 +2977,12 @@ function PostsTab({ posts, ptype, label, co, uName, onAddPost, onToggleLike, onA
       </div>
       {form && (
         <div style={{ background:C.surface, border:"1px solid " + C.border, borderTop:"3px solid " + C.accent, padding:"18px 20px", marginBottom:20 }}>
+          {sess && !unlocked && (
+            <div style={{ background:"#FFF8E7", border:"1px solid #FCD34D", borderRadius:8, padding:"10px 14px", marginBottom:14, fontSize:12, color:"#92400E", lineHeight:1.7 }}>
+              🎁 <strong>この投稿で30日間 全コンテンツ閲覧可能になります！</strong><br />
+              他の方の体験談・口コミ・年収情報がすべて閲覧できるようになります。
+            </div>
+          )}
           <Fld label="職種カテゴリ">
             <div style={{ display:"flex", gap:8 }}>
               <select style={{...S.input, flex:1}} value={form.jobCategory === "__custom__" ? "__custom__" : (form.jobCategory || "全職種")} onChange={e => {
@@ -2577,7 +3016,37 @@ function PostsTab({ posts, ptype, label, co, uName, onAddPost, onToggleLike, onA
               </Fld>
             </>
           )}
-          {!isES && !isInterview && (
+          {isBoard && !sess && (
+            <div style={{ background:"#F0F9FF", border:"1px solid #BAE6FD", padding:"12px 14px", borderRadius:6, marginBottom:14 }}>
+              <div style={{ fontSize:13, fontWeight:"bold", color:"#0C4A6E", marginBottom:8 }}>
+                💬 メールアドレスだけで投稿できます（パスワード不要）
+              </div>
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
+                <Fld label="メールアドレス *">
+                  <input style={S.input} type="email" placeholder="example@email.com" value={form.guestEmail} onChange={e => setForm({ ...form, guestEmail:e.target.value })} />
+                </Fld>
+                <Fld label="表示名（コテハン） *">
+                  <input style={S.input} placeholder="例：転職検討中" value={form.guestName} onChange={e => setForm({ ...form, guestName:e.target.value })} />
+                </Fld>
+              </div>
+              <p style={{ fontSize:10, color:C.sub, marginTop:4, lineHeight:1.7 }}>
+                ※ メールアドレスは荒らし対策のためのみ使用し、公開されません。<br />
+                ※ 会員登録すると、このメールアドレスでそのままログインできます。
+              </p>
+            </div>
+          )}
+          {isBoard && (
+            <Fld label="投稿カテゴリ">
+              <select style={S.input} value={form.stage} onChange={e => setForm({...form, stage:e.target.value})}>
+                <option value="掲示板">通常の質問・情報共有</option>
+                <option value="選考情報">選考情報・通過率</option>
+                <option value="質問">質問</option>
+                <option value="OB訪問">OB訪問・面談</option>
+                <option value="その他">その他</option>
+              </select>
+            </Fld>
+          )}
+          {!isES && !isInterview && !isBoard && (
           <Fld label="選考段階 *">
             <div style={{ display:"flex", gap:8 }}>
               <select style={{...S.input, flex:1}} value={showCustomStage ? "custom" : form.stage} onChange={e => {
@@ -2712,6 +3181,11 @@ function PostsTab({ posts, ptype, label, co, uName, onAddPost, onToggleLike, onA
             <Fld label="総評・感想（任意）">
               <textarea style={{ ...S.input, resize:"vertical" }} rows={3} placeholder="選考全体を通しての感想・準備のポイントなどがあれば（任意）" value={form.content} onChange={e => setForm({ ...form, content:e.target.value })} />
             </Fld>
+          ) : isBoard ? (
+            <Fld label={`本文 *（最低10文字）　現在${form.content.length}文字`}>
+              <textarea style={{ ...S.input, resize:"vertical", borderColor: form.content.length > 0 && form.content.length < 10 ? "#DC2626" : C.border }} rows={5} placeholder="質問や情報を自由に投稿してください。" value={form.content} onChange={e => setForm({ ...form, content:e.target.value })} />
+              {form.content.length > 0 && form.content.length < 10 && <p style={{ fontSize:11, color:"#DC2626", marginTop:4 }}>あと{10 - form.content.length}文字以上入力してください</p>}
+            </Fld>
           ) : (
             <Fld label={`本文 *（最低30文字）　現在${form.content.length}文字`}>
               <textarea style={{ ...S.input, resize:"vertical", borderColor: form.content.length > 0 && form.content.length < 30 ? "#DC2626" : C.border }} rows={5} placeholder="面接の様子、聞かれた内容、準備のポイントなどをご記入ください。（最低30文字）" value={form.content} onChange={e => setForm({ ...form, content:e.target.value })} />
@@ -2729,14 +3203,28 @@ function PostsTab({ posts, ptype, label, co, uName, onAddPost, onToggleLike, onA
             </div>
           )}
           <div style={{ display:"flex", alignItems:"center", gap:8, padding:"8px 0", borderTop:"1px solid " + C.border, fontSize:12, color:C.sub }}>
-            <AC>{ini(uName)}</AC>{uName} として投稿
+            <AC>{ini(isBoard && !sess && form.guestName ? form.guestName : uName)}</AC>
+            {isBoard && !sess
+              ? (form.guestName ? `${form.guestName} として投稿` : "コテハンを入力してください")
+              : `${uName} として投稿`}
           </div>
           <button style={{ ...S.primaryBtn, width:"100%", padding:"11px" }} onClick={async () => {
             if (!form.title.trim()) { alert("タイトルを入力してください"); return; }
+            if (isBoard) {
+              if (!form.title.trim()) { alert("タイトルを入力してください"); return; }
+              if (!form.content.trim() || form.content.length < 10) { alert("本文を10文字以上入力してください"); return; }
+              if (!sess) {
+                // 未ログインの場合はメール+コテハンが必須
+                if (!form.guestEmail || !form.guestEmail.includes("@")) { alert("メールアドレスを入力してください"); return; }
+                if (!form.guestName.trim()) { alert("表示名（コテハン）を入力してください"); return; }
+              }
+              await onAddPost(form);
+              setForm(null);
+              return;
+            }
             if (isInterview) {
               if (!form.applyMethod) { alert("応募方法を選択してください"); return; }
               if (!form.progressStage) { alert("選考の最終段階を選択してください"); return; }
-              // 補完
               const summary = [...form.stages, ...(form.extraStages||[])].filter(s => s.name && s.content).map(s => `【${s.name}】${s.content}`).join("\n\n");
               await onAddPost({ ...form, content: form.content || summary, stage: form.progressStage, finalResult: (form.progressStage === "内定" || form.progressStage === "内定辞退") ? form.progressStage : "" });
               setForm(null);
@@ -2754,12 +3242,20 @@ function PostsTab({ posts, ptype, label, co, uName, onAddPost, onToggleLike, onA
       )}
       {sorted.length === 0 && <Empty text={"まだ" + label + "がありません。最初の投稿をしてみましょう！"} />}
       {/* 選考掲示板・ES例文は1件目からロック、面接体験談は2件目以降ロック */}
-      {sorted.length > 0 && !sess && (ptype === "board" || ptype === "es") && (
-        <BoardLockedNotice setAuthMode={setAuthMode} count={sorted.length} type={label} />
+      {/* 選考掲示板はライトモード（未ログインでも閲覧可・メールのみで投稿可） */}
+      {ptype === "board" && (
+        <div style={{ background:"#F0FDF4", border:"1px solid #BBF7D0", borderRadius:8, padding:"12px 14px", marginBottom:14, fontSize:12, color:"#166534", lineHeight:1.7 }}>
+          💬 <strong>選考掲示板はメールアドレスだけで投稿できます</strong>（パスワード不要・コテハン可）<br />
+          閲覧は登録不要です。気軽に情報交換しましょう。
+        </div>
+      )}
+      {sorted.length > 0 && !unlocked && ptype === "es" && (
+        <BoardLockedNotice setAuthMode={setAuthMode} count={sorted.length} type={label} sess={sess} />
       )}
       {sorted.map((p, idx) => {
-        const isLocked = !sess && (
-          (ptype === "board" || ptype === "es") ? idx >= 0 :
+        const isLocked = !unlocked && (
+          ptype === "board" ? false :  // 掲示板はロックしない
+          ptype === "es" ? idx >= 0 :
           ptype === "interview" ? idx >= 1 :
           idx >= 1
         );
@@ -2784,7 +3280,7 @@ function PostsTab({ posts, ptype, label, co, uName, onAddPost, onToggleLike, onA
                   {p.esQuestion}
                 </div>
               )}
-              <h3 style={{ fontSize:15, fontWeight:"bold", marginBottom:8, lineHeight:1.55, fontFamily:"serif" }}>{p.title}</h3>
+              <h3 style={{ fontSize:15, fontWeight:"bold", marginBottom:8, lineHeight:1.55, fontFamily:"'M PLUS Rounded 1c', sans-serif" }}>{p.title}</h3>
               {p.year && p.ptype === "es" && (
                 <div style={{ fontSize:11, color:C.sub, marginBottom:6 }}>応募: {p.year}年 / 結果: {p.stage}</div>
               )}
@@ -2850,48 +3346,45 @@ function PostsTab({ posts, ptype, label, co, uName, onAddPost, onToggleLike, onA
               <div style={{ display:"flex", alignItems:"center", gap:10, borderTop:"1px solid " + C.border, paddingTop:10, flexWrap:"wrap" }}>
                 <AC>{ini(p.author)}</AC>
                 <span style={{ fontSize:12, color:C.sub }}>{p.author}</span>
-                <button style={{ background:"none", border:"none", color:C.sub, fontSize:12, cursor:"pointer", fontFamily:"inherit", marginLeft:"auto" }} onClick={() => onToggleLike(p.id)}>
-                  {(p.likes || []).length > 0 ? ("♥ " + (p.likes || []).length) : "♡ いいね"}
-                </button>
-                <button style={{ background:"none", border:"none", fontSize:12, cursor:"pointer", fontFamily:"inherit", color: favorites && favorites.includes(p.id) ? "#E8A000" : C.sub }} onClick={() => toggleFavorite && toggleFavorite(p.id)}>
-                  {favorites && favorites.includes(p.id) ? "★ お気に入り" : "☆ お気に入り"}
-                </button>
-                <button style={{ background:"none", border:"none", color:C.sub, fontSize:12, cursor:"pointer", fontFamily:"inherit" }} onClick={() => setExp(exp === p.id ? null : p.id)}>
-                  コメント({(p.comments || []).length}){exp === p.id ? " ▴" : " ▾"}
-                </button>
+                {getAuthorBadge && getAuthorBadge(p.authorUid) && <BadgeChip badge={getAuthorBadge(p.authorUid)} small />}
+                {(p.likes || []).length >= 10 && (
+                  <span style={{ background:"#FEE2E2", color:"#DC2626", padding:"2px 8px", fontSize:10, fontWeight:"bold", borderRadius:10 }}>
+                    🔥 人気
+                  </span>
+                )}
+                <div style={{ marginLeft:"auto", display:"flex", gap:6 }}>
+                  <LikeButton liked={(p.likes || []).includes(authUserKey)} count={(p.likes || []).length} onClick={() => onToggleLike(p.id)} />
+                  <button style={{ background:"#fff", border:"1px solid " + C.border, fontSize:12, cursor:"pointer", fontFamily:"inherit", color: favorites && favorites.includes(p.id) ? "#E8A000" : C.sub, padding:"6px 12px", borderRadius:18, display:"flex", alignItems:"center", gap:4 }} onClick={() => toggleFavorite && toggleFavorite(p.id)}>
+                    {favorites && favorites.includes(p.id) ? "★" : "☆"}
+                  </button>
+                  <button style={{ background:"#fff", border:"1px solid " + C.border, color:C.sub, fontSize:12, cursor:"pointer", fontFamily:"inherit", padding:"6px 12px", borderRadius:18, display:"flex", alignItems:"center", gap:4 }} onClick={() => setExp(exp === p.id ? null : p.id)}>
+                    💬 {(p.comments || []).length}
+                  </button>
+                </div>
               </div>
               {exp === p.id && (
-                <div style={{ marginTop:12, paddingTop:12, borderTop:"1px solid " + C.border }}>
-                  {(p.comments || []).map(c => (
-                    <div key={c.id} style={{ borderLeft:"3px solid " + C.border, paddingLeft:10, marginBottom:8, paddingBottom:8 }}>
-                      {isAdmin && <span style={{ float:"right" }}><SmBtn red onClick={() => adminDelete("comment", p.id + ":" + c.id)}>削除</SmBtn></span>}
-                      <div style={{ fontSize:11, color:C.sub, marginBottom:4 }}>{c.author} · {c.date}</div>
-                      <p style={{ fontSize:13, lineHeight:1.8 }}>{c.content}</p>
-                    </div>
-                  ))}
-                  <div style={{ display:"flex", gap:8, marginTop:8, alignItems:"flex-start" }}>
-                    <AC>{ini(uName)}</AC>
-                    <div style={{ flex:1 }}>
-                      <textarea style={{ ...S.input, resize:"vertical", width:"100%" }} rows={2} placeholder="コメントを入力" value={cmt} onChange={e => setCmt(e.target.value)} />
-                      <button style={{ ...S.primaryBtn, marginTop:6, fontSize:12, padding:"7px 14px" }} onClick={async () => {
-                        if (cmt.trim()) { await onAddComment(p.id, cmt.trim()); setCmt(""); }
-                      }}>
-                        送信
-                      </button>
-                    </div>
-                  </div>
-                </div>
+                <CommentThread
+                  post={p}
+                  uName={uName}
+                  authUserKey={authUserKey}
+                  authUser={authUser}
+                  isAdmin={isAdmin}
+                  onAddComment={onAddComment}
+                  adminDelete={adminDelete}
+                  getAuthorBadge={getAuthorBadge}
+                />
               )}
             </article>
         );
       })}
-      {!sess && ptype === "interview" && sorted.length > 1 && <LockedContent setAuthMode={setAuthMode} count={sorted.length - 1} type={label} />}
+      {!unlocked && ptype === "interview" && sorted.length > 1 && <LockedContent setAuthMode={setAuthMode} count={sorted.length - 1} type={label} sess={sess} />}
+      {!unlocked && ptype === "es" && sorted.length > 1 && <LockedContent setAuthMode={setAuthMode} count={sorted.length - 1} type={label} sess={sess} />}
     </div>
   );
 }
 
 // ─── 口コミタブ ───────────────────────────────────────────────────────────────
-function ReviewsTab({ revs, avgData: a, co, uName, plan, onAddReview, isAdmin, adminDelete, setEditTgt, go, sess, setAuthMode }) {
+function ReviewsTab({ revs, avgData: a, co, uName, plan, onAddReview, isAdmin, adminDelete, setEditTgt, go, sess, setAuthMode, unlocked, getAuthorBadge }) {
   const [form, setForm] = useState(null);
   const [deptFilter, setDeptFilter] = useState("全部門");
   const [showStats, setShowStats] = useState(false);
@@ -2934,6 +3427,7 @@ function ReviewsTab({ revs, avgData: a, co, uName, plan, onAddReview, isAdmin, a
 
   return (
     <div>
+      <AISummary reviews={revs} type="review" />
       {/* 部門フィルター */}
       {revs.length > 0 && (
         <div style={{ display:"flex", gap:6, flexWrap:"wrap", marginBottom:14, alignItems:"center" }}>
@@ -2950,7 +3444,7 @@ function ReviewsTab({ revs, avgData: a, co, uName, plan, onAddReview, isAdmin, a
         <div style={{ display:"flex", gap:20, flexWrap:"wrap", padding:"14px 0", borderBottom:"1px solid " + C.border, marginBottom:16 }}>
           <div style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:4, minWidth:80, paddingRight:18, borderRight:"1px solid " + C.border }}>
             <div style={{ fontSize:11, color:C.sub, marginBottom:4 }}>総合評価</div>
-            <div style={{ fontSize:46, fontWeight:"bold", color:C.accent, lineHeight:1, fontFamily:"serif" }}>{filteredAvg.overall.toFixed(1)}</div>
+            <div style={{ fontSize:46, fontWeight:"bold", color:C.accent, lineHeight:1, fontFamily:"'M PLUS Rounded 1c', sans-serif" }}>{filteredAvg.overall.toFixed(1)}</div>
             <Stars r={filteredAvg.overall} size={14} />
             <div style={{ fontSize:11, color:C.sub, marginTop:4 }}>{filteredRevs.length}件</div>
             {deptFilter !== "全部門" && <div style={{ fontSize:10, color:C.accent, marginTop:2 }}>{deptFilter}のみ</div>}
@@ -3045,6 +3539,11 @@ function ReviewsTab({ revs, avgData: a, co, uName, plan, onAddReview, isAdmin, a
       </div>
       {form && (
         <div style={{ background:C.surface, border:"1px solid " + C.border, borderTop:"3px solid " + C.accent, padding:"18px 20px", marginBottom:20 }}>
+          {sess && !unlocked && (
+            <div style={{ background:"#FFF8E7", border:"1px solid #FCD34D", borderRadius:8, padding:"10px 14px", marginBottom:14, fontSize:12, color:"#92400E", lineHeight:1.7 }}>
+              🎁 <strong>この投稿で30日間 全コンテンツ閲覧可能になります！</strong>
+            </div>
+          )}
           <Fld label="総合評価 *"><StarPicker value={form.overall} onChange={v => setForm({ ...form, overall:v })} label="総合評価" /></Fld>
           <Fld label="カテゴリ別評価とコメント">
             <div style={{ borderLeft:"3px solid " + C.border, paddingLeft:12 }}>
@@ -3105,8 +3604,7 @@ function ReviewsTab({ revs, avgData: a, co, uName, plan, onAddReview, isAdmin, a
       )}
       {revs.length === 0 && <Empty text="まだ口コミがありません" />}
       {filteredRevs.sort((a,b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)).map((r, idx) => {
-        // 未ログインの場合：最初の1件だけプレビュー、それ以降はぼかして登録誘導
-        const isLocked = !sess && idx >= 1;
+        const isLocked = !unlocked && idx >= 1;
         return (
         <div key={r.id} style={{ background:C.surface, border:"1px solid " + C.border, padding:"14px 16px", marginBottom:10, position:"relative", filter: isLocked ? "blur(5px)" : "none", pointerEvents: isLocked ? "none" : "auto", userSelect: isLocked ? "none" : "auto" }}>
           {isAdmin && (
@@ -3163,18 +3661,19 @@ function ReviewsTab({ revs, avgData: a, co, uName, plan, onAddReview, isAdmin, a
           {r.advice && <div style={{ marginBottom:10 }}><div style={{ fontSize:11, fontWeight:"bold", color:C.sub, marginBottom:3 }}>アドバイス</div><p style={{ fontSize:13, lineHeight:1.9 }}>{r.advice}</p></div>}
           <div style={{ display:"flex", alignItems:"center", gap:8, marginTop:10, paddingTop:10, borderTop:"1px solid " + C.border }}>
             <AC>{ini(r.author)}</AC><span style={{ fontSize:12, color:C.sub }}>{r.author}</span>
+            {getAuthorBadge && getAuthorBadge(r.authorUid) && <BadgeChip badge={getAuthorBadge(r.authorUid)} small />}
           </div>
         </div>
       );
       })}
       {/* 未ログイン時の登録誘導オーバーレイ */}
-      {!sess && filteredRevs.length > 1 && <LockedContent setAuthMode={setAuthMode} count={filteredRevs.length - 1} type="口コミ" />}
+      {!unlocked && filteredRevs.length > 1 && <LockedContent setAuthMode={setAuthMode} count={filteredRevs.length - 1} type="口コミ" sess={sess} />}
     </div>
   );
 }
 
 // ─── 年収タブ ─────────────────────────────────────────────────────────────────
-function SalaryTab({ sals, avgSalary, co, uName, plan, onAddSalary, isAdmin, adminDelete, setEditTgt, go, sess, setAuthMode }) {
+function SalaryTab({ sals, avgSalary, co, uName, plan, onAddSalary, isAdmin, adminDelete, setEditTgt, go, sess, setAuthMode, unlocked, getAuthorBadge }) {
   const [form, setForm] = useState(null);
   const canRead = ["standard","premium"].includes(plan);
   const byJob   = sals.reduce((acc, s) => { if (!acc[s.jobType]) acc[s.jobType] = []; acc[s.jobType].push(s); return acc; }, {});
@@ -3186,7 +3685,7 @@ function SalaryTab({ sals, avgSalary, co, uName, plan, onAddSalary, isAdmin, adm
         <div style={{ display:"flex", gap:20, flexWrap:"wrap", padding:"14px 0", borderBottom:"1px solid " + C.border, marginBottom:16 }}>
           <div style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:4, minWidth:80, paddingRight:18, borderRight:"1px solid " + C.border }}>
             <div style={{ fontSize:11, color:C.sub, marginBottom:4 }}>平均年収</div>
-            <div style={{ fontSize:36, fontWeight:"bold", color:"#1a5276", lineHeight:1, fontFamily:"serif" }}>{avgSalary}<span style={{ fontSize:13, fontWeight:"normal" }}>万円</span></div>
+            <div style={{ fontSize:36, fontWeight:"bold", color:"#1a5276", lineHeight:1, fontFamily:"'M PLUS Rounded 1c', sans-serif" }}>{avgSalary}<span style={{ fontSize:13, fontWeight:"normal" }}>万円</span></div>
             <div style={{ fontSize:11, color:C.sub, marginTop:4 }}>{sals.length}件</div>
           </div>
           {Object.keys(byJob).length > 0 && (
@@ -3216,6 +3715,11 @@ function SalaryTab({ sals, avgSalary, co, uName, plan, onAddSalary, isAdmin, adm
       </div>
       {form && (
         <div style={{ background:C.surface, border:"1px solid " + C.border, borderTop:"3px solid " + C.accent, padding:"18px 20px", marginBottom:20 }}>
+          {sess && !unlocked && (
+            <div style={{ background:"#FFF8E7", border:"1px solid #FCD34D", borderRadius:8, padding:"10px 14px", marginBottom:14, fontSize:12, color:"#92400E", lineHeight:1.7 }}>
+              🎁 <strong>この投稿で30日間 全コンテンツ閲覧可能になります！</strong>
+            </div>
+          )}
           <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
             <Fld label="職種 *">
               <div style={{ display:"flex", gap:8 }}>
@@ -3303,7 +3807,7 @@ function SalaryTab({ sals, avgSalary, co, uName, plan, onAddSalary, isAdmin, adm
       )}
       {sals.length === 0 && <Empty text="まだ年収情報がありません" />}
       {sals.sort((a,b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)).map((s, idx) => {
-        const isLocked = !sess && idx >= 1;
+        const isLocked = !unlocked && idx >= 1;
         return (
         <div key={s.id} style={{ background:C.surface, border:"1px solid " + C.border, padding:"14px 16px", marginBottom:10, position:"relative", filter: isLocked ? "blur(5px)" : "none", pointerEvents: isLocked ? "none" : "auto", userSelect: isLocked ? "none" : "auto" }}>
           {isAdmin && (
@@ -3314,7 +3818,7 @@ function SalaryTab({ sals, avgSalary, co, uName, plan, onAddSalary, isAdmin, adm
           )}
           <div style={{ display:"flex", justifyContent:"space-between", flexWrap:"wrap", gap:8, marginBottom:10 }}>
             <div>
-              <div style={{ fontSize:22, fontWeight:"bold", color:"#1a5276", fontFamily:"serif", marginBottom:4 }}>{s.annualSalary}<span style={{ fontSize:13, fontWeight:"normal", color:C.sub }}>万円/年</span></div>
+              <div style={{ fontSize:22, fontWeight:"bold", color:"#1a5276", fontFamily:"'M PLUS Rounded 1c', sans-serif", marginBottom:4 }}>{s.annualSalary}<span style={{ fontSize:13, fontWeight:"normal", color:C.sub }}>万円/年</span></div>
               {[s.jobType, s.position, s.ageRange, s.empType].filter(Boolean).map(t => (
                 <span key={t} style={{ fontSize:11, color:C.sub, border:"1px solid " + C.border, padding:"1px 6px", marginRight:4 }}>{t}</span>
               ))}
@@ -3355,11 +3859,12 @@ function SalaryTab({ sals, avgSalary, co, uName, plan, onAddSalary, isAdmin, adm
           {s.comment && <p style={{ fontSize:13, lineHeight:1.85, borderTop:"1px solid " + C.border, paddingTop:10, marginTop:8 }}>{s.comment}</p>}
           <div style={{ display:"flex", alignItems:"center", gap:8, marginTop:10, paddingTop:10, borderTop:"1px solid " + C.border }}>
             <AC>{ini(s.author)}</AC><span style={{ fontSize:12, color:C.sub }}>{s.author}</span>
+            {getAuthorBadge && getAuthorBadge(s.authorUid) && <BadgeChip badge={getAuthorBadge(s.authorUid)} small />}
           </div>
         </div>
         );
       })}
-      {!sess && sals.length > 1 && <LockedContent setAuthMode={setAuthMode} count={sals.length - 1} type="年収情報" />}
+      {!unlocked && sals.length > 1 && <LockedContent setAuthMode={setAuthMode} count={sals.length - 1} type="年収情報" sess={sess} />}
     </div>
   );
 }
@@ -3432,7 +3937,7 @@ function JobsTab({ jobs, co, uName, onAddJob, isAdmin, adminDelete, setEditTgt }
             )}
             <div style={{ display:"flex", justifyContent:"space-between", flexWrap:"wrap", gap:8, marginBottom:10 }}>
               <div>
-                <h3 style={{ fontSize:15, fontWeight:"bold", marginBottom:6, fontFamily:"serif" }}>{j.title}</h3>
+                <h3 style={{ fontSize:15, fontWeight:"bold", marginBottom:6, fontFamily:"'M PLUS Rounded 1c', sans-serif" }}>{j.title}</h3>
                 <div style={{ display:"flex", flexWrap:"wrap", gap:4 }}>
                   {[j.jobType, j.empType, j.location].filter(Boolean).map(t => (
                     <span key={t} style={{ fontSize:11, color:C.sub, border:"1px solid " + C.border, padding:"1px 8px" }}>{t}</span>
@@ -3515,7 +4020,7 @@ function RankingPage({ go, companies, coPosts, coRevs, coSals, isMobile }) {
         <tbody>
           {sorted.map((co, i) => (
             <tr key={co.id} style={{ ...S.tableRow, cursor:"pointer" }} onClick={() => go("company", co)}>
-              <td style={S.td}><span style={{ fontSize:15, fontWeight:"bold", color: i < 3 ? C.accent : "#bbb", fontFamily:"serif" }}>{i + 1}</span></td>
+              <td style={S.td}><span style={{ fontSize:15, fontWeight:"bold", color: i < 3 ? C.accent : "#bbb", fontFamily:"'M PLUS Rounded 1c', sans-serif" }}>{i + 1}</span></td>
               <td style={S.td}><span style={{ fontSize:16, marginRight:8 }}>{co.emoji}</span><span style={{ fontWeight:"bold", fontSize:13 }}>{co.name}</span></td>
               {!isMobile && <td style={{ ...S.td, fontSize:12, color:C.sub }}>{co.industry}</td>}
               <td style={{ ...S.td, textAlign:"center" }}>
@@ -3563,7 +4068,7 @@ function PricingPage({ sess, go, setAuthMode, plan, upgradePlan, isMobile }) {
         <div style={{ display:"flex", gap:4, alignItems:"center", justifyContent:"center", marginBottom:6 }}>
           {countdown.map(([n,l], i) => (
             <span key={l} style={{ display:"inline-flex", flexDirection:"column", alignItems:"center" }}>
-              <span style={{ background:"rgba(255,255,255,0.2)", fontWeight:"bold", fontFamily:"serif", fontSize:20, minWidth:34, textAlign:"center", padding:"3px 0", display:"block" }}>{pad(n)}</span>
+              <span style={{ background:"rgba(255,255,255,0.2)", fontWeight:"bold", fontFamily:"'M PLUS Rounded 1c', sans-serif", fontSize:20, minWidth:34, textAlign:"center", padding:"3px 0", display:"block" }}>{pad(n)}</span>
               <span style={{ fontSize:9, marginTop:2 }}>{l}</span>
             </span>
           ))}
@@ -3590,11 +4095,11 @@ function PricingPage({ sess, go, setAuthMode, plan, upgradePlan, isMobile }) {
               <div style={{ borderTop:"3px solid " + pl.color, padding:"18px 20px 14px" }}>
                 <div style={{ fontSize:10, fontWeight:"bold", color:pl.color, letterSpacing:"0.1em", marginBottom:5 }}>{pl.name.toUpperCase()}</div>
                 {pl.price === 0
-                  ? <div style={{ fontSize:24, fontWeight:"bold", fontFamily:"serif", marginBottom:4 }}>無料</div>
+                  ? <div style={{ fontSize:24, fontWeight:"bold", fontFamily:"'M PLUS Rounded 1c', sans-serif", marginBottom:4 }}>無料</div>
                   : (
                     <div style={{ marginBottom:4 }}>
                       <div style={{ display:"flex", alignItems:"baseline", gap:6 }}>
-                        <span style={{ fontSize:24, fontWeight:"bold", fontFamily:"serif", color:C.accent }}>{"¥" + disp.toLocaleString()}</span>
+                        <span style={{ fontSize:24, fontWeight:"bold", fontFamily:"'M PLUS Rounded 1c', sans-serif", color:C.accent }}>{"¥" + disp.toLocaleString()}</span>
                         <span style={{ fontSize:12, color:C.sub }}>/月</span>
                         <span style={{ fontSize:12, color:"#bbb", textDecoration:"line-through" }}>{"¥" + base.toLocaleString()}</span>
                       </div>
@@ -3699,7 +4204,7 @@ function AddCompanyPage({ go, onSubmit, uName, authUser, setAuthMode }) {
 }
 
 // ─── マイページ ───────────────────────────────────────────────────────────────
-function MyPage({ sess, go, companies, plan, upgradePlan, isMobile, diary, saveDiary, myPosts, myRevs, favPosts, favorites }) {
+function MyPage({ sess, go, companies, plan, upgradePlan, isMobile, diary, saveDiary, myPosts, myRevs, favPosts, favorites, profile, updateNotifications, markNotificationRead, clearNotifications, toggleFollowCompany }) {
   const [mTab, setMTab] = useState("activity");
   const pl = PLANS[plan];
 
@@ -3742,6 +4247,55 @@ function MyPage({ sess, go, companies, plan, upgradePlan, isMobile, diary, saveD
             {plan !== "premium" && <button style={{ ...S.textLink, fontSize:11, marginLeft:8 }} onClick={() => go("pricing")}>変更 →</button>}
           </div>
           <div style={{ padding:"12px 14px" }}>
+            {/* 投稿者バッジ */}
+            {(() => {
+              const totalPosts = (profile && profile.postCount) || 0;
+              const myBadge = getBadge(totalPosts);
+              const nextBadge = BADGES.slice().reverse().find(b => b.min > totalPosts);
+              return (
+                <div style={{ marginBottom:12, padding:"10px 12px", background: myBadge ? myBadge.bg : "#F5F8FC", borderRadius:8, border:"1px solid " + (myBadge ? myBadge.color + "33" : C.border) }}>
+                  <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:6 }}>
+                    <span style={{ fontSize:24 }}>{myBadge ? myBadge.emoji : "🌱"}</span>
+                    <div>
+                      <div style={{ fontSize:13, fontWeight:"bold", color: myBadge ? myBadge.color : C.sub }}>
+                        {myBadge ? myBadge.name + "ランク" : "未投稿"}
+                      </div>
+                      <div style={{ fontSize:10, color:C.sub }}>累計 {totalPosts}件 投稿</div>
+                    </div>
+                  </div>
+                  {nextBadge && (
+                    <div style={{ fontSize:10, color:C.sub }}>
+                      {nextBadge.name}まで あと <strong>{nextBadge.min - totalPosts}件</strong>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+            {/* 閲覧権ステータス */}
+            {(() => {
+              const unlock = (profile && profile.viewUnlockUntil) || 0;
+              const remain = Math.max(0, Math.floor((unlock - Date.now()) / 86400000));
+              return (
+                <div style={{ marginBottom:12, padding:"8px 12px", background: remain > 0 ? "#F0FDF4" : "#FFF8E7", borderRadius:6, fontSize:11, color: remain > 0 ? "#166534" : "#92400E", border:"1px solid " + (remain > 0 ? "#BBF7D0" : "#FCD34D") }}>
+                  {remain > 0
+                    ? <><strong>🔓 全閲覧権 残り{remain}日</strong><br /><span style={{ fontSize:10 }}>すべての投稿が閲覧可能です</span></>
+                    : <><strong>🔒 閲覧権なし</strong><br /><span style={{ fontSize:10 }}>投稿1件で30日間 全コンテンツ閲覧可能</span></>
+                  }
+                </div>
+              );
+            })()}
+            {/* もらったいいね数 */}
+            {(() => {
+              const totalLikes = myPosts.reduce((sum, p) => sum + ((p.likes || []).length), 0)
+                              + myRevs.reduce((sum, r) => sum + ((r.likes || []).length), 0);
+              if (totalLikes === 0) return null;
+              return (
+                <div style={{ marginBottom:12, padding:"10px 12px", background:"#FEE2E2", border:"1px solid #FCA5A5", borderRadius:8 }}>
+                  <div style={{ fontSize:11, color:"#991B1B", marginBottom:2 }}>あなたの投稿が獲得した</div>
+                  <div style={{ fontSize:18, fontWeight:"bold", color:"#DC2626" }}>❤️ {totalLikes} いいね</div>
+                </div>
+              );
+            })()}
             {[["体験談", myPosts.length + "件"],["口コミ", myRevs.length + "件"],["お気に入り", (favorites||[]).length + "件"],["日記", diary.length + "件"]].map(([l,v]) => (
               <div key={l} style={{ display:"flex", justifyContent:"space-between", padding:"5px 0", borderBottom:"1px solid " + C.border, fontSize:12 }}>
                 <span style={{ color:C.sub }}>{l}</span><span style={{ fontWeight:"bold" }}>{v}</span>
@@ -3756,7 +4310,7 @@ function MyPage({ sess, go, companies, plan, upgradePlan, isMobile, diary, saveD
         </div>
         <div>
           <div style={{ display:"flex", borderBottom:"2px solid " + C.ink, marginBottom:14 }}>
-            {[["activity","投稿履歴"],["favorites","お気に入り"],["diary","就活日記"]].map(([k,l]) => (
+            {[["activity","投稿履歴"],["favorites","お気に入り"],["notifications", "🔔 通知" + (((profile?.unreadNotifications || []).filter(n => !n.read).length > 0) ? ` (${(profile?.unreadNotifications || []).filter(n => !n.read).length})` : "")],["diary","就活日記"],["settings","⚙ 設定"]].map(([k,l]) => (
               <button key={k} style={{ background:"none", border:"none", padding:"9px 14px", fontSize:12, fontFamily:"inherit", cursor:"pointer", color: mTab===k ? C.accent : C.sub, borderBottom:"3px solid " + (mTab===k ? C.accent : "transparent"), marginBottom:-2, fontWeight: mTab===k ? "bold" : "500" }} onClick={() => setMTab(k)}>{l}</button>
             ))}
           </div>
@@ -3807,6 +4361,130 @@ function MyPage({ sess, go, companies, plan, upgradePlan, isMobile, diary, saveD
               }
             </div>
           )}
+          {mTab === "notifications" && (
+            <div>
+              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:14, paddingBottom:10, borderBottom:"1px solid " + C.border }}>
+                <span style={{ fontSize:12, color:C.sub }}>{(profile?.unreadNotifications || []).length}件の通知</span>
+                {(profile?.unreadNotifications || []).length > 0 && (
+                  <button style={{ ...S.secondaryBtn, fontSize:11, padding:"5px 12px" }} onClick={() => clearNotifications && clearNotifications()}>すべてクリア</button>
+                )}
+              </div>
+              {(profile?.unreadNotifications || []).length === 0
+                ? <Empty text="通知はありません" />
+                : (profile?.unreadNotifications || []).map(n => {
+                    const co = companies.find(c => (c.id === n.coId));
+                    const icons = { comment:"💬", reply:"↩️", milestone:"🎉", follow:"⭐", weekly:"📊" };
+                    return (
+                      <div key={n.id} style={{
+                        background: n.read ? "#fff" : "#FFFBEB",
+                        border:"1px solid " + (n.read ? C.border : "#FCD34D"),
+                        borderRadius:8,
+                        padding:"12px 14px",
+                        marginBottom:8,
+                        cursor:"pointer"
+                      }} onClick={() => {
+                        markNotificationRead && markNotificationRead(n.id);
+                        if (n.postId) {
+                          const post = (window._posts || []).find(p => p.id === n.postId);
+                          if (post) go("company", companies.find(c => c.id === post.companyId));
+                        }
+                      }}>
+                        <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:4 }}>
+                          <span style={{ fontSize:18 }}>{icons[n.type] || "🔔"}</span>
+                          <span style={{ fontSize:13, fontWeight:"bold", color:C.ink }}>
+                            {n.type === "comment" && `${n.fromUser}さんがコメントしました`}
+                            {n.type === "reply" && `${n.fromUser}さんが返信しました`}
+                            {n.type === "milestone" && n.content}
+                            {n.type === "follow" && `フォロー中の「${n.coName}」に新しい投稿`}
+                            {n.type === "weekly" && "週次レポート"}
+                          </span>
+                          {!n.read && <span style={{ background:"#DC2626", color:"#fff", fontSize:9, padding:"1px 6px", borderRadius:8, fontWeight:"bold" }}>NEW</span>}
+                          <span style={{ fontSize:10, color:C.sub, marginLeft:"auto" }}>{new Date(n.ts).toLocaleString("ja-JP", { month:"numeric", day:"numeric", hour:"2-digit", minute:"2-digit" })}</span>
+                        </div>
+                        {n.postTitle && <div style={{ fontSize:11, color:C.sub, marginBottom:4 }}>「{n.postTitle}」</div>}
+                        {n.content && n.type !== "milestone" && <div style={{ fontSize:12, color:C.ink, lineHeight:1.7 }}>{n.content}</div>}
+                      </div>
+                    );
+                  })
+              }
+            </div>
+          )}
+          {mTab === "settings" && (
+            <div>
+              <STitle label="通知設定" />
+              <div style={{ background:"#fff", border:"1px solid " + C.border, borderRadius:8, padding:"16px 18px", marginBottom:18 }}>
+                <p style={{ fontSize:12, color:C.sub, marginBottom:14, lineHeight:1.7 }}>
+                  通知が不要な項目はオフにできます。サイト内通知は常に表示されます（重要な通知のみ）。
+                </p>
+                {[
+                  ["email",       "📧 メール通知を受け取る",      "オフにすると、すべてのメール通知が止まります"],
+                  ["comments",    "💬 自分の投稿へのコメント",   "コメント・返信があった時に通知"],
+                  ["likes",       "❤️ 投稿のマイルストーン",     "10/50/100いいね到達時に通知"],
+                  ["weeklyDigest","📊 週次ダイジェスト",         "週1回、自分の投稿の反応をまとめてお知らせ"],
+                  ["followedCos", "⭐ フォロー中の企業の新着",    "フォローした企業に新しい投稿があった時に通知"],
+                ].map(([key, label, desc]) => {
+                  const checked = (profile?.notifications || {})[key] !== false;
+                  return (
+                    <div key={key} style={{ display:"flex", alignItems:"flex-start", gap:14, padding:"12px 0", borderBottom:"1px solid " + C.border }}>
+                      <label style={{ display:"flex", alignItems:"center", cursor:"pointer", marginTop:2 }}>
+                        <input type="checkbox" checked={checked} onChange={e => {
+                          const newSettings = { ...(profile?.notifications || {}), [key]: e.target.checked };
+                          updateNotifications && updateNotifications(newSettings);
+                        }} style={{ width:18, height:18, cursor:"pointer" }} />
+                      </label>
+                      <div style={{ flex:1 }}>
+                        <div style={{ fontSize:13, fontWeight:"bold", color:C.ink, marginBottom:2 }}>{label}</div>
+                        <div style={{ fontSize:11, color:C.sub, lineHeight:1.6 }}>{desc}</div>
+                      </div>
+                    </div>
+                  );
+                })}
+                <div style={{ marginTop:14, padding:"10px 12px", background:"#F0F9FF", border:"1px solid #BAE6FD", borderRadius:6, fontSize:11, color:"#0C4A6E", lineHeight:1.7 }}>
+                  💡 通知メールには「通知を停止する」リンクが含まれています。メールから直接オフにすることもできます。
+                </div>
+              </div>
+
+              <STitle label="フォロー中の企業" />
+              <div style={{ background:"#fff", border:"1px solid " + C.border, borderRadius:8, padding:"16px 18px" }}>
+                {(profile?.followedCompanies || []).length === 0
+                  ? <p style={{ fontSize:12, color:C.sub, textAlign:"center", padding:"12px 0" }}>まだフォローしている企業はありません。<br />企業ページの「⭐ フォロー」ボタンで追加できます。</p>
+                  : (profile?.followedCompanies || []).map(coId => {
+                      const co = companies.find(c => c.id === coId);
+                      if (!co) return null;
+                      return (
+                        <div key={coId} style={{ display:"flex", alignItems:"center", gap:10, padding:"8px 0", borderBottom:"1px solid " + C.border }}>
+                          <span style={{ fontSize:18 }}>{co.emoji || "🏢"}</span>
+                          <span style={{ flex:1, fontSize:13, fontWeight:"bold", color:C.ink, cursor:"pointer" }} onClick={() => go("company", co)}>{co.name}</span>
+                          <button style={{ ...S.secondaryBtn, fontSize:11, padding:"4px 10px" }} onClick={() => toggleFollowCompany && toggleFollowCompany(coId)}>解除</button>
+                        </div>
+                      );
+                    })
+                }
+              </div>
+
+              {/* 連続投稿日数 */}
+              {profile?.streak > 0 && (
+                <>
+                  <div style={{ marginTop:18 }} />
+                  <STitle label="連続投稿記録" />
+                  <div style={{ background:"#fff", border:"1px solid " + C.border, borderRadius:8, padding:"16px 18px", display:"flex", alignItems:"center", gap:14 }}>
+                    {(() => {
+                      const sb = getStreakBadge(profile.streak);
+                      return (
+                        <>
+                          <span style={{ fontSize:36 }}>{sb ? sb.emoji : "🌱"}</span>
+                          <div>
+                            <div style={{ fontSize:18, fontWeight:"bold", color: sb ? sb.color : C.sub }}>{profile.streak}日連続</div>
+                            <div style={{ fontSize:11, color:C.sub }}>{sb ? sb.name + "バッジ獲得中" : "投稿を続けるとバッジが獲得できます"}</div>
+                          </div>
+                        </>
+                      );
+                    })()}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -3850,7 +4528,7 @@ function DiarySection({ entries, onSave }) {
         <div key={e.id} style={{ ...S.cardItem, cursor:"default" }}>
           <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:8 }}>
             <span style={{ fontSize:20 }}>{e.mood}</span>
-            <span style={{ fontWeight:"bold", fontSize:14, fontFamily:"serif", flex:1 }}>{e.title}</span>
+            <span style={{ fontWeight:"bold", fontSize:14, fontFamily:"'M PLUS Rounded 1c', sans-serif", flex:1 }}>{e.title}</span>
             <span style={{ fontSize:11, color:C.sub }}>{e.date}</span>
             <button style={{ background:"none", border:"1px solid #FAA", padding:"3px 8px", fontSize:11, cursor:"pointer", fontFamily:"inherit", color:"#C00", marginLeft:4 }} onClick={() => onSave(entries.filter(x => x.id !== e.id))}>削除</button>
           </div>
@@ -3929,7 +4607,7 @@ function AnalyticsPage({ companies, posts, reviews, salaries, isMobile }) {
         {[["投稿数",posts.length],["口コミ数",reviews.length],["年収情報",salaries.length],["掲載企業",companies.length],["今週の投稿",weekPosts]].map(([l,v],i) => (
           <div key={l} style={{ padding:"12px 14px", background:C.surface, textAlign:"center", ...(i > 0 ? { borderLeft:"1px solid " + C.border } : {}) }}>
             <div style={{ fontSize:11, color:C.sub, marginBottom:5 }}>{l}</div>
-            <div style={{ fontSize:22, fontWeight:"bold", color:C.accent, fontFamily:"serif" }}>{v}</div>
+            <div style={{ fontSize:22, fontWeight:"bold", color:C.accent, fontFamily:"'M PLUS Rounded 1c', sans-serif" }}>{v}</div>
           </div>
         ))}
       </div>
@@ -4002,7 +4680,7 @@ function PostCard({ post, co, go, isAdmin, onDelete, onEdit }) {
         <StageBadge s={post.stage} />
         <span style={{ fontSize:10, color:C.sub, marginLeft:"auto" }}>{ago(post.createdAt)}</span>
       </div>
-      <h3 style={{ fontSize:14, fontWeight:"bold", marginBottom:6, lineHeight:1.5, fontFamily:"serif" }}>{post.title}</h3>
+      <h3 style={{ fontSize:14, fontWeight:"bold", marginBottom:6, lineHeight:1.5, fontFamily:"'M PLUS Rounded 1c', sans-serif" }}>{post.title}</h3>
       <p style={{ fontSize:12, color:C.sub, lineHeight:1.8, marginBottom:8 }}>{post.content && post.content.slice(0, 90)}{post.content && post.content.length > 90 ? "..." : ""}</p>
       <div style={{ display:"flex", alignItems:"center", gap:8, borderTop:"1px solid " + C.border, paddingTop:8 }}>
         <AC>{ini(post.author)}</AC>
@@ -4022,7 +4700,7 @@ function STitle({ label }) {
 function PageHeader({ title, desc }) {
   return (
     <div style={{ borderTop:"3px solid " + C.ink, paddingTop:14, marginBottom:20 }}>
-      <h1 style={{ fontSize:"clamp(18px,3vw,26px)", fontWeight:"bold", fontFamily:"serif" }}>{title}</h1>
+      <h1 style={{ fontSize:"clamp(18px,3vw,26px)", fontWeight:"bold", fontFamily:"'M PLUS Rounded 1c', sans-serif" }}>{title}</h1>
       {desc && <p style={{ color:C.sub, marginTop:6, fontSize:12 }}>{desc}</p>}
     </div>
   );
@@ -4044,31 +4722,44 @@ function AccessDenied({ go }) {
   return (
     <div style={{ textAlign:"center", padding:"72px 20px" }}>
       <div style={{ fontSize:44, marginBottom:14 }}>🔒</div>
-      <h2 style={{ fontSize:18, fontWeight:"bold", fontFamily:"serif", marginBottom:10 }}>アクセス権限がありません</h2>
+      <h2 style={{ fontSize:18, fontWeight:"bold", fontFamily:"'M PLUS Rounded 1c', sans-serif", marginBottom:10 }}>アクセス権限がありません</h2>
       <p style={{ fontSize:13, color:C.sub, marginBottom:20, lineHeight:1.8 }}>このページは管理者のみが閲覧できます。</p>
       <button style={S.primaryBtn} onClick={() => go("home")}>トップに戻る</button>
     </div>
   );
 }
-function BoardLockedNotice({ setAuthMode, count, type }) {
+function BoardLockedNotice({ setAuthMode, count, type, sess }) {
   return (
     <div style={{
       background:"#fff",
       border:"2px solid " + C.accent,
-      borderRadius:8,
+      borderRadius:12,
       padding:"24px 28px",
       marginBottom:16,
-      boxShadow:"0 4px 16px rgba(30,90,150,0.12)"
+      boxShadow:"0 4px 16px rgba(43,123,209,0.12)"
     }}>
       <div style={{ display:"flex", alignItems:"center", gap:14, marginBottom:14, flexWrap:"wrap" }}>
-        <div style={{ fontSize:32 }}>🔒</div>
+        <div style={{ fontSize:32 }}>🔓</div>
         <div style={{ flex:1, minWidth:200 }}>
-          <h3 style={{ fontSize:15, fontWeight:"bold", color:C.ink, marginBottom:4 }}>
-            {type}を見るには無料会員登録が必要です
-          </h3>
-          <p style={{ fontSize:12, color:C.sub, lineHeight:1.7 }}>
-            登録済みの<strong style={{ color:C.accent }}>{count}件</strong>の投稿が閲覧できます。メールアドレスだけで30秒で完了します。
-          </p>
+          {!sess ? (
+            <>
+              <h3 style={{ fontSize:15, fontWeight:"bold", color:C.ink, marginBottom:4 }}>
+                {type}を見るには無料会員登録が必要です
+              </h3>
+              <p style={{ fontSize:12, color:C.sub, lineHeight:1.7 }}>
+                登録済みの<strong style={{ color:C.accent }}>{count}件</strong>の投稿が閲覧できます。
+              </p>
+            </>
+          ) : (
+            <>
+              <h3 style={{ fontSize:15, fontWeight:"bold", color:C.ink, marginBottom:4 }}>
+                投稿すると30日間 見放題！
+              </h3>
+              <p style={{ fontSize:12, color:C.sub, lineHeight:1.7 }}>
+                体験談・口コミなどを<strong style={{ color:C.accent }}>1件投稿</strong>するだけで、登録済みの{count}件すべてが閲覧可能になります。
+              </p>
+            </>
+          )}
         </div>
       </div>
       <div style={{ display:"flex", gap:8, flexWrap:"wrap", marginBottom:14 }}>
@@ -4076,23 +4767,326 @@ function BoardLockedNotice({ setAuthMode, count, type }) {
           <span key={t} style={{ background:C.light, color:C.accent, padding:"4px 10px", fontSize:11, borderRadius:14, fontWeight:"bold" }}>{t}</span>
         ))}
       </div>
-      <button style={{
-        background:C.accent, color:"#fff", border:"none",
-        padding:"12px 28px", fontSize:14, fontWeight:"bold",
-        fontFamily:"inherit", cursor:"pointer", borderRadius:6,
-        width:"100%",
-        boxShadow:"0 2px 8px rgba(30,90,150,0.3)"
-      }} onClick={() => setAuthMode("register")}>
-        閲覧する（無料会員登録）→
-      </button>
-      <div style={{ fontSize:11, color:C.sub, marginTop:8, textAlign:"center" }}>
-        すでに会員の方は <button style={{...S.textLink, fontSize:11}} onClick={() => setAuthMode("login")}>ログイン</button>
+      {!sess ? (
+        <>
+          <button style={{
+            background:C.accent, color:"#fff", border:"none",
+            padding:"12px 28px", fontSize:14, fontWeight:"bold",
+            fontFamily:"inherit", cursor:"pointer", borderRadius:30,
+            width:"100%",
+            boxShadow:"0 2px 8px rgba(43,123,209,0.3)"
+          }} onClick={() => setAuthMode("register")}>
+            閲覧する（無料会員登録）→
+          </button>
+          <div style={{ fontSize:11, color:C.sub, marginTop:8, textAlign:"center" }}>
+            すでに会員の方は <button style={{...S.textLink, fontSize:11}} onClick={() => setAuthMode("login")}>ログイン</button>
+          </div>
+        </>
+      ) : (
+        <div style={{ background:"#FFF8E7", border:"1px solid #FCD34D", borderRadius:8, padding:"10px 14px", fontSize:12, color:"#92400E", textAlign:"center" }}>
+          🎁 体験談を1件投稿で<strong>30日間 全コンテンツ閲覧可能</strong>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PopularPosters({ posts, reviews }) {
+  // 投稿者ごとのもらったいいね数を集計
+  const likeCounts = {};
+  const names = {};
+  [...posts, ...reviews].forEach(item => {
+    const uid = item.authorUid;
+    if (!uid) return;
+    const lk = (item.likes || []).length;
+    likeCounts[uid] = (likeCounts[uid] || 0) + lk;
+    if (item.author) names[uid] = item.author;
+  });
+  const ranked = Object.entries(likeCounts)
+    .filter(([_, c]) => c > 0)
+    .map(([uid, c]) => ({ uid, count:c, name:names[uid] || "ユーザー" }))
+    .sort((a,b) => b.count - a.count)
+    .slice(0, 5);
+
+  if (ranked.length === 0) return null;
+  return (
+    <div style={{ background:"#fff", border:"1px solid " + C.border, borderRadius:8, padding:"16px 18px", marginTop:16 }}>
+      <h3 style={{ fontSize:14, fontWeight:"bold", marginBottom:12, color:C.ink, paddingBottom:8, borderBottom:"2px solid #DC2626" }}>
+        ❤️ 人気投稿者ランキング
+      </h3>
+      {ranked.map((u, i) => (
+        <div key={u.uid} style={{ display:"flex", alignItems:"center", gap:8, padding:"6px 0", borderBottom: i < ranked.length - 1 ? "1px solid " + C.border : "none" }}>
+          <span style={{ fontSize:13, fontWeight:"bold", width:18, color: i < 3 ? "#DC2626" : C.sub }}>{i + 1}.</span>
+          <span style={{ flex:1, fontSize:12, color:C.ink, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{u.name}</span>
+          <span style={{ fontSize:11, fontWeight:"bold", color:"#DC2626" }}>❤️ {u.count}</span>
+        </div>
+      ))}
+      <div style={{ marginTop:8, paddingTop:8, borderTop:"1px solid " + C.border, fontSize:10, color:C.sub, lineHeight:1.6 }}>
+        投稿の累計いいね数で集計
       </div>
     </div>
   );
 }
 
-function LockedContent({ setAuthMode, count, type }) {
+function TopContributors({ posts, reviews, salaries }) {
+  // 月初からの集計
+  const monthStart = new Date();
+  monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0);
+  const monthMs = monthStart.getTime();
+
+  const counts = {};
+  const names = {};
+  [...posts, ...reviews, ...salaries].forEach(item => {
+    const ts = item.createdAt?.toDate?.()?.getTime() || 0;
+    if (ts < monthMs || !item.authorUid) return;
+    counts[item.authorUid] = (counts[item.authorUid] || 0) + 1;
+    if (item.author) names[item.authorUid] = item.author;
+  });
+  const ranked = Object.entries(counts)
+    .map(([uid, c]) => ({ uid, count:c, name:names[uid] || "ユーザー" }))
+    .sort((a,b) => b.count - a.count)
+    .slice(0, 5);
+
+  return (
+    <div style={{ background:"#fff", border:"1px solid " + C.border, borderRadius:8, padding:"16px 18px" }}>
+      <h3 style={{ fontSize:14, fontWeight:"bold", marginBottom:12, color:C.ink, paddingBottom:8, borderBottom:"2px solid #F59E0B" }}>
+        🏆 今月の貢献者ランキング
+      </h3>
+      {ranked.length === 0
+        ? <p style={{ fontSize:11, color:C.sub, padding:"8px 0" }}>今月の投稿者はまだいません</p>
+        : ranked.map((u, i) => {
+            const badge = getBadge(u.count);
+            return (
+              <div key={u.uid} style={{ display:"flex", alignItems:"center", gap:8, padding:"6px 0", borderBottom: i < ranked.length - 1 ? "1px solid " + C.border : "none" }}>
+                <span style={{ fontSize:13, fontWeight:"bold", width:18, color: i < 3 ? C.accent : C.sub }}>{i + 1}.</span>
+                <span style={{ flex:1, fontSize:12, color:C.ink, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{u.name}</span>
+                {badge && <BadgeChip badge={badge} small />}
+                <span style={{ fontSize:11, fontWeight:"bold", color:C.accent }}>{u.count}件</span>
+              </div>
+            );
+          })
+      }
+      <div style={{ marginTop:10, paddingTop:8, borderTop:"1px solid " + C.border, fontSize:10, color:C.sub, lineHeight:1.6 }}>
+        投稿数に応じてバッジ獲得：<br />
+        🥉ブロンズ(1+) 🥈シルバー(5+) 🥇ゴールド(20+) 💎プラチナ(50+)
+      </div>
+    </div>
+  );
+}
+
+function AISummary({ posts, reviews, type }) {
+  const items = type === "interview" ? posts.filter(p => p.ptype === "interview") : reviews;
+  if (items.length < 3) return null;
+
+  // 主要ポイント抽出（簡易版）
+  let summaryPoints = [];
+  if (type === "interview") {
+    // 段階数の中央値
+    const stageCounts = items.map(i => (i.stages || []).length).filter(n => n > 0).sort((a,b) => a - b);
+    const medianStages = stageCounts[Math.floor(stageCounts.length / 2)] || 0;
+    // 最終結果の分布
+    const results = items.filter(i => i.finalResult);
+    const offerRate = results.filter(i => i.finalResult === "内定" || i.finalResult === "内定辞退").length;
+    // 応募方法の上位
+    const methods = {};
+    items.forEach(i => { if (i.applyMethod) methods[i.applyMethod] = (methods[i.applyMethod] || 0) + 1; });
+    const topMethod = Object.entries(methods).sort((a,b) => b[1] - a[1])[0];
+    // オファー金額の中央値
+    const offers = items.map(i => Number(i.offerAmount) || 0).filter(n => n > 0).sort((a,b) => a - b);
+    const medianOffer = offers[Math.floor(offers.length / 2)];
+
+    if (medianStages) summaryPoints.push(`選考は平均 **${medianStages}段階** で構成されています`);
+    if (results.length > 2) summaryPoints.push(`内定到達率は約 **${Math.round(offerRate / results.length * 100)}%**（${results.length}件中${offerRate}件）`);
+    if (topMethod) summaryPoints.push(`最も多い応募経路は **${topMethod[0]}**（${topMethod[1]}件）`);
+    if (medianOffer) summaryPoints.push(`提示年収の中央値は **${medianOffer}万円**`);
+  } else if (type === "review") {
+    // 退職検討理由トップ3
+    const reasons = {};
+    items.forEach(i => { if (i.quitReason && i.quitReason !== "退職検討なし") reasons[i.quitReason] = (reasons[i.quitReason] || 0) + 1; });
+    const topReasons = Object.entries(reasons).sort((a,b) => b[1] - a[1]).slice(0, 3);
+    // 平均残業
+    const overtimes = items.map(i => i.overtimeBucket).filter(Boolean);
+    const otCounts = {};
+    overtimes.forEach(o => { otCounts[o] = (otCounts[o] || 0) + 1; });
+    const topOT = Object.entries(otCounts).sort((a,b) => b[1] - a[1])[0];
+    // 上位ポイント
+    const allRats = items.flatMap(i => Object.entries(i.rats || {})).filter(([k,v]) => v >= 4);
+    const ratCounts = {};
+    allRats.forEach(([k]) => { ratCounts[k] = (ratCounts[k] || 0) + 1; });
+    const topRat = Object.entries(ratCounts).sort((a,b) => b[1] - a[1])[0];
+    const ratLabels = { motivation:"働きがい", morale:"社員のやる気", relations:"同僚・上司との関係", white:"ホワイト度", growth:"成長環境", wlb:"ワークライフバランス", salary:"待遇・給与", mgmt:"経営の安定性" };
+
+    if (topRat) summaryPoints.push(`高評価が多い項目は **${ratLabels[topRat[0]]}**（${topRat[1]}件で4以上の評価）`);
+    if (topOT) summaryPoints.push(`月間残業時間で最も多いゾーンは **${topOT[0]}**`);
+    if (topReasons.length > 0) summaryPoints.push(`退職検討理由のトップは **${topReasons.map(([r,c]) => `${r}（${c}件）`).join("、")}**`);
+  }
+
+  if (summaryPoints.length === 0) return null;
+
+  return (
+    <div style={{
+      background:"linear-gradient(135deg, #EFF6FF 0%, #FEF3C7 100%)",
+      border:"1px solid #BFDBFE",
+      borderRadius:8,
+      padding:"14px 16px",
+      marginBottom:14,
+    }}>
+      <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:10 }}>
+        <span style={{ fontSize:20 }}>🤖</span>
+        <span style={{ fontSize:13, fontWeight:"bold", color:"#1E40AF" }}>AIによる投稿の傾向まとめ</span>
+        <span style={{ fontSize:10, background:"#1E40AF", color:"#fff", padding:"1px 6px", borderRadius:8, marginLeft:"auto" }}>{items.length}件分析</span>
+      </div>
+      <ul style={{ listStyle:"none", padding:0, margin:0 }}>
+        {summaryPoints.map((p, i) => (
+          <li key={i} style={{ fontSize:12, color:C.ink, padding:"4px 0", lineHeight:1.7, display:"flex", gap:6 }}>
+            <span style={{ color:"#1E40AF" }}>▸</span>
+            <span dangerouslySetInnerHTML={{ __html: p.replace(/\*\*(.+?)\*\*/g, '<strong style="color:#1E40AF">$1</strong>') }} />
+          </li>
+        ))}
+      </ul>
+      <p style={{ fontSize:10, color:C.sub, marginTop:8, fontStyle:"italic" }}>
+        ※ 投稿の自動集計に基づく傾向です。最新3件のみ表示しています。
+      </p>
+    </div>
+  );
+}
+
+function CommentThread({ post, uName, authUserKey, authUser, isAdmin, onAddComment, adminDelete, getAuthorBadge }) {
+  const [cmt, setCmt] = React.useState("");
+  const [replyTo, setReplyTo] = React.useState(null); // 返信先のコメントID
+  const [replyText, setReplyText] = React.useState("");
+
+  const comments = post.comments || [];
+  // 親 = parentId なし、子 = parentId あり
+  const tops = comments.filter(c => !c.parentId);
+  const childrenOf = (id) => comments.filter(c => c.parentId === id);
+
+  const handleSubmit = async (parentId) => {
+    const text = parentId ? replyText : cmt;
+    if (!text.trim()) return;
+    await onAddComment(post.id, text.trim(), parentId);
+    if (parentId) { setReplyText(""); setReplyTo(null); }
+    else setCmt("");
+  };
+
+  const renderComment = (c, depth = 0) => {
+    const kids = childrenOf(c.id);
+    const indent = Math.min(depth, 2) * 18; // 最大2レベル下までインデント
+    const liked = (c.likes || []).includes(authUserKey);
+    return (
+      <div key={c.id} style={{ marginLeft:indent, marginBottom:8 }}>
+        <div style={{ background: depth === 0 ? "#FAFCFE" : "#fff", border:"1px solid " + C.border, borderRadius:8, padding:"10px 12px" }}>
+          <div style={{ display:"flex", alignItems:"center", gap:6, marginBottom:6, flexWrap:"wrap" }}>
+            <AC>{ini(c.author)}</AC>
+            <span style={{ fontSize:12, fontWeight:"bold", color:C.ink }}>{c.author}</span>
+            {getAuthorBadge && getAuthorBadge(c.authorUid) && <BadgeChip badge={getAuthorBadge(c.authorUid)} small />}
+            <span style={{ fontSize:10, color:C.sub }}>{c.date}</span>
+            {isAdmin && <SmBtn red onClick={() => adminDelete("comment", post.id + ":" + c.id)}>削除</SmBtn>}
+          </div>
+          <p style={{ fontSize:13, lineHeight:1.8, color:C.ink, marginBottom:6 }}>{c.content}</p>
+          <div style={{ display:"flex", gap:6 }}>
+            <button style={{ background:"none", border:"1px solid " + C.border, color: liked ? "#DC2626" : C.sub, fontSize:11, cursor:"pointer", fontFamily:"inherit", padding:"3px 10px", borderRadius:14 }} onClick={async () => {
+              // コメントいいね機能（簡易版）
+              const newComments = (post.comments || []).map(cc => {
+                if (cc.id !== c.id) return cc;
+                const cl = cc.likes || [];
+                return { ...cc, likes: cl.includes(authUserKey) ? cl.filter(u => u !== authUserKey) : [...cl, authUserKey] };
+              });
+              await onAddComment(post.id, "__updateComments__", null, newComments);
+            }}>
+              {liked ? "❤️" : "🤍"} {(c.likes || []).length || ""}
+            </button>
+            <button style={{ background:"none", border:"1px solid " + C.border, color:C.sub, fontSize:11, cursor:"pointer", fontFamily:"inherit", padding:"3px 10px", borderRadius:14 }} onClick={() => setReplyTo(replyTo === c.id ? null : c.id)}>
+              💬 返信
+            </button>
+          </div>
+        </div>
+        {replyTo === c.id && (
+          <div style={{ marginLeft:24, marginTop:6, display:"flex", gap:6, alignItems:"flex-start" }}>
+            <AC>{ini(uName)}</AC>
+            <div style={{ flex:1 }}>
+              <textarea style={{ ...S.input, resize:"vertical", width:"100%" }} rows={2} placeholder={`${c.author}さんへの返信`} value={replyText} onChange={e => setReplyText(e.target.value)} />
+              <div style={{ display:"flex", gap:6, marginTop:4 }}>
+                <button style={{ ...S.primaryBtn, fontSize:11, padding:"5px 12px" }} onClick={() => handleSubmit(c.id)}>
+                  返信する
+                </button>
+                <button style={{ background:"none", border:"1px solid " + C.border, color:C.sub, fontSize:11, padding:"5px 12px", cursor:"pointer", fontFamily:"inherit", borderRadius:4 }} onClick={() => { setReplyTo(null); setReplyText(""); }}>
+                  キャンセル
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+        {/* 子コメント（再帰） */}
+        {kids.length > 0 && (
+          <div style={{ marginTop:6 }}>
+            {kids.map(k => renderComment(k, depth + 1))}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  return (
+    <div style={{ marginTop:12, paddingTop:12, borderTop:"1px solid " + C.border }}>
+      {tops.length === 0 && <p style={{ fontSize:11, color:C.sub, textAlign:"center", padding:"8px 0" }}>まだコメントがありません。最初のコメントを残しましょう。</p>}
+      {tops.map(c => renderComment(c, 0))}
+      <div style={{ display:"flex", gap:8, marginTop:12, alignItems:"flex-start", paddingTop:10, borderTop:"1px solid " + C.border }}>
+        <AC>{ini(uName)}</AC>
+        <div style={{ flex:1 }}>
+          <textarea style={{ ...S.input, resize:"vertical", width:"100%" }} rows={2} placeholder="コメントを入力" value={cmt} onChange={e => setCmt(e.target.value)} />
+          <button style={{ ...S.primaryBtn, marginTop:6, fontSize:12, padding:"7px 14px" }} onClick={() => handleSubmit(null)}>
+            コメントする
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function LikeButton({ liked, count, onClick }) {
+  const [animate, setAnimate] = React.useState(false);
+  const handle = () => {
+    onClick();
+    if (!liked) { setAnimate(true); setTimeout(() => setAnimate(false), 400); }
+  };
+  return (
+    <button
+      onClick={handle}
+      style={{
+        background: liked ? "#FEE2E2" : "#fff",
+        border: "1px solid " + (liked ? "#FCA5A5" : "#E1E9F2"),
+        color: liked ? "#DC2626" : "#6B7B91",
+        fontSize: 12, fontWeight: liked ? "bold" : "normal",
+        fontFamily: "inherit", cursor: "pointer",
+        padding: "6px 14px", borderRadius: 18,
+        display: "flex", alignItems: "center", gap: 4,
+        transform: animate ? "scale(1.15)" : "scale(1)",
+        transition: "transform .2s, background .2s, color .2s",
+      }}>
+      <span style={{ fontSize: 14 }}>{liked ? "❤️" : "🤍"}</span>
+      <span>{count > 0 ? count : "いいね"}</span>
+    </button>
+  );
+}
+
+function BadgeChip({ badge, small }) {
+  if (!badge) return null;
+  return (
+    <span style={{
+      display:"inline-flex", alignItems:"center", gap:3,
+      background: badge.bg, color: badge.color,
+      padding: small ? "1px 6px" : "2px 8px",
+      fontSize: small ? 9 : 10, fontWeight:"bold",
+      borderRadius: 10, border:"1px solid " + badge.color + "33",
+      marginLeft:4, whiteSpace:"nowrap",
+    }}>
+      <span>{badge.emoji}</span>{badge.name}
+    </span>
+  );
+}
+
+function LockedContent({ setAuthMode, count, type, sess }) {
   return (
     <div style={{
       position:"relative",
@@ -4108,31 +5102,56 @@ function LockedContent({ setAuthMode, count, type }) {
       <div style={{
         background:"#fff",
         border:"2px solid " + C.accent,
-        borderRadius:8,
+        borderRadius:12,
         padding:"24px 24px",
-        maxWidth:480,
+        maxWidth:520,
         margin:"0 auto",
-        boxShadow:"0 8px 28px rgba(30,90,150,0.18)"
+        boxShadow:"0 8px 28px rgba(43,123,209,0.18)"
       }}>
-        <div style={{ fontSize:32, marginBottom:8 }}>🔒</div>
-        <h3 style={{ fontSize:16, fontWeight:"bold", marginBottom:8, color:C.ink }}>
-          続きを読むには無料会員登録
-        </h3>
-        <p style={{ fontSize:13, color:C.sub, marginBottom:18, lineHeight:1.7 }}>
-          残り <strong style={{ color:C.accent, fontSize:15 }}>{count}件</strong> の{type}が閲覧できます<br />
-          メールアドレスだけで30秒で完了
-        </p>
-        <button style={{
-          background:C.accent, color:"#fff", border:"none",
-          padding:"12px 36px", fontSize:14, fontWeight:"bold",
-          fontFamily:"inherit", cursor:"pointer", borderRadius:6,
-          boxShadow:"0 2px 8px rgba(30,90,150,0.3)"
-        }} onClick={() => setAuthMode("register")}>
-          閲覧する（無料会員登録）→
-        </button>
-        <div style={{ fontSize:11, color:C.sub, marginTop:10 }}>
-          すでに会員の方は <button style={{...S.textLink, fontSize:11}} onClick={() => setAuthMode("login")}>ログイン</button>
-        </div>
+        <div style={{ fontSize:32, marginBottom:8 }}>🔓</div>
+        {!sess ? (
+          <>
+            <h3 style={{ fontSize:16, fontWeight:"bold", marginBottom:8, color:C.ink }}>
+              続きを読むには無料会員登録
+            </h3>
+            <p style={{ fontSize:13, color:C.sub, marginBottom:18, lineHeight:1.7 }}>
+              残り <strong style={{ color:C.accent, fontSize:15 }}>{count}件</strong> の{type}が閲覧できます。<br />
+              メールアドレスだけで30秒で完了します。
+            </p>
+            <button style={{
+              background:C.accent, color:"#fff", border:"none",
+              padding:"12px 36px", fontSize:14, fontWeight:"bold",
+              fontFamily:"inherit", cursor:"pointer", borderRadius:30,
+              boxShadow:"0 2px 8px rgba(43,123,209,0.3)"
+            }} onClick={() => setAuthMode("register")}>
+              閲覧する（無料会員登録）→
+            </button>
+            <div style={{ fontSize:11, color:C.sub, marginTop:10 }}>
+              すでに会員の方は <button style={{...S.textLink, fontSize:11}} onClick={() => setAuthMode("login")}>ログイン</button>
+            </div>
+          </>
+        ) : (
+          <>
+            <h3 style={{ fontSize:16, fontWeight:"bold", marginBottom:8, color:C.ink }}>
+              投稿すると30日間 全コンテンツが見放題！
+            </h3>
+            <p style={{ fontSize:13, color:C.sub, marginBottom:18, lineHeight:1.7 }}>
+              残り <strong style={{ color:C.accent, fontSize:15 }}>{count}件</strong> の{type}が閲覧できます。<br />
+              <strong>体験談・口コミ・年収情報を1件投稿</strong>するだけで、<br />
+              30日間すべてのコンテンツが閲覧可能になります。
+            </p>
+            <div style={{ display:"flex", gap:8, justifyContent:"center", flexWrap:"wrap", marginTop:8 }}>
+              {[["📝 面接体験談を投稿","interview"],["⭐ 口コミを投稿","review"],["💰 年収情報を投稿","salary"]].map(([l,k]) => (
+                <span key={k} style={{ background:C.light, color:C.accent, padding:"6px 14px", fontSize:12, borderRadius:18, fontWeight:"bold" }}>
+                  {l}
+                </span>
+              ))}
+            </div>
+            <p style={{ fontSize:11, color:C.sub, marginTop:14 }}>
+              気になる企業のページから投稿できます
+            </p>
+          </>
+        )}
       </div>
     </div>
   );
@@ -4151,27 +5170,30 @@ function AC({ children }) {
 
 // ─── スタイル ─────────────────────────────────────────────────────────────────
 const CSS = `
-  @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@400;700&family=Noto+Sans+JP:wght@400;500;700&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=BIZ+UDPGothic:wght@400;700&family=M+PLUS+Rounded+1c:wght@400;500;700;800&family=Noto+Sans+JP:wght@400;500;700&display=swap');
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  button { cursor: pointer; transition: opacity .15s; }
-  button:hover { opacity: .75; }
-  textarea, input, select { font-family: 'Noto Sans JP', sans-serif; }
+  body { font-family: "M PLUS Rounded 1c", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "BIZ UDPGothic", "Yu Gothic", "Noto Sans JP", sans-serif; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+  button { cursor: pointer; transition: all .15s; font-family: inherit; }
+  button:hover { opacity: .85; }
+  textarea, input, select { font-family: inherit; }
   @keyframes fadeUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
   .fadeUp { animation: fadeUp .18s ease; }
-  tr:hover td { background: #FAFAF8; }
+  tr:hover td { background: #FAFCFE; }
   a { color: inherit; }
+  /* 数字は Tabular で並びを揃える */
+  .tabnum { font-variant-numeric: tabular-nums; }
 `;
 
 const S = {
-  root:        { fontFamily:"'Noto Sans JP',sans-serif", background:C.bg, minHeight:"100vh", color:C.ink, fontSize:14 },
+  root:        { fontFamily:"'M PLUS Rounded 1c', 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'BIZ UDPGothic', 'Yu Gothic', 'Noto Sans JP', sans-serif", background:C.bg, minHeight:"100vh", color:C.ink, fontSize:14 },
   pageWrap:    { background:C.bg },
   nav:         { background:"#fff", position:"sticky", top:0, zIndex:200, borderBottom:"1px solid " + C.border, boxShadow:"0 2px 8px rgba(43,123,209,0.06)" },
   logoBtn:     { background:"none", border:"none", textAlign:"left", cursor:"pointer" },
-  logoText:    { display:"block", fontWeight:"bold", color:"#2B7BD1", fontFamily:"'Noto Serif JP',serif", letterSpacing:"0.06em" },
+  logoText:    { display:"block", fontWeight:800, color:"#2B7BD1", fontFamily:"'M PLUS Rounded 1c', sans-serif", letterSpacing:"0.04em" },
   toast:       { position:"fixed", bottom:20, left:"50%", transform:"translateX(-50%)", background:C.ink, color:"#fff", padding:"9px 20px", fontSize:12, zIndex:600, boxShadow:"0 2px 10px rgba(0,0,0,0.25)", whiteSpace:"nowrap" },
   overlay:     { position:"fixed", inset:0, background:"rgba(0,0,0,0.45)", zIndex:400, display:"flex", alignItems:"center", justifyContent:"center", padding:16 },
   modal:       { background:"#fff", padding:"24px 22px", width:"100%", maxWidth:420, maxHeight:"94vh", overflowY:"auto", borderTop:"4px solid " + C.accent },
-  modalTitle:  { fontSize:17, fontWeight:"bold", fontFamily:"serif", marginBottom:12 },
+  modalTitle:  { fontSize:17, fontWeight:"bold", fontFamily:"'M PLUS Rounded 1c', sans-serif", marginBottom:12 },
   modalHr:     { height:1, background:C.border, marginBottom:14 },
   errBox:      { background:"#FFF5F5", border:"1px solid #F5AAAA", color:"#8B0000", padding:"8px 12px", fontSize:12, marginBottom:12 },
   main:        { maxWidth:1160, margin:"0 auto" },
