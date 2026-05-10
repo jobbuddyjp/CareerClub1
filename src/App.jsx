@@ -238,13 +238,12 @@ function useWidth() {
 const col  = (name)     => collection(db, name);
 const dref = (c, id)    => doc(db, c, id);
 
-const fsSet = async (c, id, data) => {
-  await setDoc(doc(db, c, id), { ...data, createdAt: serverTimestamp() });
-};
-
 const fsAdd = async (c, data) => {
   const ref = await addDoc(col(c), { ...data, createdAt: serverTimestamp() });
   return ref.id;
+};
+const fsSet = async (c, id, data) => {
+  await setDoc(dref(c, id), { ...data, updatedAt: serverTimestamp() }, { merge: true });
 };
 const fsDel = async (c, id) => {
   await deleteDoc(dref(c, id));
@@ -2573,101 +2572,140 @@ function AppNav({ sess, go, plan, isAdmin, setAuthMode, isMobile, menuOpen, setM
 // 業種ごとのテーマ画像（SVGで生成、印象的なグラデーション + アイコン）
 const GROUP_THEMES = {
   "航空": {
-    bg: "linear-gradient(180deg, #FFB87C 0%, #FF8C5A 30%, #FFCC88 50%, #B0D8FF 100%)",
+    img: "https://images.unsplash.com/photo-1436491865332-7a61a109cc05?w=1200&q=70",
     emoji: "✈️",
     catch: "雲の上のキャリアを目指す方へ",
     desc: "パイロット・CA・整備士・グランドスタッフなど、空の仕事の選考情報・年収・口コミ",
-    svg: <svg viewBox="0 0 800 200" style={{width:"100%", height:"100%", display:"block"}}>
-      <defs>
-        <linearGradient id="skyGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-          <stop offset="0%" stopColor="#FF6B35"/>
-          <stop offset="40%" stopColor="#FFB87C"/>
-          <stop offset="70%" stopColor="#FFCC88"/>
-          <stop offset="100%" stopColor="#B8DDF5"/>
-        </linearGradient>
-      </defs>
-      <rect width="800" height="200" fill="url(#skyGradient)"/>
-      <circle cx="650" cy="60" r="25" fill="#FFEB3B" opacity="0.9"/>
-      <circle cx="650" cy="60" r="40" fill="#FFEB3B" opacity="0.3"/>
-      <ellipse cx="100" cy="160" rx="120" ry="20" fill="white" opacity="0.5"/>
-      <ellipse cx="350" cy="170" rx="180" ry="15" fill="white" opacity="0.4"/>
-      <ellipse cx="600" cy="160" rx="140" ry="22" fill="white" opacity="0.5"/>
-      <text x="400" y="115" fontSize="60" textAnchor="middle">✈️</text>
-    </svg>
   },
   "交通・運輸": {
-    bg: "linear-gradient(135deg, #4FACFE 0%, #00F2FE 100%)",
+    img: "https://images.unsplash.com/photo-1474487548417-781cb71495f3?w=1200&q=70",
     emoji: "🚄",
     catch: "人と物の流れを支える仕事",
     desc: "鉄道・バス・海運・物流の選考情報・年収・口コミ",
   },
   "金融・銀行": {
-    bg: "linear-gradient(135deg, #1E3C72 0%, #2A5298 100%)",
+    img: "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=1200&q=70",
     emoji: "🏦",
     catch: "経済の中枢で活躍する",
     desc: "メガバンク・証券・保険・外資金融の選考情報・年収・口コミ",
   },
   "商社": {
-    bg: "linear-gradient(135deg, #134E5E 0%, #71B280 100%)",
+    img: "https://images.unsplash.com/photo-1577416412292-747c6607f055?w=1200&q=70",
     emoji: "🌐",
     catch: "世界を舞台に働く",
     desc: "総合商社・専門商社の選考情報・年収・口コミ",
   },
   "メーカー": {
-    bg: "linear-gradient(135deg, #5B86E5 0%, #36D1DC 100%)",
+    img: "https://images.unsplash.com/photo-1565793298595-6a879b1d9492?w=1200&q=70",
     emoji: "🏭",
     catch: "ものづくり日本を担う",
     desc: "自動車・電機・化学・食品・医薬品メーカーの選考情報・年収・口コミ",
   },
   "IT・テック": {
-    bg: "linear-gradient(135deg, #667EEA 0%, #764BA2 100%)",
+    img: "https://images.unsplash.com/photo-1518770660439-4636190af475?w=1200&q=70",
     emoji: "💻",
     catch: "テクノロジーで未来を創る",
     desc: "SIer・Web・スタートアップ・外資ITの選考情報・年収・口コミ",
   },
   "コンサル": {
-    bg: "linear-gradient(135deg, #2C3E50 0%, #4CA1AF 100%)",
+    img: "https://images.unsplash.com/photo-1556761175-5973dc0f32e7?w=1200&q=70",
     emoji: "💡",
     catch: "知力で企業を変革する",
     desc: "戦略コンサル・ITコンサル・監査法人・税理士の選考情報・年収・口コミ",
   },
   "不動産・建設": {
-    bg: "linear-gradient(135deg, #8E2DE2 0%, #4A00E0 100%)",
+    img: "https://images.unsplash.com/photo-1486325212027-8081e485255e?w=1200&q=70",
     emoji: "🏢",
     catch: "街と建物を創る仕事",
     desc: "デベロッパー・ゼネコン・ハウスメーカーの選考情報・年収・口コミ",
   },
   "小売・流通": {
-    bg: "linear-gradient(135deg, #FFA17F 0%, #00223E 100%)",
+    img: "https://images.unsplash.com/photo-1481437156560-3205f6a55735?w=1200&q=70",
     emoji: "🛒",
     catch: "暮らしを支える販売・流通",
     desc: "百貨店・SPA・EC・ドラッグストア・物流の選考情報・年収・口コミ",
   },
   "サービス": {
-    bg: "linear-gradient(135deg, #FF6B6B 0%, #FFE66D 100%)",
+    img: "https://images.unsplash.com/photo-1556761175-b413da4baf72?w=1200&q=70",
     emoji: "📢",
     catch: "人と人をつなぐ仕事",
     desc: "広告・人材・メディア・外食の選考情報・年収・口コミ",
   },
   "医療・ヘルス": {
-    bg: "linear-gradient(135deg, #56AB2F 0%, #A8E063 100%)",
+    img: "https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?w=1200&q=70",
     emoji: "🏥",
     catch: "人々の健康を守る",
     desc: "医療機器・製薬・ヘルスケアの選考情報・年収・口コミ",
   },
   "教育・公共": {
-    bg: "linear-gradient(135deg, #F2994A 0%, #F2C94C 100%)",
+    img: "https://images.unsplash.com/photo-1497486751825-1233686d5d80?w=1200&q=70",
     emoji: "📚",
     catch: "学びと社会を支える",
     desc: "教育・予備校・人材育成の選考情報・年収・口コミ",
   },
   "エンタメ": {
-    bg: "linear-gradient(135deg, #DA22FF 0%, #9733EE 100%)",
+    img: "https://images.unsplash.com/photo-1542204165-65bf26472b9b?w=1200&q=70",
     emoji: "🎮",
     catch: "感動と楽しみを生み出す",
     desc: "ゲーム・映像・音楽・出版の選考情報・年収・口コミ",
   },
 };
+
+
+// 企業ロゴ風アイコン（文字ベース・業種別カラー）
+const GROUP_LOGO_COLORS = {
+  "金融・銀行":   { bg:"linear-gradient(135deg, #1E3A8A 0%, #3B82F6 100%)", color:"#fff" },
+  "商社":         { bg:"linear-gradient(135deg, #064E3B 0%, #10B981 100%)", color:"#fff" },
+  "メーカー":     { bg:"linear-gradient(135deg, #0E7490 0%, #06B6D4 100%)", color:"#fff" },
+  "IT・テック":   { bg:"linear-gradient(135deg, #4338CA 0%, #818CF8 100%)", color:"#fff" },
+  "コンサル":     { bg:"linear-gradient(135deg, #1F2937 0%, #4B5563 100%)", color:"#fff" },
+  "不動産・建設": { bg:"linear-gradient(135deg, #581C87 0%, #A855F7 100%)", color:"#fff" },
+  "小売・流通":   { bg:"linear-gradient(135deg, #9A3412 0%, #FB923C 100%)", color:"#fff" },
+  "サービス":     { bg:"linear-gradient(135deg, #BE123C 0%, #FB7185 100%)", color:"#fff" },
+  "医療・ヘルス": { bg:"linear-gradient(135deg, #14532D 0%, #4ADE80 100%)", color:"#fff" },
+  "教育・公共":   { bg:"linear-gradient(135deg, #92400E 0%, #FACC15 100%)", color:"#fff" },
+  "エンタメ":     { bg:"linear-gradient(135deg, #6B21A8 0%, #E879F9 100%)", color:"#fff" },
+  "航空":         { bg:"linear-gradient(135deg, #1E40AF 0%, #60A5FA 100%)", color:"#fff" },
+  "交通・運輸":   { bg:"linear-gradient(135deg, #115E59 0%, #2DD4BF 100%)", color:"#fff" },
+};
+
+function CompanyLogo({ company, size = 36 }) {
+  if (!company) return null;
+  const grp = company.group || "メーカー";
+  const theme = GROUP_LOGO_COLORS[grp] || { bg:"linear-gradient(135deg, #475569 0%, #94A3B8 100%)", color:"#fff" };
+
+  // イニシャル抽出：日本語企業はカナ・漢字の頭文字、英語は最初の2文字
+  const name = company.name || "";
+  let initial = "";
+  if (/^[A-Za-z0-9]/.test(name)) {
+    // 英文字始まり：先頭2文字を大文字で
+    const cleaned = name.replace(/[^A-Za-z0-9]/g, "");
+    initial = cleaned.slice(0, 2).toUpperCase();
+  } else {
+    // 日本語：先頭1文字
+    initial = name.slice(0, 1);
+  }
+
+  const fontSize = size <= 28 ? 11 : size <= 36 ? 14 : size <= 48 ? 18 : 22;
+
+  return (
+    <div style={{
+      width: size, height: size,
+      borderRadius: size <= 28 ? 6 : 8,
+      background: theme.bg,
+      color: theme.color,
+      display:"flex", alignItems:"center", justifyContent:"center",
+      fontWeight: "bold",
+      fontSize: fontSize,
+      fontFamily: "\"M PLUS Rounded 1c\", sans-serif",
+      letterSpacing: initial.length > 1 ? "-0.04em" : "0",
+      flexShrink: 0,
+      boxShadow: "0 1px 3px rgba(0,0,0,0.12)",
+    }}>
+      {initial}
+    </div>
+  );
+}
 
 function NaiteiTimeline({ posts, companies, go, isMobile }) {
   // 最終結果が内定/内定辞退の interview だけ抽出（最新10件）
@@ -2782,42 +2820,39 @@ function SubTopPage({ go, goSubTop, grp, companies, posts, reviews, salaries, co
 
   return (
     <div>
-      {/* ヒーロー */}
+      {/* ヒーロー（実写画像背景・コンパクト） */}
       <section style={{
-        background: theme.bg,
-        padding: isMobile ? "32px 20px" : "56px 40px",
+        position:"relative",
+        backgroundImage: `linear-gradient(rgba(0,0,0,0.45), rgba(0,0,0,0.55)), url("${theme.img}")`,
+        backgroundSize:"cover",
+        backgroundPosition:"center",
+        padding: isMobile ? "26px 20px" : "36px 40px",
         borderRadius: 14,
         marginTop: 12,
         marginBottom: 24,
         color: "#fff",
-        position: "relative",
         overflow: "hidden",
+        minHeight: isMobile ? 180 : 220,
       }}>
-        {theme.svg && (
-          <div style={{ position:"absolute", inset:0, zIndex:0, opacity:0.7 }}>
-            {theme.svg}
-          </div>
-        )}
-        <div style={{ position:"relative", zIndex:1, maxWidth:760, margin:"0 auto", textAlign:"center", textShadow:"0 2px 8px rgba(0,0,0,0.3)" }}>
-          <div style={{ fontSize:60, marginBottom:12 }}>{theme.emoji}</div>
-          <p style={{ fontSize:11, letterSpacing:"0.2em", marginBottom:8, opacity:0.9, fontWeight:"bold" }}>CAREER COMMUNITY ｜ {grp}</p>
-          <h1 style={{ fontSize: isMobile ? 22 : 30, fontWeight:"bold", lineHeight:1.4, marginBottom:14, fontFamily:"\"M PLUS Rounded 1c\", sans-serif" }}>
+        <div style={{ position:"relative", zIndex:1, maxWidth:760, margin:"0 auto", textAlign:"center", textShadow:"0 2px 12px rgba(0,0,0,0.5)" }}>
+          <p style={{ fontSize:11, letterSpacing:"0.2em", marginBottom:6, opacity:0.95, fontWeight:"bold" }}>{theme.emoji} {grp}</p>
+          <h1 style={{ fontSize: isMobile ? 20 : 26, fontWeight:"bold", lineHeight:1.4, marginBottom:10, fontFamily:"\"M PLUS Rounded 1c\", sans-serif" }}>
             {theme.catch}
           </h1>
-          <p style={{ fontSize: isMobile ? 12 : 14, lineHeight:1.8, opacity:0.95, marginBottom:18 }}>
+          <p style={{ fontSize: isMobile ? 11 : 13, lineHeight:1.7, opacity:0.92, marginBottom:14, maxWidth:600, marginLeft:"auto", marginRight:"auto" }}>
             {theme.desc}
           </p>
           <div style={{ display:"flex", gap:isMobile ? 14 : 24, justifyContent:"center", flexWrap:"wrap" }}>
             <div style={{ textAlign:"center" }}>
-              <div style={{ fontSize:isMobile ? 18 : 24, fontWeight:"bold", fontFamily:"\"M PLUS Rounded 1c\", sans-serif" }}>{grpCos.length}</div>
+              <div style={{ fontSize:isMobile ? 16 : 20, fontWeight:"bold", fontFamily:"\"M PLUS Rounded 1c\", sans-serif" }}>{grpCos.length}</div>
               <div style={{ fontSize:10, opacity:0.85 }}>掲載企業</div>
             </div>
             <div style={{ textAlign:"center" }}>
-              <div style={{ fontSize:isMobile ? 18 : 24, fontWeight:"bold", fontFamily:"\"M PLUS Rounded 1c\", sans-serif" }}>{grpPosts.length}</div>
+              <div style={{ fontSize:isMobile ? 16 : 20, fontWeight:"bold", fontFamily:"\"M PLUS Rounded 1c\", sans-serif" }}>{grpPosts.length}</div>
               <div style={{ fontSize:10, opacity:0.85 }}>体験談</div>
             </div>
             <div style={{ textAlign:"center" }}>
-              <div style={{ fontSize:isMobile ? 18 : 24, fontWeight:"bold", fontFamily:"\"M PLUS Rounded 1c\", sans-serif" }}>{grpReviews.length}</div>
+              <div style={{ fontSize:isMobile ? 16 : 20, fontWeight:"bold", fontFamily:"\"M PLUS Rounded 1c\", sans-serif" }}>{grpReviews.length}</div>
               <div style={{ fontSize:10, opacity:0.85 }}>口コミ</div>
             </div>
           </div>
@@ -2850,7 +2885,7 @@ function SubTopPage({ go, goSubTop, grp, companies, posts, reviews, salaries, co
             return (
               <div key={co.id} style={{ background:"#fff", border:"1px solid " + C.border, borderRadius:8, padding:"14px 16px", cursor:"pointer", transition:"all .15s" }} onClick={() => go("company", co)}>
                 <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:8 }}>
-                  <span style={{ fontSize:24 }}>{co.emoji || theme.emoji}</span>
+                  <CompanyLogo company={co} size={36} />
                   <div style={{ flex:1, minWidth:0 }}>
                     <div style={{ fontSize:14, fontWeight:"bold", color:C.ink, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{co.name}</div>
                     <div style={{ fontSize:10, color:C.sub }}>{co.industry}</div>
@@ -3147,7 +3182,7 @@ function CompaniesPage({ go, filtered, searchQ, setSearchQ, grpFilter, setGrpFil
               return (
                 <div key={co.id} style={{ background:C.surface, padding:"12px", borderBottom:"1px solid " + C.border, cursor:"pointer" }} onClick={() => go("company", co)}>
                   <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-                    <span style={{ fontSize:22 }}>{co.emoji}</span>
+                    <CompanyLogo company={co} size={32} />
                     <div style={{ flex:1 }}>
                       <div style={{ fontWeight:"bold", fontSize:13 }}>{co.name}</div>
                       <div style={{ fontSize:11, color:C.sub }}>{co.group || getGroup(co.industry)} &gt; {co.industry}</div>
@@ -3180,7 +3215,7 @@ function CompaniesPage({ go, filtered, searchQ, setSearchQ, grpFilter, setGrpFil
                 const sal = calcAvgSal(coSals(co.id));
                 return (
                   <tr key={co.id} style={{ ...S.tableRow, cursor:"pointer" }} onClick={() => go("company", co)}>
-                    <td style={S.td}><span style={{ fontSize:16, marginRight:8 }}>{co.emoji}</span><span style={{ fontWeight:"bold", fontSize:13 }}>{co.name}</span></td>
+                    <td style={S.td}><div style={{ display:"flex", alignItems:"center", gap:8 }}><CompanyLogo company={co} size={28} /><span style={{ fontWeight:"bold", fontSize:13 }}>{co.name}</span></div></td>
                     <td style={{ ...S.td, fontSize:12, color:C.sub }}>{co.industry}</td>
                     <td style={{ ...S.td, textAlign:"center", color:C.accent, fontWeight:"bold", fontSize:12 }}>{a ? ("★" + a.overall.toFixed(1)) : "-"}</td>
                     <td style={{ ...S.td, textAlign:"right", fontSize:12, fontWeight:"bold", color:"#1a5276" }}>{sal ? (sal + "万円") : "-"}</td>
@@ -3240,7 +3275,7 @@ function CompanyPage({ go, co, cposts, crevs, csals, cjobs, initTab, onToggleLik
       </button>
       <div style={{ borderTop:"3px solid " + C.ink, borderBottom:"1px solid " + C.border, padding:"16px 0", marginBottom:0 }}>
         <div style={{ display:"flex", alignItems:"center", gap:16, flexWrap:"wrap" }}>
-          <span style={{ fontSize: isMobile ? 28 : 40 }}>{co.emoji}</span>
+          <CompanyLogo company={co} size={isMobile ? 48 : 64} />
           <div style={{ flex:1 }}>
             <h1 style={{ fontWeight:"bold", fontFamily:"'M PLUS Rounded 1c', sans-serif", fontSize: isMobile ? 18 : 24 }}>{co.name}</h1>
             <p style={{ fontSize:12, color:C.sub, marginTop:3 }}>{co.group || getGroup(co.industry)} &gt; {co.industry}</p>
@@ -4451,7 +4486,7 @@ function RankingPage({ go, companies, coPosts, coRevs, coSals, isMobile }) {
           {sorted.map((co, i) => (
             <tr key={co.id} style={{ ...S.tableRow, cursor:"pointer" }} onClick={() => go("company", co)}>
               <td style={S.td}><span style={{ fontSize:15, fontWeight:"bold", color: i < 3 ? C.accent : "#bbb", fontFamily:"'M PLUS Rounded 1c', sans-serif" }}>{i + 1}</span></td>
-              <td style={S.td}><span style={{ fontSize:16, marginRight:8 }}>{co.emoji}</span><span style={{ fontWeight:"bold", fontSize:13 }}>{co.name}</span></td>
+              <td style={S.td}><div style={{ display:"flex", alignItems:"center", gap:8 }}><CompanyLogo company={co} size={28} /><span style={{ fontWeight:"bold", fontSize:13 }}>{co.name}</span></div></td>
               {!isMobile && <td style={{ ...S.td, fontSize:12, color:C.sub }}>{co.industry}</td>}
               <td style={{ ...S.td, textAlign:"center" }}>
                 {co.avgObj
@@ -4883,7 +4918,7 @@ function MyPage({ sess, go, companies, plan, upgradePlan, isMobile, diary, saveD
                       if (!co) return null;
                       return (
                         <div key={coId} style={{ display:"flex", alignItems:"center", gap:10, padding:"8px 0", borderBottom:"1px solid " + C.border }}>
-                          <span style={{ fontSize:18 }}>{co.emoji || "🏢"}</span>
+                          <CompanyLogo company={co} size={28} />
                           <span style={{ flex:1, fontSize:13, fontWeight:"bold", color:C.ink, cursor:"pointer" }} onClick={() => go("company", co)}>{co.name}</span>
                           <button style={{ ...S.secondaryBtn, fontSize:11, padding:"4px 10px" }} onClick={() => toggleFollowCompany && toggleFollowCompany(coId)}>解除</button>
                         </div>
@@ -5059,7 +5094,7 @@ function AnalyticsPage({ companies, posts, reviews, salaries, isMobile }) {
           {topActive.map((co, i) => (
             <div key={co.id} style={{ display:"flex", alignItems:"center", gap:8, padding:"6px 0", borderBottom:"1px solid " + C.border }}>
               <span style={{ fontSize:12, fontWeight:"bold", color: i < 3 ? C.accent : "#bbb", width:20 }}>{i + 1}</span>
-              <span style={{ fontSize:13, flex:1 }}>{co.emoji} {co.name}</span>
+              <div style={{ display:"flex", alignItems:"center", gap:6, flex:1, fontSize:13 }}><CompanyLogo company={co} size={20} /><span>{co.name}</span></div>
               <span style={{ fontSize:13, fontWeight:"bold", color:C.accent }}>{co.score}件</span>
             </div>
           ))}
@@ -5106,7 +5141,7 @@ function PostCard({ post, co, go, isAdmin, onDelete, onEdit }) {
         </div>
       )}
       <div style={{ display:"flex", gap:8, marginBottom:8, alignItems:"center", flexWrap:"wrap" }}>
-        <span style={{ fontSize:11, color:C.sub }}>{co && co.emoji} {co && co.name}</span>
+        <span style={{ fontSize:11, color:C.sub, display:"flex", alignItems:"center", gap:4 }}>{co && <CompanyLogo company={co} size={16} />}<span>{co && co.name}</span></span>
         <StageBadge s={post.stage} />
         <span style={{ fontSize:10, color:C.sub, marginLeft:"auto" }}>{ago(post.createdAt)}</span>
       </div>
