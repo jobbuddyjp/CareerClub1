@@ -2670,23 +2670,103 @@ const GROUP_LOGO_COLORS = {
 };
 
 function CompanyLogo({ company, size = 36 }) {
+  const [imgErr, setImgErr] = React.useState(false);
   if (!company) return null;
   const grp = company.group || "メーカー";
   const theme = GROUP_LOGO_COLORS[grp] || { bg:"linear-gradient(135deg, #475569 0%, #94A3B8 100%)", color:"#fff" };
 
-  // イニシャル抽出：日本語企業はカナ・漢字の頭文字、英語は最初の2文字
+  // ドメイン抽出（websiteフィールド or 企業名から推測）
+  const KNOWN_DOMAINS = {
+    "トヨタ自動車":"toyota.co.jp","ホンダ":"honda.co.jp","日産自動車":"nissan.co.jp",
+    "ソニーグループ":"sony.co.jp","パナソニックホールディングス":"panasonic.com",
+    "日立製作所":"hitachi.co.jp","三菱電機":"mitsubishielectric.co.jp",
+    "三菱UFJ銀行":"bk.mufg.jp","三井住友銀行":"smbc.co.jp","みずほ銀行":"mizuhobank.co.jp",
+    "野村證券":"nomura.co.jp","大和証券":"daiwa.co.jp",
+    "東京海上日動火災保険":"tokiomarine-nichido.co.jp","日本生命保険":"nissay.co.jp",
+    "三菱商事":"mitsubishicorp.com","三井物産":"mitsui.com","伊藤忠商事":"itochu.co.jp",
+    "住友商事":"sumitomocorp.com","丸紅":"marubeni.com",
+    "NTTデータ":"nttdata.com","野村総合研究所":"nri.co.jp","富士通":"fujitsu.com",
+    "NEC":"nec.com","楽天グループ":"rakuten.co.jp","ソフトバンク":"softbank.jp",
+    "KDDI":"kddi.com","NTTドコモ":"docomo.ne.jp",
+    "ANAホールディングス":"ana.co.jp","日本航空":"jal.com",
+    "JR東日本":"jreast.co.jp","JR東海":"jr-central.co.jp","JR西日本":"westjr.co.jp",
+    "三井不動産":"mitsuifudosan.co.jp","三菱地所":"mec.co.jp",
+    "電通グループ":"dentsu.co.jp","博報堂DYホールディングス":"hakuhodody-holdings.co.jp",
+    "リクルートホールディングス":"recruit.co.jp","任天堂":"nintendo.co.jp",
+    "ファーストリテイリング":"fastretailing.com","セブン&アイ・ホールディングス":"7andi.com",
+    "味の素":"ajinomoto.co.jp","キリンホールディングス":"kirinholdings.com",
+    "アサヒグループホールディングス":"asahigroup-holdings.com",
+    "サントリーホールディングス":"suntory.co.jp",
+    "武田薬品工業":"takeda.com","アステラス製薬":"astellas.com",
+    "アクセンチュア":"accenture.com",
+    "デロイトトーマツコンサルティング":"deloitte.com",
+    "PwCコンサルティング":"pwc.com",
+    "EYストラテジー・アンド・コンサルティング":"ey.com",
+    "KPMGコンサルティング":"kpmg.com",
+    "ゴールドマン・サックス証券":"goldmansachs.com",
+    "JPモルガン証券":"jpmorgan.com","モルガン・スタンレーMUFG証券":"morganstanley.com",
+    "バンク・オブ・アメリカ":"bankofamerica.com",
+    "Google合同会社":"google.com","日本マイクロソフト":"microsoft.com",
+    "Amazon Japan合同会社":"amazon.co.jp","アマゾン ウェブ サービス ジャパン":"aws.amazon.com",
+    "Salesforce Japan":"salesforce.com","メルカリ":"mercari.com",
+    "サイバーエージェント":"cyberagent.co.jp","DeNA":"dena.com",
+    "LINEヤフー":"lycorp.co.jp","ZOZO":"zozo.com",
+    "大成建設":"taisei.co.jp","鹿島建設":"kajima.co.jp","清水建設":"shimz.co.jp",
+    "イオン":"aeon.info","ニトリホールディングス":"nitori.co.jp",
+    "バンダイナムコホールディングス":"bandainamco.co.jp","カプコン":"capcom.co.jp",
+    "有限責任あずさ監査法人":"kpmg.com",
+    "EY新日本有限責任監査法人":"ey.com",
+    "有限責任監査法人トーマツ":"deloitte.com",
+    "PwC Japan有限責任監査法人":"pwc.com",
+    "西村あさひ法律事務所":"nishimura.com",
+    "ブラックロック・ジャパン":"blackrock.com",
+    "テルモ":"terumo.co.jp","シスメックス":"sysmex.co.jp",
+    "ベネッセホールディングス":"benesse.co.jp",
+    "東宝":"toho.co.jp","講談社":"kodansha.co.jp","集英社":"shueisha.co.jp",
+  };
+
+  let domain = null;
+  if (company.website) {
+    try { domain = new URL(company.website.startsWith("http") ? company.website : "https://" + company.website).hostname.replace("www.", ""); } catch {}
+  }
+  if (!domain) domain = KNOWN_DOMAINS[company.name] || null;
+
+  const faviconUrl = domain ? `https://www.google.com/s2/favicons?domain=${domain}&sz=${size >= 48 ? 128 : 64}` : null;
+  const showFavicon = faviconUrl && !imgErr;
+
+  // フォールバック：文字ロゴ
   const name = company.name || "";
   let initial = "";
   if (/^[A-Za-z0-9]/.test(name)) {
-    // 英文字始まり：先頭2文字を大文字で
-    const cleaned = name.replace(/[^A-Za-z0-9]/g, "");
-    initial = cleaned.slice(0, 2).toUpperCase();
+    initial = name.replace(/[^A-Za-z0-9]/g, "").slice(0, 2).toUpperCase();
   } else {
-    // 日本語：先頭1文字
     initial = name.slice(0, 1);
   }
-
   const fontSize = size <= 28 ? 11 : size <= 36 ? 14 : size <= 48 ? 18 : 22;
+
+  if (showFavicon) {
+    return (
+      <div style={{
+        width: size, height: size,
+        borderRadius: size <= 28 ? 6 : 8,
+        background: "#fff",
+        border: "1px solid #E5E7EB",
+        display:"flex", alignItems:"center", justifyContent:"center",
+        flexShrink: 0,
+        overflow:"hidden",
+      }}>
+        <img
+          src={faviconUrl}
+          alt=""
+          width={Math.round(size * 0.7)}
+          height={Math.round(size * 0.7)}
+          style={{ objectFit:"contain" }}
+          onError={() => setImgErr(true)}
+          loading="lazy"
+        />
+      </div>
+    );
+  }
 
   return (
     <div style={{
@@ -2949,24 +3029,28 @@ function HomePage({ sess, go, goSubTop, companies, posts, reviews, salaries, isA
 
   return (
     <div>
-      {/* ヒーローセクション - 明るく、コンパクト、最上部に大きな検索窓 */}
+      {/* ヒーローセクション - 実写画像背景・コンパクト */}
       <section style={{
-        background: "linear-gradient(135deg, #E3F0FA 0%, #FFF8E7 100%)",
-        padding: isMobile ? "20px 16px 24px" : "28px 32px 32px",
+        position: "relative",
+        backgroundImage: "linear-gradient(rgba(0,0,0,0.4), rgba(0,0,0,0.5)), url(\"https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=1400&q=70\")",
+        backgroundSize: "cover",
+        backgroundPosition: "center 40%",
+        padding: isMobile ? "28px 16px 28px" : "36px 32px 36px",
         marginBottom: 20,
         borderRadius: 14,
         marginTop: 12,
-        border: "1px solid #DDE9F5",
+        overflow: "hidden",
+        color: "#fff",
       }}>
-        <div style={{ maxWidth:840, margin:"0 auto" }}>
-          <div style={{ textAlign:"center", marginBottom: isMobile ? 14 : 18 }}>
-            <p style={{ fontSize:10, fontWeight:"bold", letterSpacing:"0.18em", color:C.accent, marginBottom:6, opacity:0.85 }}>
+        <div style={{ maxWidth:840, margin:"0 auto", position:"relative", zIndex:1 }}>
+          <div style={{ textAlign:"center", marginBottom: isMobile ? 14 : 18, textShadow:"0 2px 12px rgba(0,0,0,0.4)" }}>
+            <p style={{ fontSize:10, fontWeight:"bold", letterSpacing:"0.18em", color:"#FCD34D", marginBottom:6, opacity:0.95 }}>
               CAREER COMMUNITY
             </p>
-            <h1 style={{ fontSize: isMobile ? 18 : 24, fontWeight:"bold", lineHeight:1.4, color:C.ink, fontFamily:"\"M PLUS Rounded 1c\", sans-serif" }}>
-              転職・就活の<span style={{ color:C.accent }}>リアル</span>がわかる
+            <h1 style={{ fontSize: isMobile ? 20 : 26, fontWeight:"bold", lineHeight:1.4, color:"#fff", fontFamily:"\"M PLUS Rounded 1c\", sans-serif" }}>
+              転職・就活の<span style={{ color:"#FCD34D" }}>リアル</span>がわかる
             </h1>
-            <p style={{ fontSize: isMobile ? 12 : 13, color:C.sub, marginTop:6, lineHeight:1.7 }}>
+            <p style={{ fontSize: isMobile ? 12 : 13, color:"rgba(255,255,255,0.9)", marginTop:6, lineHeight:1.7 }}>
               面接体験談・年収・口コミ・選考情報をみんなで共有するコミュニティ
             </p>
           </div>
@@ -2978,10 +3062,10 @@ function HomePage({ sess, go, goSubTop, companies, posts, reviews, salaries, isA
               onKeyDown={(e) => { if (e.key === "Enter" && doGlobalSearch) doGlobalSearch(e.target.value); }}
               style={{
                 width:"100%", padding: isMobile ? "12px 16px 12px 44px" : "14px 18px 14px 50px",
-                background:"#fff", border:"2px solid " + C.accent, borderRadius:30,
+                background:"rgba(255,255,255,0.95)", border:"2px solid rgba(255,255,255,0.8)", borderRadius:30,
                 fontSize: isMobile ? 13 : 14, fontFamily:"inherit", outline:"none",
-                boxShadow:"0 2px 12px rgba(30,90,150,0.12)",
-                color:C.ink
+                boxShadow:"0 4px 20px rgba(0,0,0,0.2)",
+                color:"#1F3A5F"
               }}
             />
             <span style={{ position:"absolute", left: isMobile ? 16 : 20, top:"50%", transform:"translateY(-50%)", fontSize:18, color:C.accent }}>🔍</span>
@@ -2990,17 +3074,17 @@ function HomePage({ sess, go, goSubTop, companies, posts, reviews, salaries, isA
           <div style={{ display:"flex", gap: isMobile ? 12 : 24, justifyContent:"center", marginTop: isMobile ? 14 : 20, flexWrap:"wrap", alignItems:"center" }}>
             {[[companies.length,"企業"],[posts.length,"体験談"],[reviews.length,"口コミ"]].map(([n,l]) => (
               <div key={l} style={{ textAlign:"center" }}>
-                <div style={{ fontSize: isMobile ? 16 : 20, fontWeight:"bold", color:C.accent, fontFamily:"\"M PLUS Rounded 1c\", sans-serif", lineHeight:1 }}>{n.toLocaleString()}<span style={{ fontSize:11, color:C.sub, fontWeight:"normal", marginLeft:2 }}>件</span></div>
-                <div style={{ fontSize:10, color:C.sub, marginTop:2 }}>{l}</div>
+                <div style={{ fontSize: isMobile ? 16 : 20, fontWeight:"bold", color:"#fff", fontFamily:"\"M PLUS Rounded 1c\", sans-serif", lineHeight:1, textShadow:"0 1px 4px rgba(0,0,0,0.3)" }}>{n.toLocaleString()}<span style={{ fontSize:11, color:"rgba(255,255,255,0.8)", fontWeight:"normal", marginLeft:2 }}>件</span></div>
+                <div style={{ fontSize:10, color:"rgba(255,255,255,0.8)", marginTop:2 }}>{l}</div>
               </div>
             ))}
             {!sess && (
               <button style={{
                 background:"#F59E0B", color:"#fff", border:"none",
-                padding: isMobile ? "8px 18px" : "9px 24px",
-                fontSize:12, fontWeight:"bold",
-                fontFamily:"inherit", cursor:"pointer", borderRadius:18,
-                boxShadow:"0 2px 8px rgba(245,158,11,0.3)",
+                padding: isMobile ? "10px 20px" : "11px 28px",
+                fontSize:13, fontWeight:"bold",
+                fontFamily:"inherit", cursor:"pointer", borderRadius:22,
+                boxShadow:"0 4px 16px rgba(245,158,11,0.4)",
                 marginLeft: isMobile ? 0 : 6
               }} onClick={() => setAuthMode("register")}>
                 無料会員登録（30秒）→
