@@ -2089,6 +2089,28 @@ export default function App() {
   };
 
   const addPost = async (d) => {
+    // 転職掲示板（ptype==="board"）はログイン不要・メールとコテハンで投稿可能
+    if (d.ptype === "board") {
+      let author = uName;
+      let authorUid = authUser?.uid || null;
+      let guestEmail = null;
+      if (!authUser) {
+        if (!d.guestEmail || !d.guestEmail.includes("@")) { toast2("メールアドレスを入力してください"); return; }
+        if (!d.guestName || !d.guestName.trim()) { toast2("お名前を入力してください"); return; }
+        author = d.guestName.trim();
+        authorUid = null;
+        guestEmail = d.guestEmail.trim();
+      }
+      const data = { ...d, author, authorUid, guestEmail, likes: [], comments: [] };
+      delete data.guestName;
+      const id = await fsAdd("posts", data);
+      setPosts(prev => [{ id, ...data, createdAt: null }, ...prev]);
+      if (authUser) await grantUnlock();
+      toast2(authUser ? "投稿ありがとうございます！30日間 全コンテンツ閲覧可能になりました" : "書き込みありがとうございます！会員登録すると投稿の編集ができます");
+      go("company", companies.find(c => c.id === d.companyId), "board");
+      return;
+    }
+    // それ以外（面接体験談・ES例文）はログイン必須
     if (!authUser) { setAuthMode("login"); toast2("ログイン後に投稿できます"); return; }
     const data = { ...d, author: uName, authorUid: authUser?.uid || null, likes: [], comments: [] };
     const id   = await fsAdd("posts", data);
