@@ -191,6 +191,19 @@ const C = {
 // ─── ユーティリティ ────────────────────────────────────────────────────────────
 const ini   = (n) => n ? String(n).slice(0,2) : "?";
 const today = () => new Date().toISOString().slice(0,10);
+// 投稿時刻フォーマット（YYYY-MM-DD HH:MM:SS、日本時間）
+const fmtDateTime = (d) => {
+  if (!d) return "";
+  const date = d?.toDate ? d.toDate() : (typeof d === "string" ? new Date(d) : (d instanceof Date ? d : null));
+  if (!date || isNaN(date.getTime())) return typeof d === "string" ? d : "";
+  const yr  = date.getFullYear();
+  const mo  = String(date.getMonth() + 1).padStart(2, "0");
+  const dy  = String(date.getDate()).padStart(2, "0");
+  const hh  = String(date.getHours()).padStart(2, "0");
+  const mm  = String(date.getMinutes()).padStart(2, "0");
+  const ss  = String(date.getSeconds()).padStart(2, "0");
+  return `${yr}-${mo}-${dy} ${hh}:${mm}:${ss}`;
+};
 const ago   = (ts) => {
   if (!ts) return "-";
   const d    = ts?.toDate ? ts.toDate() : new Date(typeof ts === "number" ? ts * 1000 : ts);
@@ -2165,12 +2178,28 @@ export default function App() {
     toast2(favorites.includes(postId) ? "お気に入りを解除しました" : "お気に入りに追加しました");
   };
 
-  const addComment = async (postId, content) => {
-    const cmt     = { id: Math.random().toString(36).slice(2,10), author: uName, authorUid: authUser?.uid || null, content, date: today() };
+  const addComment = async (postId, content, parentId = null, guestName = null) => {
+    // コメント・リプライは認証不要（掲示板に準ずる）
+    const author = authUser ? uName : (guestName || "匿名ユーザー");
+    const cmt = {
+      id: Math.random().toString(36).slice(2,10) + Date.now().toString(36),
+      author,
+      authorUid: authUser?.uid || null,
+      content,
+      date: today(),
+      ts: Date.now(),     // ミリ秒タイムスタンプ
+      parentId: parentId || null,
+      likes: [],
+    };
     const post    = posts.find(p => p.id === postId);
     const newCmts = [...(post?.comments || []), cmt];
-    await fsUpdate("posts", postId, { comments: newCmts });
-    setPosts(prev => prev.map(p => p.id !== postId ? p : { ...p, comments: newCmts }));
+    try {
+      await fsUpdate("posts", postId, { comments: newCmts });
+      setPosts(prev => prev.map(p => p.id !== postId ? p : { ...p, comments: newCmts }));
+    } catch (e) {
+      console.error("comment error:", e);
+      toast2("コメントに失敗しました: " + (e.message || e.code));
+    }
   };
 
   const toggleLike = async (postId) => {
@@ -5668,8 +5697,10 @@ function AISummary({ posts, reviews, type }) {
 
 function CommentThread({ post, uName, authUserKey, authUser, isAdmin, onAddComment, adminDelete, getAuthorBadge }) {
   const [cmt, setCmt] = React.useState("");
-  const [replyTo, setReplyTo] = React.useState(null); // 返信先のコメントID
+  const [replyTo, setReplyTo] = React.useState(null);
   const [replyText, setReplyText] = React.useState("");
+  const [guestNameLocal, setGuestNameLocal] = React.useState("");
+  const isGuest = !authUser;
 
   const comments = post.comments || [];
   // 親 = parentId なし、子 = parentId あり
@@ -5679,7 +5710,7 @@ function CommentThread({ post, uName, authUserKey, authUser, isAdmin, onAddComme
   const handleSubmit = async (parentId) => {
     const text = parentId ? replyText : cmt;
     if (!text.trim()) return;
-    await onAddComment(post.id, text.trim(), parentId);
+    await onAddComment(post.id, text.trim(), parentId, guestNameLocal);
     if (parentId) { setReplyText(""); setReplyTo(null); }
     else setCmt("");
   };
@@ -5695,7 +5726,7 @@ function CommentThread({ post, uName, authUserKey, authUser, isAdmin, onAddComme
             <AC>{ini(c.author)}</AC>
             <span style={{ fontSize:12, fontWeight:"bold", color:C.ink }}>{c.author}</span>
             {getAuthorBadge && getAuthorBadge(c.authorUid) && <BadgeChip badge={getAuthorBadge(c.authorUid)} small />}
-            <span style={{ fontSize:10, color:C.sub }}>{c.date}</span>
+            <span style={{ fontSize:10, color:C.sub }}>{fmtDateTime(c.ts || c.date)}</span>
             {isAdmin && <SmBtn red onClick={() => adminDelete("comment", post.id + ":" + c.id)}>削除</SmBtn>}
           </div>
           <p style={{ fontSize:13, lineHeight:1.8, color:C.ink, marginBottom:6 }}>{c.content}</p>
@@ -5747,8 +5778,16 @@ function CommentThread({ post, uName, authUserKey, authUser, isAdmin, onAddComme
       {tops.length === 0 && <p style={{ fontSize:11, color:C.sub, textAlign:"center", padding:"8px 0" }}>まだコメントがありません。最初のコメントを残しましょう。</p>}
       {tops.map(c => renderComment(c, 0))}
       <div style={{ display:"flex", gap:8, marginTop:12, alignItems:"flex-start", paddingTop:10, borderTop:"1px solid " + C.border }}>
-        <AC>{ini(uName)}</AC>
+        <AC>{ini(isGuest ? (guestNameLocal || "匿") : uName)}</AC>
         <div style={{ flex:1 }}>
+          {isGuest && (
+            <input
+              style={{ ...S.input, marginBottom:6, fontSize:12 }}
+              placeholder="お名前（任意・空欄なら匿名）"
+              value={guestNameLocal}
+              onChange={e => setGuestNameLocal(e.target.value)}
+            />
+          )}
           <textarea style={{ ...S.input, resize:"vertical", width:"100%" }} rows={2} placeholder="コメントを入力" value={cmt} onChange={e => setCmt(e.target.value)} />
           <button style={{ ...S.primaryBtn, marginTop:6, fontSize:12, padding:"7px 14px" }} onClick={() => handleSubmit(null)}>
             コメントする
