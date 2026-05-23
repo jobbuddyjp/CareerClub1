@@ -191,6 +191,27 @@ const C = {
 // ─── ユーティリティ ────────────────────────────────────────────────────────────
 const ini   = (n) => n ? String(n).slice(0,2) : "?";
 const today = () => new Date().toISOString().slice(0,10);
+// 短いハッシュ生成（SHA-256の先頭8文字、同期版）
+const shortHash = (str) => {
+  if (!str) return "";
+  // 簡易ハッシュ（FNV-1a）：暗号学的でないが、表示用のIDとしては十分
+  let h = 0x811c9dc5;
+  for (let i = 0; i < str.length; i++) {
+    h ^= str.charCodeAt(i);
+    h = (h * 0x01000193) >>> 0;
+  }
+  // 8桁の16進数
+  return h.toString(16).padStart(8, "0").slice(0, 8);
+};
+
+// 投稿者ID生成：authorUid → email → anon localStorage
+const getAuthorId = (item) => {
+  if (item.authorUid) return shortHash("uid:" + item.authorUid);
+  if (item.guestEmail) return shortHash("em:" + item.guestEmail.toLowerCase().trim());
+  if (item.anonKey) return shortHash("anon:" + item.anonKey);
+  return null;
+};
+
 // 投稿時刻フォーマット（YYYY-MM-DD HH:MM:SS、日本時間）
 const fmtDateTime = (d) => {
   if (!d) return "";
@@ -2185,9 +2206,10 @@ export default function App() {
       id: Math.random().toString(36).slice(2,10) + Date.now().toString(36),
       author,
       authorUid: authUser?.uid || null,
+      anonKey: authUser ? null : anonKey(),  // ゲストのID用（ブラウザ単位）
       content,
       date: today(),
-      ts: Date.now(),     // ミリ秒タイムスタンプ
+      ts: Date.now(),
       parentId: parentId || null,
       likes: [],
     };
@@ -2745,9 +2767,17 @@ const RANDOM_NAMES_BY_GROUP = {
 };
 const DEFAULT_RANDOM_NAMES = ["匿名希望","名無しさん","通りすがり","気になる人","転職検討中","就活生","業界研究中","情報収集中"];
 
-function getRandomNickname(group) {
+function getRandomNickname(group, usedNames = []) {
   const pool = (RANDOM_NAMES_BY_GROUP[group] || []).concat(DEFAULT_RANDOM_NAMES);
-  return pool[Math.floor(Math.random() * pool.length)];
+  const available = pool.filter(n => !usedNames.includes(n));
+  // 全部使い尽くしたら数字をつけて衝突回避
+  if (available.length === 0) {
+    const base = pool[Math.floor(Math.random() * pool.length)];
+    let suffix = 2;
+    while (usedNames.includes(`${base}${suffix}`)) suffix += 1;
+    return `${base}${suffix}`;
+  }
+  return available[Math.floor(Math.random() * available.length)];
 }
 
 function CompanyLogo({ company, size = 36 }) {
@@ -3702,7 +3732,8 @@ function PostsTab({ posts, ptype, label, co, uName, onAddPost, onToggleLike, onA
     : isBoard
     ? {
         companyId:co.id, ptype, stage:"掲示板", title:"", content:"", jobCategory: jobCat || "全職種",
-        guestEmail:"", guestName: getRandomNickname(co.group || getGroup(co.industry))
+        guestEmail:"",
+        guestName: getRandomNickname(co.group || getGroup(co.industry), [...new Set((posts.filter(p => p.ptype === "board").map(p => p.author).filter(Boolean)))])
       }
     : { companyId:co.id, ptype, stage:"", title:"", content:"", jobCategory:"全職種", offerAmount:"", offerBase:"", offerBonus:"" };
   const sorted = [...posts].sort((a,b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
@@ -3777,7 +3808,10 @@ function PostsTab({ posts, ptype, label, co, uName, onAddPost, onToggleLike, onA
                 <div style={{ display:"flex", gap:6 }}>
                   <input style={{...S.input, flex:1}} placeholder="例：伝説のバンカー" value={sess ? uName : form.guestName} onChange={e => { if (!sess) setForm({ ...form, guestName:e.target.value }); }} readOnly={!!sess} />
                   {!sess && (
-                    <button type="button" style={{ background:"#fff", border:"1px solid " + C.border, padding:"6px 12px", fontSize:12, cursor:"pointer", fontFamily:"inherit", borderRadius:5, whiteSpace:"nowrap" }} onClick={() => setForm({ ...form, guestName: getRandomNickname(co.group || getGroup(co.industry)) })}>
+                    <button type="button" style={{ background:"#fff", border:"1px solid " + C.border, padding:"6px 12px", fontSize:12, cursor:"pointer", fontFamily:"inherit", borderRadius:5, whiteSpace:"nowrap" }} onClick={() => {
+                      const used = [...new Set(posts.filter(p => p.ptype === "board").map(p => p.author).filter(Boolean))].filter(n => n !== form.guestName);
+                      setForm({ ...form, guestName: getRandomNickname(co.group || getGroup(co.industry), used) });
+                    }}>
                       🎲 シャッフル
                     </button>
                   )}
@@ -4090,6 +4124,7 @@ function PostsTab({ posts, ptype, label, co, uName, onAddPost, onToggleLike, onA
               <div style={{ display:"flex", alignItems:"center", gap:10, borderTop:"1px solid " + C.border, paddingTop:10, flexWrap:"wrap" }}>
                 <AC>{ini(p.author)}</AC>
                 <span style={{ fontSize:12, color:C.sub }}>{p.author}</span>
+                {getAuthorId(p) && <span style={{ fontSize:10, color:"#C0C0C0", fontFamily:"monospace", marginLeft:-2 }}>#{getAuthorId(p)}</span>}
                 {getAuthorBadge && getAuthorBadge(p.authorUid) && <BadgeChip badge={getAuthorBadge(p.authorUid)} small />}
                 {(p.likes || []).length >= 10 && (
                   <span style={{ background:"#FEE2E2", color:"#DC2626", padding:"2px 8px", fontSize:10, fontWeight:"bold", borderRadius:10 }}>
@@ -4112,6 +4147,7 @@ function PostsTab({ posts, ptype, label, co, uName, onAddPost, onToggleLike, onA
                   uName={uName}
                   authUserKey={authUserKey}
                   authUser={authUser}
+                  co={co}
                   isAdmin={isAdmin}
                   onAddComment={onAddComment}
                   adminDelete={adminDelete}
@@ -4405,6 +4441,7 @@ function ReviewsTab({ revs, avgData: a, co, uName, plan, onAddReview, isAdmin, a
           {r.advice && <div style={{ marginBottom:10 }}><div style={{ fontSize:11, fontWeight:"bold", color:C.sub, marginBottom:3 }}>アドバイス</div><p style={{ fontSize:13, lineHeight:1.9 }}>{r.advice}</p></div>}
           <div style={{ display:"flex", alignItems:"center", gap:8, marginTop:10, paddingTop:10, borderTop:"1px solid " + C.border }}>
             <AC>{ini(r.author)}</AC><span style={{ fontSize:12, color:C.sub }}>{r.author}</span>
+            {getAuthorId(r) && <span style={{ fontSize:10, color:"#C0C0C0", fontFamily:"monospace" }}>#{getAuthorId(r)}</span>}
             {getAuthorBadge && getAuthorBadge(r.authorUid) && <BadgeChip badge={getAuthorBadge(r.authorUid)} small />}
           </div>
         </div>
@@ -4603,6 +4640,7 @@ function SalaryTab({ sals, avgSalary, co, uName, plan, onAddSalary, isAdmin, adm
           {s.comment && <p style={{ fontSize:13, lineHeight:1.85, borderTop:"1px solid " + C.border, paddingTop:10, marginTop:8 }}>{s.comment}</p>}
           <div style={{ display:"flex", alignItems:"center", gap:8, marginTop:10, paddingTop:10, borderTop:"1px solid " + C.border }}>
             <AC>{ini(s.author)}</AC><span style={{ fontSize:12, color:C.sub }}>{s.author}</span>
+            {getAuthorId(s) && <span style={{ fontSize:10, color:"#C0C0C0", fontFamily:"monospace" }}>#{getAuthorId(s)}</span>}
             {getAuthorBadge && getAuthorBadge(s.authorUid) && <BadgeChip badge={getAuthorBadge(s.authorUid)} small />}
           </div>
         </div>
@@ -5695,11 +5733,19 @@ function AISummary({ posts, reviews, type }) {
   );
 }
 
-function CommentThread({ post, uName, authUserKey, authUser, isAdmin, onAddComment, adminDelete, getAuthorBadge }) {
+function CommentThread({ post, uName, authUserKey, authUser, co, isAdmin, onAddComment, adminDelete, getAuthorBadge }) {
   const [cmt, setCmt] = React.useState("");
   const [replyTo, setReplyTo] = React.useState(null);
   const [replyText, setReplyText] = React.useState("");
-  const [guestNameLocal, setGuestNameLocal] = React.useState("");
+  const grpForName = (co && (co.group || getGroup(co.industry))) || "メーカー";
+  // 投稿者＋すべてのコメント参加者の名前を「使用済み」として渡す
+  const usedNames = React.useMemo(() => {
+    const names = new Set();
+    if (post.author) names.add(post.author);
+    (post.comments || []).forEach(c => c.author && names.add(c.author));
+    return Array.from(names);
+  }, [post.author, post.comments]);
+  const [guestNameLocal, setGuestNameLocal] = React.useState(() => getRandomNickname(grpForName, usedNames));
   const isGuest = !authUser;
 
   const comments = post.comments || [];
@@ -5725,6 +5771,7 @@ function CommentThread({ post, uName, authUserKey, authUser, isAdmin, onAddComme
           <div style={{ display:"flex", alignItems:"center", gap:6, marginBottom:6, flexWrap:"wrap" }}>
             <AC>{ini(c.author)}</AC>
             <span style={{ fontSize:12, fontWeight:"bold", color:C.ink }}>{c.author}</span>
+            {getAuthorId(c) && <span style={{ fontSize:10, color:"#C0C0C0", fontFamily:"monospace" }}>#{getAuthorId(c)}</span>}
             {getAuthorBadge && getAuthorBadge(c.authorUid) && <BadgeChip badge={getAuthorBadge(c.authorUid)} small />}
             <span style={{ fontSize:10, color:C.sub }}>{fmtDateTime(c.ts || c.date)}</span>
             {isAdmin && <SmBtn red onClick={() => adminDelete("comment", post.id + ":" + c.id)}>削除</SmBtn>}
@@ -5749,8 +5796,23 @@ function CommentThread({ post, uName, authUserKey, authUser, isAdmin, onAddComme
         </div>
         {replyTo === c.id && (
           <div style={{ marginLeft:24, marginTop:6, display:"flex", gap:6, alignItems:"flex-start" }}>
-            <AC>{ini(uName)}</AC>
+            <AC>{ini(isGuest ? (guestNameLocal || "匿") : uName)}</AC>
             <div style={{ flex:1 }}>
+              {isGuest && (
+                <div style={{ display:"flex", gap:6, marginBottom:4 }}>
+                  <input
+                    style={{ ...S.input, flex:1, fontSize:12 }}
+                    placeholder="お名前（ランダム自動セット済み）"
+                    value={guestNameLocal}
+                    onChange={e => setGuestNameLocal(e.target.value)}
+                  />
+                  <button
+                    type="button"
+                    style={{ background:"#fff", border:"1px solid " + C.border, padding:"4px 10px", fontSize:11, cursor:"pointer", fontFamily:"inherit", borderRadius:5, whiteSpace:"nowrap" }}
+                    onClick={() => setGuestNameLocal(getRandomNickname(grpForName, usedNames.filter(n => n !== guestNameLocal)))}
+                  >🎲</button>
+                </div>
+              )}
               <textarea style={{ ...S.input, resize:"vertical", width:"100%" }} rows={2} placeholder={`${c.author}さんへの返信`} value={replyText} onChange={e => setReplyText(e.target.value)} />
               <div style={{ display:"flex", gap:6, marginTop:4 }}>
                 <button style={{ ...S.primaryBtn, fontSize:11, padding:"5px 12px" }} onClick={() => handleSubmit(c.id)}>
@@ -5781,12 +5843,19 @@ function CommentThread({ post, uName, authUserKey, authUser, isAdmin, onAddComme
         <AC>{ini(isGuest ? (guestNameLocal || "匿") : uName)}</AC>
         <div style={{ flex:1 }}>
           {isGuest && (
-            <input
-              style={{ ...S.input, marginBottom:6, fontSize:12 }}
-              placeholder="お名前（任意・空欄なら匿名）"
-              value={guestNameLocal}
-              onChange={e => setGuestNameLocal(e.target.value)}
-            />
+            <div style={{ display:"flex", gap:6, marginBottom:6 }}>
+              <input
+                style={{ ...S.input, flex:1, fontSize:12 }}
+                placeholder="お名前（ランダム自動セット済み）"
+                value={guestNameLocal}
+                onChange={e => setGuestNameLocal(e.target.value)}
+              />
+              <button
+                type="button"
+                style={{ background:"#fff", border:"1px solid " + C.border, padding:"4px 10px", fontSize:11, cursor:"pointer", fontFamily:"inherit", borderRadius:5, whiteSpace:"nowrap" }}
+                onClick={() => setGuestNameLocal(getRandomNickname(grpForName, usedNames.filter(n => n !== guestNameLocal)))}
+              >🎲 シャッフル</button>
+            </div>
           )}
           <textarea style={{ ...S.input, resize:"vertical", width:"100%" }} rows={2} placeholder="コメントを入力" value={cmt} onChange={e => setCmt(e.target.value)} />
           <button style={{ ...S.primaryBtn, marginTop:6, fontSize:12, padding:"7px 14px" }} onClick={() => handleSubmit(null)}>
