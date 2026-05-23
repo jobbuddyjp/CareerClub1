@@ -2103,11 +2103,16 @@ export default function App() {
       }
       const data = { ...d, author, authorUid, guestEmail, likes: [], comments: [] };
       delete data.guestName;
-      const id = await fsAdd("posts", data);
-      setPosts(prev => [{ id, ...data, createdAt: null }, ...prev]);
-      if (authUser) await grantUnlock();
-      toast2(authUser ? "投稿ありがとうございます！30日間 全コンテンツ閲覧可能になりました" : "書き込みありがとうございます！会員登録すると投稿の編集ができます");
-      go("company", companies.find(c => c.id === d.companyId), "board");
+      try {
+        const id = await fsAdd("posts", data);
+        setPosts(prev => [{ id, ...data, createdAt: null }, ...prev]);
+        if (authUser) await grantUnlock();
+        toast2(authUser ? "投稿ありがとうございます！30日間 全コンテンツ閲覧可能になりました" : "書き込みありがとうございます！会員登録すると投稿の編集ができます");
+        go("company", companies.find(c => c.id === d.companyId), "board");
+      } catch (e) {
+        console.error("post error:", e);
+        toast2("投稿に失敗しました: " + (e.message || e.code || "unknown error"));
+      }
       return;
     }
     // それ以外（面接体験談・ES例文）はログイン必須
