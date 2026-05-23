@@ -3712,6 +3712,7 @@ function PostsTab({ posts, ptype, label, co, uName, onAddPost, onToggleLike, onA
   const [exp,  setExp]  = useState(null);
   const [cmt,  setCmt]  = useState("");
   const [form, setForm] = useState(null);
+  const [boardViewMode, setBoardViewMode] = React.useState("full"); // "full" | "title-only"
   const [customStage, setCustomStage] = useState("");
   const [showCustomStage, setShowCustomStage] = useState(false);
   const [stages, setStages] = useState([{ stage:"", content:"" }]);
@@ -3749,12 +3750,26 @@ function PostsTab({ posts, ptype, label, co, uName, onAddPost, onToggleLike, onA
       )}
       <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:14, paddingBottom:10, borderBottom:"1px solid " + C.border, flexWrap:"wrap", gap:8 }}>
         <span style={{ fontSize:12, color:C.sub }}>{posts.length}件の{label}{ptype === "board" && jobCat !== "全職種" ? ` (${jobCat})` : ""}</span>
-        <button
-          style={{ ...S.primaryBtn, ...(isBoard && !form ? { background:"#F59E0B", boxShadow:"0 2px 8px rgba(245,158,11,0.3)" } : {}) }}
-          onClick={(e) => { e.preventDefault(); e.stopPropagation(); setForm(form ? null : initF); }}
-        >
-          {form ? "キャンセル" : isBoard ? "✏️ いますぐ書き込む" : "＋ " + label + "を投稿する"}
-        </button>
+        <div style={{ display:"flex", gap:6, alignItems:"center" }}>
+          {isBoard && (
+            <div style={{ display:"flex", border:"1px solid " + C.border, borderRadius:5, overflow:"hidden" }}>
+              <button
+                style={{ background: boardViewMode === "title-only" ? C.accent : "#fff", color: boardViewMode === "title-only" ? "#fff" : C.sub, border:"none", padding:"5px 10px", fontSize:11, cursor:"pointer", fontFamily:"inherit" }}
+                onClick={() => setBoardViewMode("title-only")}
+              >📋 タイトルのみ</button>
+              <button
+                style={{ background: boardViewMode === "full" ? C.accent : "#fff", color: boardViewMode === "full" ? "#fff" : C.sub, border:"none", padding:"5px 10px", fontSize:11, cursor:"pointer", fontFamily:"inherit" }}
+                onClick={() => setBoardViewMode("full")}
+              >📄 記事内容</button>
+            </div>
+          )}
+          <button
+            style={{ ...S.primaryBtn, ...(isBoard && !form ? { background:"#F59E0B", boxShadow:"0 2px 8px rgba(245,158,11,0.3)" } : {}) }}
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); setForm(form ? null : initF); }}
+          >
+            {form ? "キャンセル" : isBoard ? "✏️ いますぐ書き込む" : "＋ " + label + "を投稿する"}
+          </button>
+        </div>
       </div>
       {form && (
         <div style={{ background:C.surface, border:"1px solid " + C.border, borderTop:"3px solid " + C.accent, padding:"18px 20px", marginBottom:20 }}>
@@ -4032,11 +4047,87 @@ function PostsTab({ posts, ptype, label, co, uName, onAddPost, onToggleLike, onA
       )}
       {sorted.map((p, idx) => {
         const isLocked = !unlocked && (
-          ptype === "board" ? false :  // 掲示板はロックしない
+          ptype === "board" ? false :
           ptype === "es" ? idx >= 0 :
           ptype === "interview" ? idx >= 1 :
           idx >= 1
         );
+        // 掲示板用 タイトル一覧モード
+        if (isBoard && boardViewMode === "title-only") {
+          return (
+            <div key={p.id} style={{ display:"flex", alignItems:"center", gap:10, padding:"10px 14px", background:"#fff", border:"1px solid " + C.border, borderRadius:6, marginBottom:6, cursor:"pointer", flexWrap:"wrap" }} onClick={() => { setBoardViewMode("full"); setTimeout(() => { const el = document.getElementById("post-" + p.id); if (el) el.scrollIntoView({ behavior:"smooth", block:"start" }); }, 50); }}>
+              <span style={{ background:"#1E3A8A", color:"#fff", padding:"2px 8px", fontSize:10, fontWeight:"bold", fontFamily:"monospace", borderRadius:3 }}>No.{(sorted.length - idx).toString().padStart(4, "0")}</span>
+              <span style={{ fontSize:13, fontWeight:"bold", color:C.ink, flex:1, minWidth:200 }}>{p.title}</span>
+              {(p.comments || []).length > 0 && (
+                <span style={{ fontSize:11, color:C.accent, fontWeight:"bold" }}>💬 {(p.comments || []).length}</span>
+              )}
+              {(p.likes || []).length > 0 && (
+                <span style={{ fontSize:11, color:"#DC2626" }}>❤️ {(p.likes || []).length}</span>
+              )}
+              <span style={{ fontSize:10, color:C.sub }}>投稿者: {p.author}</span>
+              {getAuthorId(p) && <span style={{ fontSize:9, color:"#C0C0C0", fontFamily:"monospace" }}>#{getAuthorId(p)}</span>}
+              <span style={{ fontSize:10, color:C.sub }}>{fmtDateTime(p.createdAt)}</span>
+            </div>
+          );
+        }
+        // 掲示板用 記事内容モード（クルーネット風ヘッダー）
+        if (isBoard && boardViewMode === "full") {
+          return (
+            <article key={p.id} id={"post-" + p.id} style={{ background:"#fff", border:"1px solid " + C.border, borderRadius:6, marginBottom:14, overflow:"hidden" }}>
+              {/* 番号付きヘッダー */}
+              <div style={{ background:"#1E3A8A", color:"#fff", padding:"8px 14px", display:"flex", alignItems:"center", gap:10, flexWrap:"wrap" }}>
+                <span style={{ fontSize:11, fontFamily:"monospace", opacity:0.9 }}>No.{(sorted.length - idx).toString().padStart(4, "0")}</span>
+                <span style={{ width:1, height:14, background:"rgba(255,255,255,0.3)" }} />
+                <span style={{ fontSize:14, fontWeight:"bold", flex:1, minWidth:0 }}>{p.title}</span>
+                {isAdmin && (
+                  <>
+                    <button style={{ background:"rgba(255,255,255,0.15)", color:"#fff", border:"1px solid rgba(255,255,255,0.3)", padding:"2px 8px", fontSize:10, cursor:"pointer", fontFamily:"inherit", borderRadius:3 }} onClick={() => setEditTgt({ type:"post", data:p })}>編集</button>
+                    <button style={{ background:"rgba(220,38,38,0.7)", color:"#fff", border:"1px solid rgba(255,255,255,0.3)", padding:"2px 8px", fontSize:10, cursor:"pointer", fontFamily:"inherit", borderRadius:3 }} onClick={() => adminDelete("post", p.id)}>削除</button>
+                  </>
+                )}
+              </div>
+              {/* メタ情報行 */}
+              <div style={{ background:"#F5F8FC", padding:"6px 14px", fontSize:11, color:C.sub, display:"flex", gap:14, flexWrap:"wrap", borderBottom:"1px solid " + C.border }}>
+                <span>投稿日：{fmtDateTime(p.createdAt)}</span>
+                <span>投稿者：<strong style={{ color:C.ink }}>{p.author}</strong>{getAuthorId(p) && <span style={{ color:"#C0C0C0", fontFamily:"monospace", marginLeft:4 }}>#{getAuthorId(p)}</span>}</span>
+                {p.jobCategory && p.jobCategory !== "全職種" && (
+                  <span style={{ background:"#EFF6FF", color:"#1E40AF", padding:"1px 7px", borderRadius:3 }}>{p.jobCategory}</span>
+                )}
+              </div>
+              {/* 本文 */}
+              <div style={{ padding:"14px 16px" }}>
+                <p style={{ fontSize:13, lineHeight:1.9, whiteSpace:"pre-wrap" }}>{p.content}</p>
+                <div style={{ display:"flex", alignItems:"center", gap:10, marginTop:12, paddingTop:10, borderTop:"1px solid " + C.border, flexWrap:"wrap" }}>
+                  {(p.likes || []).length >= 10 && (
+                    <span style={{ background:"#FEE2E2", color:"#DC2626", padding:"2px 8px", fontSize:10, fontWeight:"bold", borderRadius:10 }}>🔥 人気</span>
+                  )}
+                  <div style={{ marginLeft:"auto", display:"flex", gap:6 }}>
+                    <LikeButton liked={(p.likes || []).includes(authUserKey)} count={(p.likes || []).length} onClick={() => onToggleLike(p.id)} />
+                    <button style={{ background:"#fff", border:"1px solid " + C.border, color:C.sub, fontSize:12, cursor:"pointer", fontFamily:"inherit", padding:"6px 12px", borderRadius:18 }} onClick={() => setExp(exp === p.id ? null : p.id)}>
+                      💬 コメントを書く ({(p.comments || []).length})
+                    </button>
+                  </div>
+                </div>
+              </div>
+              {/* コメントツリー */}
+              {exp === p.id && (
+                <div style={{ borderTop:"1px solid " + C.border, background:"#FAFCFE", padding:"10px 14px" }}>
+                  <CommentThread
+                    post={p}
+                    uName={uName}
+                    authUserKey={authUserKey}
+                    authUser={authUser}
+                    co={co}
+                    isAdmin={isAdmin}
+                    onAddComment={onAddComment}
+                    adminDelete={adminDelete}
+                    getAuthorBadge={getAuthorBadge}
+                  />
+                </div>
+              )}
+            </article>
+          );
+        }
         return (
             <article key={p.id} style={{ background:C.surface, padding:"12px 0", borderBottom:"1px solid " + C.border, position:"relative", filter: isLocked ? "blur(5px)" : "none", pointerEvents: isLocked ? "none" : "auto", userSelect: isLocked ? "none" : "auto" }}>
               {isAdmin && (
