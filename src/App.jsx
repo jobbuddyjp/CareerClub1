@@ -2281,6 +2281,7 @@ export default function App() {
         {page === "home"       && <HomePage       {...sp} coPosts={coPosts} coRevs={coRevs} coSals={coSals} setAuthMode={setAuthMode} doGlobalSearch={doGlobalSearch} />}
         {page === "companies"  && <CompaniesPage  {...sp} filtered={filteredCos} searchQ={searchQ} setSearchQ={setSearchQ} grpFilter={grpFilter} setGrpFilter={setGrpFilter} subFilter={subFilter} setSubFilter={setSubFilter} sortBy={sortBy} setSortBy={setSortBy} coPosts={coPosts} coRevs={coRevs} coSals={coSals} />}
         {page === "subTop"     && <SubTopPage     {...sp} grp={subTopGroup} setGrpFilter={setGrpFilter} setSubFilter={setSubFilter} coPosts={coPosts} coRevs={coRevs} coSals={coSals} />}
+        {page === "boardFeed"  && <BoardFeedPage  {...sp} coPosts={coPosts} />}
         {page === "company"    && selCo && (
           <CompanyPage {...sp}
             co={selCo}
@@ -2669,6 +2670,30 @@ const GROUP_LOGO_COLORS = {
   "交通・運輸":   { bg:"linear-gradient(135deg, #115E59 0%, #2DD4BF 100%)", color:"#fff" },
 };
 
+
+// 業種別のランダム匿名ニックネーム
+const RANDOM_NAMES_BY_GROUP = {
+  "金融・銀行":   ["伝説のバンカー","チャートの魔術師","M&Aの達人","数字に強い人","シニアアナリスト","資産運用の鬼","金融マンの卵","深夜の決算分析人"],
+  "商社":         ["世界を駆ける営業","資源ハンター","食料の番人","エネルギーの旗手","会議が長い人","駐在経験者","内資総合職","商社マンの末裔"],
+  "メーカー":     ["ものづくりの匠","設計の鬼","品質の番人","現場の声","工場のヌシ","ライン班長","研究室の主","技術屋一筋"],
+  "IT・テック":   ["コードの魔術師","エンジニアの卵","フルスタック男","インフラ番長","SaaSの伝道師","深夜のデバッガー","勉強会勢","クラウドおじさん"],
+  "コンサル":     ["スライド職人","深夜のExcel芸人","パートナー候補","BCG志望","クロス分析の人","インタビュアー","ロジカルシンキング職人","M&Aアドバイザー"],
+  "不動産・建設": ["街づくり職人","現場監督候補","用地仕入の達人","営業の鬼","プロパティ番人","建築デザイナー","施工管理マン","デベロッパー志望"],
+  "小売・流通":   ["バイヤー志望","店長候補","物流の達人","SCMマスター","現場のヌシ","エリアマネ","百貨店マン","EC運営者"],
+  "サービス":     ["広告マン","クリエイティブ職人","営業マシン","HR担当","プランナー","コピーライター志望","Sansan使い","採用担当"],
+  "医療・ヘルス": ["MR志望","臨床開発の人","薬剤師","研究員","製薬マン","医療機器マン","営業所長","学術担当"],
+  "教育・公共":   ["教育者","公務員志望","学校事務員","研究員","講師","教材開発者","行政マン","教育の伝道師"],
+  "エンタメ":     ["ゲームクリエイター","映像クリエイター","音楽家志望","プランナー","シナリオライター","声優志望","アニメ好き","出版志望"],
+  "航空":         ["伝説のパイロット","空の達人","CA志望","整備士の卵","グランドスタッフ","航空大学校生","運航管理者","管制官志望"],
+  "交通・運輸":   ["鉄道マン","運転士志望","駅員","運行管理者","車掌志望","船員","物流の達人","タクシードライバー"],
+};
+const DEFAULT_RANDOM_NAMES = ["匿名希望","名無しさん","通りすがり","気になる人","転職検討中","就活生","業界研究中","情報収集中"];
+
+function getRandomNickname(group) {
+  const pool = (RANDOM_NAMES_BY_GROUP[group] || []).concat(DEFAULT_RANDOM_NAMES);
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+
 function CompanyLogo({ company, size = 36 }) {
   const [imgErr, setImgErr] = React.useState(false);
   if (!company) return null;
@@ -2881,6 +2906,121 @@ function NaiteiTimeline({ posts, companies, go, isMobile }) {
       </p>
       <style>{`@keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.4; } }`}</style>
     </section>
+  );
+}
+
+function BoardFeedPage({ go, goSubTop, companies, posts, isMobile, sess, setAuthMode, authUser, profile, getAuthorBadge }) {
+  // 全企業の board 投稿を集約
+  const boardPosts = posts
+    .filter(p => p.ptype === "board")
+    .sort((a,b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+
+  const recentPostsByCompany = {};
+  boardPosts.forEach(p => {
+    if (!recentPostsByCompany[p.companyId]) recentPostsByCompany[p.companyId] = [];
+    recentPostsByCompany[p.companyId].push(p);
+  });
+
+  // 投稿数の多い企業 TOP20
+  const topCompanies = Object.entries(recentPostsByCompany)
+    .map(([cid, ps]) => ({ company: companies.find(c => c.id === cid), count: ps.length, latest: ps[0] }))
+    .filter(x => x.company)
+    .sort((a,b) => b.count - a.count)
+    .slice(0, 20);
+
+  return (
+    <div>
+      {/* ヒーロー */}
+      <section style={{
+        position:"relative",
+        backgroundImage:'linear-gradient(rgba(0,0,0,0.45), rgba(0,0,0,0.55)), url("https://images.unsplash.com/photo-1521737604893-d14cc237f11d?w=1400&q=70")',
+        backgroundSize:"cover",
+        backgroundPosition:"center",
+        padding: isMobile ? "28px 20px" : "40px 40px",
+        borderRadius: 14,
+        marginTop: 12,
+        marginBottom: 24,
+        color: "#fff",
+      }}>
+        <div style={{ maxWidth:760, margin:"0 auto", textAlign:"center", textShadow:"0 2px 12px rgba(0,0,0,0.5)" }}>
+          <p style={{ fontSize:11, letterSpacing:"0.2em", fontWeight:"bold", color:"#FCD34D", marginBottom:8 }}>🔥 BOARD FEED</p>
+          <h1 style={{ fontSize: isMobile ? 20 : 28, fontWeight:"bold", lineHeight:1.4, marginBottom:10, fontFamily:'"M PLUS Rounded 1c", sans-serif' }}>
+            転職掲示板
+          </h1>
+          <p style={{ fontSize: isMobile ? 12 : 14, opacity:0.92, lineHeight:1.7 }}>
+            登録不要・匿名で書き込み可能。気軽に情報交換しましょう。
+          </p>
+        </div>
+      </section>
+
+      {/* 最新の掲示板投稿 */}
+      <section style={{ marginBottom:24 }}>
+        <h2 style={{ fontSize:16, fontWeight:"bold", marginBottom:12, paddingBottom:8, borderBottom:"3px solid " + C.accent, color:C.ink }}>
+          最新の書き込み
+        </h2>
+        {boardPosts.length === 0 ? (
+          <Empty text="まだ投稿がありません。気になる企業ページから書き込んでみましょう。" />
+        ) : (
+          <div>
+            {boardPosts.slice(0, 30).map(p => {
+              const co = companies.find(c => c.id === p.companyId);
+              if (!co) return null;
+              const t = p.createdAt?.toDate ? p.createdAt.toDate() : null;
+              const tStr = t ? t.toLocaleString("ja-JP", { month:"numeric", day:"numeric", hour:"2-digit", minute:"2-digit" }) : "";
+              return (
+                <div key={p.id} style={{ background:"#fff", border:"1px solid " + C.border, borderRadius:8, padding:"12px 16px", marginBottom:8, cursor:"pointer" }} onClick={() => go("company", co, "board")}>
+                  <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:6, flexWrap:"wrap" }}>
+                    <CompanyLogo company={co} size={24} />
+                    <span style={{ fontSize:13, fontWeight:"bold", color:C.ink }}>{co.name}</span>
+                    {p.jobCategory && p.jobCategory !== "全職種" && (
+                      <span style={{ fontSize:10, background:"#EFF6FF", color:"#1E40AF", padding:"1px 7px", borderRadius:3 }}>{p.jobCategory}</span>
+                    )}
+                    <span style={{ fontSize:10, color:C.sub, marginLeft:"auto" }}>{tStr}</span>
+                  </div>
+                  <h3 style={{ fontSize:14, fontWeight:"bold", marginBottom:4, color:C.ink }}>{p.title}</h3>
+                  <p style={{ fontSize:12, color:C.sub, lineHeight:1.7, overflow:"hidden", display:"-webkit-box", WebkitLineClamp:2, WebkitBoxOrient:"vertical" }}>{p.content}</p>
+                  <div style={{ display:"flex", gap:10, marginTop:6, fontSize:11, color:C.sub }}>
+                    <span>by {p.author}</span>
+                    <span>💬 {(p.comments || []).length}</span>
+                    <span>❤️ {(p.likes || []).length}</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </section>
+
+      {/* 投稿が活発な企業 */}
+      {topCompanies.length > 0 && (
+        <section style={{ marginBottom:24 }}>
+          <h2 style={{ fontSize:16, fontWeight:"bold", marginBottom:12, paddingBottom:8, borderBottom:"3px solid " + C.accent, color:C.ink }}>
+            掲示板が盛り上がってる企業
+          </h2>
+          <div style={{ display:"grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap:8 }}>
+            {topCompanies.map(({ company, count }) => (
+              <div key={company.id} style={{ background:"#fff", border:"1px solid " + C.border, borderRadius:8, padding:"10px 14px", cursor:"pointer", display:"flex", alignItems:"center", gap:10 }} onClick={() => go("company", company, "board")}>
+                <CompanyLogo company={company} size={28} />
+                <span style={{ flex:1, fontSize:13, fontWeight:"bold", color:C.ink }}>{company.name}</span>
+                <span style={{ fontSize:11, background:C.light, color:C.accent, padding:"2px 8px", borderRadius:10, fontWeight:"bold" }}>{count}件の書き込み</span>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* 業種別への導線 */}
+      <section style={{ marginBottom:24 }}>
+        <h2 style={{ fontSize:14, fontWeight:"bold", marginBottom:10, color:C.ink }}>業界から探す</h2>
+        <div style={{ display:"flex", flexWrap:"wrap", gap:6 }}>
+          {ALL_GROUPS.map(g => (
+            <button key={g} style={{ background:"#fff", border:"1px solid " + C.border, padding:"6px 14px", fontSize:12, cursor:"pointer", fontFamily:"inherit", borderRadius:18, color:C.ink }} onClick={() => goSubTop(g)}>
+              {GROUP_THEMES[g]?.emoji || "🏢"} {g}
+            </button>
+          ))}
+        </div>
+      </section>
+    </div>
   );
 }
 
@@ -3470,7 +3610,7 @@ function CompanyPage({ go, co, cposts, crevs, csals, cjobs, initTab, onToggleLik
       <div style={{ marginTop:14 }} />
       <div style={{ paddingTop:20 }}>
         {tab === "interview" && <PostsTab posts={iv} ptype="interview" label="面接体験談" co={co} uName={uName} onAddPost={onAddPost} onToggleLike={onToggleLike} onAddComment={onAddComment} isAdmin={isAdmin} adminDelete={adminDelete} setEditTgt={setEditTgt} favorites={favorites} toggleFavorite={toggleFavorite} jobCat={jobCat} sess={sess} setAuthMode={setAuthMode} unlocked={unlocked} getAuthorBadge={getAuthorBadge} authUser={authUser} />}
-        {tab === "board"     && <PostsTab posts={bd} ptype="board"     label="選考掲示板" co={co} uName={uName} onAddPost={onAddPost} onToggleLike={onToggleLike} onAddComment={onAddComment} isAdmin={isAdmin} adminDelete={adminDelete} setEditTgt={setEditTgt} favorites={favorites} toggleFavorite={toggleFavorite} jobCat={jobCat} sess={sess} setAuthMode={setAuthMode} unlocked={unlocked} getAuthorBadge={getAuthorBadge} authUser={authUser} />}
+        {tab === "board"     && <PostsTab posts={bd} ptype="board"     label="転職掲示板" co={co} uName={uName} onAddPost={onAddPost} onToggleLike={onToggleLike} onAddComment={onAddComment} isAdmin={isAdmin} adminDelete={adminDelete} setEditTgt={setEditTgt} favorites={favorites} toggleFavorite={toggleFavorite} jobCat={jobCat} sess={sess} setAuthMode={setAuthMode} unlocked={unlocked} getAuthorBadge={getAuthorBadge} authUser={authUser} />}
         {tab === "es"        && <PostsTab posts={es} ptype="es"        label="ES例文"     co={co} uName={uName} onAddPost={onAddPost} onToggleLike={onToggleLike} onAddComment={onAddComment} isAdmin={isAdmin} adminDelete={adminDelete} setEditTgt={setEditTgt} favorites={favorites} toggleFavorite={toggleFavorite} jobCat={jobCat} sess={sess} setAuthMode={setAuthMode} unlocked={unlocked} getAuthorBadge={getAuthorBadge} authUser={authUser} />}
         {tab === "review"    && <ReviewsTab revs={crevs} avgData={a}   co={co} uName={uName} plan={plan} onAddReview={onAddReview} isAdmin={isAdmin} adminDelete={adminDelete} setEditTgt={setEditTgt} go={go} sess={sess} setAuthMode={setAuthMode} unlocked={unlocked} getAuthorBadge={getAuthorBadge} />}
         {tab === "salary"    && <SalaryTab  sals={csals} avgSalary={sal} co={co} uName={uName} plan={plan} onAddSalary={onAddSalary} isAdmin={isAdmin} adminDelete={adminDelete} setEditTgt={setEditTgt} go={go} sess={sess} setAuthMode={setAuthMode} unlocked={unlocked} getAuthorBadge={getAuthorBadge} />}
@@ -3506,7 +3646,7 @@ function PostsTab({ posts, ptype, label, co, uName, onAddPost, onToggleLike, onA
     : isBoard
     ? {
         companyId:co.id, ptype, stage:"掲示板", title:"", content:"", jobCategory: jobCat || "全職種",
-        guestEmail:"", guestName:""
+        guestEmail:"", guestName: getRandomNickname(co.group || getGroup(co.industry))
       }
     : { companyId:co.id, ptype, stage:"", title:"", content:"", jobCategory:"全職種", offerAmount:"", offerBase:"", offerBonus:"" };
   const sorted = [...posts].sort((a,b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
@@ -3522,8 +3662,11 @@ function PostsTab({ posts, ptype, label, co, uName, onAddPost, onToggleLike, onA
       )}
       <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:14, paddingBottom:10, borderBottom:"1px solid " + C.border, flexWrap:"wrap", gap:8 }}>
         <span style={{ fontSize:12, color:C.sub }}>{posts.length}件の{label}{ptype === "board" && jobCat !== "全職種" ? ` (${jobCat})` : ""}</span>
-        <button style={S.primaryBtn} onClick={() => setForm(form ? null : initF)}>
-          {form ? "キャンセル" : "＋ " + label + "を投稿する"}
+        <button
+          style={{ ...S.primaryBtn, ...(isBoard && !form ? { background:"#F59E0B", boxShadow:"0 2px 8px rgba(245,158,11,0.3)" } : {}) }}
+          onClick={(e) => { e.preventDefault(); e.stopPropagation(); setForm(form ? null : initF); }}
+        >
+          {form ? "キャンセル" : isBoard ? "✏️ いますぐ書き込む" : "＋ " + label + "を投稿する"}
         </button>
       </div>
       {form && (
@@ -3572,14 +3715,21 @@ function PostsTab({ posts, ptype, label, co, uName, onAddPost, onToggleLike, onA
           {isBoard && (
             <div style={{ background:"#F0F9FF", border:"1px solid #BAE6FD", padding:"14px 16px", borderRadius:8, marginBottom:14 }}>
               <div style={{ fontSize:13, fontWeight:"bold", color:"#0C4A6E", marginBottom:10 }}>
-                💬 気軽に書き込もう（匿名OK）
+                💬 気軽に書き込もう（匿名・登録不要）
               </div>
-              <Fld label="名前 *">
-                <input style={S.input} placeholder={sess ? uName : "ニックネーム（例：転職検討中）"} value={sess ? uName : form.guestName} onChange={e => { if (!sess) setForm({ ...form, guestName:e.target.value }); }} readOnly={!!sess} />
+              <Fld label="お名前（ランダム自動セット済み・編集も可）">
+                <div style={{ display:"flex", gap:6 }}>
+                  <input style={{...S.input, flex:1}} placeholder="例：伝説のバンカー" value={sess ? uName : form.guestName} onChange={e => { if (!sess) setForm({ ...form, guestName:e.target.value }); }} readOnly={!!sess} />
+                  {!sess && (
+                    <button type="button" style={{ background:"#fff", border:"1px solid " + C.border, padding:"6px 12px", fontSize:12, cursor:"pointer", fontFamily:"inherit", borderRadius:5, whiteSpace:"nowrap" }} onClick={() => setForm({ ...form, guestName: getRandomNickname(co.group || getGroup(co.industry)) })}>
+                      🎲 シャッフル
+                    </button>
+                  )}
+                </div>
               </Fld>
               {!sess && (
-                <Fld label="メールアドレス *（非公開）">
-                  <input style={S.input} type="email" placeholder="荒らし対策のみ・非公開" value={form.guestEmail} onChange={e => setForm({ ...form, guestEmail:e.target.value })} />
+                <Fld label="メールアドレス（非公開・荒らし対策のみ）">
+                  <input style={S.input} type="email" placeholder="example@email.com" value={form.guestEmail} onChange={e => setForm({ ...form, guestEmail:e.target.value })} />
                 </Fld>
               )}
             </div>
