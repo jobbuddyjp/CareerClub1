@@ -28,9 +28,9 @@ service cloud.firestore {
                     || (request.resource.data.ptype == "board"
                         && request.resource.data.guestEmail is string
                         && request.resource.data.guestEmail.matches('.*@.*')
-                        && request.resource.data.guestName is string
-                        && request.resource.data.guestName.size() > 0
-                        && request.resource.data.guestName.size() < 50);
+                        && request.resource.data.author is string
+                        && request.resource.data.author.size() > 0
+                        && request.resource.data.author.size() < 50);
       allow delete: if isOwner(resource.data.authorUid) || isAdmin();
       allow update: if
         // いいね・コメントは全員可（閲覧者も押せる）
