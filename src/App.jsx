@@ -174,57 +174,27 @@ const PLANS = {
 
 // ─── カラーパレット ────────────────────────────────────────────────────────────
 const C = {
-  bg:"#FAFCFE",          // ほぼ白の明るい背景
+  bg:"#FAF8F3",          // 温かみのある紙色の背景
   surface:"#FFFFFF",     // カード背景
-  ink:"#1F3A5F",         // やや明るめの紺色（テキスト）
-  sub:"#6B7B91",         // サブテキスト
-  accent:"#2B7BD1",      // 明るく親しみやすい青（メイン）
-  accent2:"#4A95E5",     // さらに明るい青（ホバー）
-  accentDark:"#1E5A96",  // 強調用の濃い青
-  light:"#EAF4FC",       // 淡い水色
-  warm:"#FFF8E7",        // 温かみのあるクリーム色
-  warmAccent:"#F59E0B",  // CTAボタン用のオレンジ
-  border:"#E1E9F2",      // 明るめの境界線
-  success:"#16A34A",     // 成功色
+  ink:"#1C2B3A",         // 深い紺（テキスト）
+  sub:"#6E7A88",         // サブテキスト
+  accent:"#1E5FA6",      // 信頼の青（メイン/リンク）
+  accent2:"#2C72BE",     // ホバー用の青
+  accentDark:"#15406F",  // 強調用の濃紺
+  light:"#EAF1F8",       // 淡い青
+  warm:"#FBF4E6",        // 柔らかいクリーム（パネル）
+  warmAccent:"#E0512F",  // 単一のエネルギー色（新着・盛り上がり・CTA）
+  border:"#E8E2D6",      // 温かいヘアライン境界線
+  success:"#2C7A4B",     // 成功色
 };
+
+// 会社をまたぐ「みんなの相談」用の仮想企業（企業一覧・業種集計には出さない）
+const GENERAL_ID = "__general__";
+const GENERAL_CO = { id: GENERAL_ID, name: "みんなの相談", emoji: "📣", group: "総合", industry: "総合", isGeneral: true };
 
 // ─── ユーティリティ ────────────────────────────────────────────────────────────
 const ini   = (n) => n ? String(n).slice(0,2) : "?";
 const today = () => new Date().toISOString().slice(0,10);
-// 短いハッシュ生成（SHA-256の先頭8文字、同期版）
-const shortHash = (str) => {
-  if (!str) return "";
-  // 簡易ハッシュ（FNV-1a）：暗号学的でないが、表示用のIDとしては十分
-  let h = 0x811c9dc5;
-  for (let i = 0; i < str.length; i++) {
-    h ^= str.charCodeAt(i);
-    h = (h * 0x01000193) >>> 0;
-  }
-  // 8桁の16進数
-  return h.toString(16).padStart(8, "0").slice(0, 8);
-};
-
-// 投稿者ID生成：authorUid → email → anon localStorage
-const getAuthorId = (item) => {
-  if (item.authorUid) return shortHash("uid:" + item.authorUid);
-  if (item.guestEmail) return shortHash("em:" + item.guestEmail.toLowerCase().trim());
-  if (item.anonKey) return shortHash("anon:" + item.anonKey);
-  return null;
-};
-
-// 投稿時刻フォーマット（YYYY-MM-DD HH:MM:SS、日本時間）
-const fmtDateTime = (d) => {
-  if (!d) return "";
-  const date = d?.toDate ? d.toDate() : (typeof d === "string" ? new Date(d) : (d instanceof Date ? d : null));
-  if (!date || isNaN(date.getTime())) return typeof d === "string" ? d : "";
-  const yr  = date.getFullYear();
-  const mo  = String(date.getMonth() + 1).padStart(2, "0");
-  const dy  = String(date.getDate()).padStart(2, "0");
-  const hh  = String(date.getHours()).padStart(2, "0");
-  const mm  = String(date.getMinutes()).padStart(2, "0");
-  const ss  = String(date.getSeconds()).padStart(2, "0");
-  return `${yr}-${mo}-${dy} ${hh}:${mm}:${ss}`;
-};
 const ago   = (ts) => {
   if (!ts) return "-";
   const d    = ts?.toDate ? ts.toDate() : new Date(typeof ts === "number" ? ts * 1000 : ts);
@@ -1768,6 +1738,7 @@ export default function App() {
   const [page,     setPage]     = useState("home");
   const [selCo,    setSelCo]    = useState(null);
   const [selTab,   setSelTab]   = useState("interview");
+  const [selPost,  setSelPost]  = useState(null);
   const [authMode, setAuthMode] = useState(null);
   const [toast,    setToast]    = useState(null);
   const [editTgt,  setEditTgt]  = useState(null);
@@ -2010,10 +1981,11 @@ export default function App() {
 
   // ── 画面遷移
   const go = (p, co = null, tab = null, fromPopstate = false) => {
+    if (p === "company" && (co === undefined || co === null)) { p = "board"; co = null; }
     setPage(p);
     if (co  !== null) setSelCo(co);
     if (tab !== null) setSelTab(tab);
-    else if (p === "company") setSelTab("board");
+    else if (p === "company") setSelTab("interview");
     window.scrollTo(0, 0);
     setMenuOpen(false);
     // ブラウザ履歴に追加
@@ -2034,6 +2006,18 @@ export default function App() {
     }
   };
 
+  // スレッド個別ページに遷移
+  const goThread = (post) => {
+    if (!post) return;
+    setSelPost(post);
+    setPage("thread");
+    window.scrollTo(0, 0);
+    setMenuOpen(false);
+    if (typeof window !== "undefined") {
+      window.history.pushState({ p:"thread", postId: post.id }, "", "#thread/" + post.id);
+    }
+  };
+
   // popstate（戻る/進むボタン）で内部状態を復元
   useEffect(() => {
     const handler = (e) => {
@@ -2042,6 +2026,11 @@ export default function App() {
         setSubTopGroup(s.grp);
         setPage("subTop");
         window.scrollTo(0, 0);
+        return;
+      }
+      if (s.p === "thread" && s.postId) {
+        const post = posts.find(pp => pp.id === s.postId);
+        if (post) { setSelPost(post); setPage("thread"); window.scrollTo(0, 0); }
         return;
       }
       const co = s.coId ? companies.find(c => c.id === s.coId) : null;
@@ -2053,7 +2042,7 @@ export default function App() {
       window.history.replaceState({ p:"home" }, "", "");
     }
     return () => window.removeEventListener("popstate", handler);
-  }, [companies]);
+  }, [companies, posts]);
 
   // ── 派生値
   const plan    = profile?.plan    || "free";
@@ -2123,40 +2112,14 @@ export default function App() {
   };
 
   const addPost = async (d) => {
-    // 転職掲示板（ptype==="board"）はログイン不要・メールとコテハンで投稿可能
-    if (d.ptype === "board") {
-      let author = uName;
-      let authorUid = authUser?.uid || null;
-      let guestEmail = null;
-      if (!authUser) {
-        if (!d.guestEmail || !d.guestEmail.includes("@")) { toast2("メールアドレスを入力してください"); return; }
-        if (!d.guestName || !d.guestName.trim()) { toast2("お名前を入力してください"); return; }
-        author = d.guestName.trim();
-        authorUid = null;
-        guestEmail = d.guestEmail.trim();
-      }
-      const data = { ...d, author, authorUid, guestEmail, likes: [], comments: [] };
-      delete data.guestName;
-      try {
-        const id = await fsAdd("posts", data);
-        setPosts(prev => [{ id, ...data, createdAt: null }, ...prev]);
-        if (authUser) await grantUnlock();
-        toast2(authUser ? "投稿ありがとうございます！30日間 全コンテンツ閲覧可能になりました" : "書き込みありがとうございます！会員登録すると投稿の編集ができます");
-        go("company", companies.find(c => c.id === d.companyId), "board");
-      } catch (e) {
-        console.error("post error:", e);
-        toast2("投稿に失敗しました: " + (e.message || e.code || "unknown error"));
-      }
-      return;
-    }
-    // それ以外（面接体験談・ES例文）はログイン必須
     if (!authUser) { setAuthMode("login"); toast2("ログイン後に投稿できます"); return; }
     const data = { ...d, author: uName, authorUid: authUser?.uid || null, likes: [], comments: [] };
     const id   = await fsAdd("posts", data);
     setPosts(prev => [{ id, ...data, createdAt: null }, ...prev]);
     await grantUnlock();
     toast2("投稿ありがとうございます！30日間 全コンテンツが閲覧可能になりました");
-    go("company", companies.find(c => c.id === d.companyId), d.ptype);
+    if (d.companyId === GENERAL_ID) go("board");
+    else go("company", companies.find(c => c.id === d.companyId), d.ptype);
   };
 
   const addReview = async (d) => {
@@ -2199,29 +2162,17 @@ export default function App() {
     toast2(favorites.includes(postId) ? "お気に入りを解除しました" : "お気に入りに追加しました");
   };
 
-  const addComment = async (postId, content, parentId = null, guestName = null) => {
-    // コメント・リプライは認証不要（掲示板に準ずる）
-    const author = authUser ? uName : (guestName || "匿名ユーザー");
-    const cmt = {
-      id: Math.random().toString(36).slice(2,10) + Date.now().toString(36),
-      author,
-      authorUid: authUser?.uid || null,
-      anonKey: authUser ? null : anonKey(),  // ゲストのID用（ブラウザ単位）
-      content,
-      date: today(),
-      ts: Date.now(),
-      parentId: parentId || null,
-      likes: [],
-    };
+  const addComment = async (postId, content, parentId = null, newCommentsOverride = null) => {
     const post    = posts.find(p => p.id === postId);
-    const newCmts = [...(post?.comments || []), cmt];
-    try {
-      await fsUpdate("posts", postId, { comments: newCmts });
-      setPosts(prev => prev.map(p => p.id !== postId ? p : { ...p, comments: newCmts }));
-    } catch (e) {
-      console.error("comment error:", e);
-      toast2("コメントに失敗しました: " + (e.message || e.code));
+    let newCmts;
+    if (newCommentsOverride) {
+      newCmts = newCommentsOverride;
+    } else {
+      const cmt = { id: Math.random().toString(36).slice(2,10), author: uName, authorUid: authUser?.uid || null, content, date: today(), ...(parentId ? { parentId } : {}) };
+      newCmts = [...(post?.comments || []), cmt];
     }
+    await fsUpdate("posts", postId, { comments: newCmts });
+    setPosts(prev => prev.map(p => p.id !== postId ? p : { ...p, comments: newCmts }));
   };
 
   const toggleLike = async (postId) => {
@@ -2232,6 +2183,18 @@ export default function App() {
     const newLikes = liked ? post.likes.filter(u => u !== key) : [...(post.likes || []), key];
     await fsUpdate("posts", postId, { likes: newLikes });
     setPosts(prev => prev.map(p => p.id !== postId ? p : { ...p, likes: newLikes }));
+  };
+
+  // ベストアンサー（投稿主・管理者のみ）→ 設定で「解決済み」
+  const setBestAnswer = async (post, commentId) => {
+    if (!authUser) { setAuthMode("login"); return; }
+    const isOP = post.authorUid && post.authorUid === authUser.uid;
+    if (!isOP && !isAdmin) { toast2("ベストアンサーは投稿主のみ設定できます"); return; }
+    const newVal = post.bestAnswerId === commentId ? null : commentId;
+    await fsUpdate("posts", post.id, { bestAnswerId: newVal });
+    setPosts(prev => prev.map(p => p.id === post.id ? { ...p, bestAnswerId: newVal } : p));
+    setSelPost(prev => (prev && prev.id === post.id) ? { ...prev, bestAnswerId: newVal } : prev);
+    toast2(newVal ? "✅ ベストアンサーに設定しました（解決済み）" : "ベストアンサーを解除しました");
   };
 
   const adminDelete = async (type, id) => {
@@ -2334,7 +2297,7 @@ export default function App() {
     return getBadge(authorPostCounts[authorUid] || 0);
   };
 
-  const sp = { sess, go, goSubTop, companies, posts, reviews, salaries, jobListings, plan, isAdmin, adminDelete, adminEdit, setEditTgt, setAuthMode, isMobile, uName, upgradePlan, authUser, favorites, toggleFavorite, unlocked, profile, getAuthorBadge, authorPostCounts };
+  const sp = { sess, go, goSubTop, companies, posts, reviews, salaries, jobListings, plan, isAdmin, adminDelete, adminEdit, setEditTgt, setAuthMode, isMobile, uName, upgradePlan, authUser, favorites, toggleFavorite, unlocked, profile, getAuthorBadge, authorPostCounts, goThread, setBestAnswer };
 
   return (
     <ErrorBoundary>
@@ -2357,9 +2320,10 @@ export default function App() {
 
       <main style={{ ...S.main, padding: isMobile ? "0 12px 60px" : "0 24px 72px" }}>
         {page === "home"       && <HomePage       {...sp} coPosts={coPosts} coRevs={coRevs} coSals={coSals} setAuthMode={setAuthMode} doGlobalSearch={doGlobalSearch} />}
+        {page === "board"      && <GeneralBoardPage {...sp} onAddPost={addPost} onToggleLike={toggleLike} onAddComment={addComment} />}
+        {page === "thread"     && selPost && <ThreadPage {...sp} post={selPost} onToggleLike={toggleLike} onAddComment={addComment} />}
         {page === "companies"  && <CompaniesPage  {...sp} filtered={filteredCos} searchQ={searchQ} setSearchQ={setSearchQ} grpFilter={grpFilter} setGrpFilter={setGrpFilter} subFilter={subFilter} setSubFilter={setSubFilter} sortBy={sortBy} setSortBy={setSortBy} coPosts={coPosts} coRevs={coRevs} coSals={coSals} />}
         {page === "subTop"     && <SubTopPage     {...sp} grp={subTopGroup} setGrpFilter={setGrpFilter} setSubFilter={setSubFilter} coPosts={coPosts} coRevs={coRevs} coSals={coSals} />}
-        {page === "boardFeed"  && <BoardFeedPage  {...sp} coPosts={coPosts} />}
         {page === "company"    && selCo && (
           <CompanyPage {...sp}
             co={selCo}
@@ -2545,17 +2509,17 @@ function AppNav({ sess, go, plan, isAdmin, setAuthMode, isMobile, menuOpen, setM
   const pl = PLANS[plan];
   return (
     <nav style={S.nav}>
-      <div style={{ height:3, background:"linear-gradient(90deg, #2B7BD1 0%, #4A95E5 50%, #F59E0B 100%)" }} />
+      <div style={{ height:3, background:"linear-gradient(90deg, " + C.accentDark + " 0%, " + C.accent + " 50%, " + C.warmAccent + " 100%)" }} />
       <div style={{ maxWidth:1160, margin:"0 auto", display:"flex", alignItems:"center", justifyContent:"space-between", padding: isMobile ? "8px 12px" : "10px 24px" }}>
         <button style={S.logoBtn} onClick={() => go("home")}>
           <span style={{ ...S.logoText, fontSize: isMobile ? 17 : 22 }}>CareerClub</span>
-          {!isMobile && <span style={{ display:"block", fontSize:9, color:C.sub, letterSpacing:"0.1em", marginTop:1 }}>転職体験談・選考情報の匿名コミュニティ</span>}
+          {!isMobile && <span style={{ display:"block", fontSize:9, color:C.sub, letterSpacing:"0.1em", marginTop:1 }}>転職・就活のリアルを話す掲示板</span>}
         </button>
         {!isMobile && (
           <div style={{ flex:1, maxWidth:480, margin:"0 24px", position:"relative" }}>
             <input
               type="text"
-              placeholder="🔍 企業名・キーワードで検索"
+              placeholder="🔍 スレッド・企業名で検索"
               defaultValue={globalSearch}
               onKeyDown={(e) => { if (e.key === "Enter") doGlobalSearch(e.target.value); }}
               style={{
@@ -2577,7 +2541,7 @@ function AppNav({ sess, go, plan, isAdmin, setAuthMode, isMobile, menuOpen, setM
           </button>
         ) : (
           <div style={{ display:"flex", alignItems:"center", gap:0 }}>
-            {[["home","ホーム"],["companies","企業一覧"],["ranking","ランキング"]].map(([p,l]) => (
+            {[["home","掲示板"],["board","みんなの相談"],["companies","企業を探す"],["ranking","ランキング"]].map(([p,l]) => (
               <span key={p}>
                 <button style={{ background:"none", border:"none", color:C.ink, fontSize:12, padding:"4px 10px", fontFamily:"inherit", cursor:"pointer" }} onClick={() => go(p)}>{l}</button>
                 <span style={{ color:C.border, fontSize:11 }}>|</span>
@@ -2623,7 +2587,7 @@ function AppNav({ sess, go, plan, isAdmin, setAuthMode, isMobile, menuOpen, setM
       </div>
       {isMobile && menuOpen && (
         <div style={{ background:"#fff", borderBottom:"1px solid " + C.border, boxShadow:"0 4px 12px rgba(0,0,0,0.1)" }} className="fadeUp">
-          {[["home","ホーム"],["companies","企業一覧"],["ranking","ランキング"],["addCompany","＋企業追加"]].map(([p,l]) => (
+          {[["home","掲示板"],["board","みんなの相談"],["companies","企業を探す"],["ranking","ランキング"],["addCompany","＋企業追加"]].map(([p,l]) => (
             <button key={p} style={{ display:"block", width:"100%", textAlign:"left", background:"none", border:"none", padding:"12px 16px", fontSize:13, color:C.ink, fontFamily:"inherit", cursor:"pointer", borderBottom:"1px solid " + C.border }} onClick={() => go(p)}>{l}</button>
           ))}
           {sess ? (
@@ -2748,38 +2712,6 @@ const GROUP_LOGO_COLORS = {
   "交通・運輸":   { bg:"linear-gradient(135deg, #115E59 0%, #2DD4BF 100%)", color:"#fff" },
 };
 
-
-// 業種別のランダム匿名ニックネーム
-const RANDOM_NAMES_BY_GROUP = {
-  "金融・銀行":   ["伝説のバンカー","チャートの魔術師","M&Aの達人","数字に強い人","シニアアナリスト","資産運用の鬼","金融マンの卵","深夜の決算分析人"],
-  "商社":         ["世界を駆ける営業","資源ハンター","食料の番人","エネルギーの旗手","会議が長い人","駐在経験者","内資総合職","商社マンの末裔"],
-  "メーカー":     ["ものづくりの匠","設計の鬼","品質の番人","現場の声","工場のヌシ","ライン班長","研究室の主","技術屋一筋"],
-  "IT・テック":   ["コードの魔術師","エンジニアの卵","フルスタック男","インフラ番長","SaaSの伝道師","深夜のデバッガー","勉強会勢","クラウドおじさん"],
-  "コンサル":     ["スライド職人","深夜のExcel芸人","パートナー候補","BCG志望","クロス分析の人","インタビュアー","ロジカルシンキング職人","M&Aアドバイザー"],
-  "不動産・建設": ["街づくり職人","現場監督候補","用地仕入の達人","営業の鬼","プロパティ番人","建築デザイナー","施工管理マン","デベロッパー志望"],
-  "小売・流通":   ["バイヤー志望","店長候補","物流の達人","SCMマスター","現場のヌシ","エリアマネ","百貨店マン","EC運営者"],
-  "サービス":     ["広告マン","クリエイティブ職人","営業マシン","HR担当","プランナー","コピーライター志望","Sansan使い","採用担当"],
-  "医療・ヘルス": ["MR志望","臨床開発の人","薬剤師","研究員","製薬マン","医療機器マン","営業所長","学術担当"],
-  "教育・公共":   ["教育者","公務員志望","学校事務員","研究員","講師","教材開発者","行政マン","教育の伝道師"],
-  "エンタメ":     ["ゲームクリエイター","映像クリエイター","音楽家志望","プランナー","シナリオライター","声優志望","アニメ好き","出版志望"],
-  "航空":         ["伝説のパイロット","空の達人","CA志望","整備士の卵","グランドスタッフ","航空大学校生","運航管理者","管制官志望"],
-  "交通・運輸":   ["鉄道マン","運転士志望","駅員","運行管理者","車掌志望","船員","物流の達人","タクシードライバー"],
-};
-const DEFAULT_RANDOM_NAMES = ["匿名希望","名無しさん","通りすがり","気になる人","転職検討中","就活生","業界研究中","情報収集中"];
-
-function getRandomNickname(group, usedNames = []) {
-  const pool = (RANDOM_NAMES_BY_GROUP[group] || []).concat(DEFAULT_RANDOM_NAMES);
-  const available = pool.filter(n => !usedNames.includes(n));
-  // 全部使い尽くしたら数字をつけて衝突回避
-  if (available.length === 0) {
-    const base = pool[Math.floor(Math.random() * pool.length)];
-    let suffix = 2;
-    while (usedNames.includes(`${base}${suffix}`)) suffix += 1;
-    return `${base}${suffix}`;
-  }
-  return available[Math.floor(Math.random() * available.length)];
-}
-
 function CompanyLogo({ company, size = 36 }) {
   const [imgErr, setImgErr] = React.useState(false);
   if (!company) return null;
@@ -2874,8 +2806,6 @@ function CompanyLogo({ company, size = 36 }) {
           style={{ objectFit:"contain" }}
           onError={() => setImgErr(true)}
           loading="lazy"
-          crossOrigin="anonymous"
-          referrerPolicy="no-referrer"
         />
       </div>
     );
@@ -2890,7 +2820,7 @@ function CompanyLogo({ company, size = 36 }) {
       display:"flex", alignItems:"center", justifyContent:"center",
       fontWeight: "bold",
       fontSize: fontSize,
-      fontFamily: "\"M PLUS Rounded 1c\", sans-serif",
+      fontFamily: "\"Zen Kaku Gothic New\", sans-serif",
       letterSpacing: initial.length > 1 ? "-0.04em" : "0",
       flexShrink: 0,
       boxShadow: "0 1px 3px rgba(0,0,0,0.12)",
@@ -2995,121 +2925,6 @@ function NaiteiTimeline({ posts, companies, go, isMobile }) {
   );
 }
 
-function BoardFeedPage({ go, goSubTop, companies, posts, isMobile, sess, setAuthMode, authUser, profile, getAuthorBadge }) {
-  // 全企業の board 投稿を集約
-  const boardPosts = posts
-    .filter(p => p.ptype === "board")
-    .sort((a,b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
-
-  const recentPostsByCompany = {};
-  boardPosts.forEach(p => {
-    if (!recentPostsByCompany[p.companyId]) recentPostsByCompany[p.companyId] = [];
-    recentPostsByCompany[p.companyId].push(p);
-  });
-
-  // 投稿数の多い企業 TOP20
-  const topCompanies = Object.entries(recentPostsByCompany)
-    .map(([cid, ps]) => ({ company: companies.find(c => c.id === cid), count: ps.length, latest: ps[0] }))
-    .filter(x => x.company)
-    .sort((a,b) => b.count - a.count)
-    .slice(0, 20);
-
-  return (
-    <div>
-      {/* ヒーロー */}
-      <section style={{
-        position:"relative",
-        backgroundImage:'linear-gradient(rgba(0,0,0,0.45), rgba(0,0,0,0.55)), url("https://images.unsplash.com/photo-1521737604893-d14cc237f11d?w=1400&q=70")',
-        backgroundSize:"cover",
-        backgroundPosition:"center",
-        padding: isMobile ? "28px 20px" : "40px 40px",
-        borderRadius: 14,
-        marginTop: 12,
-        marginBottom: 24,
-        color: "#fff",
-      }}>
-        <div style={{ maxWidth:760, margin:"0 auto", textAlign:"center", textShadow:"0 2px 12px rgba(0,0,0,0.5)" }}>
-          <p style={{ fontSize:11, letterSpacing:"0.2em", fontWeight:"bold", color:"#FCD34D", marginBottom:8 }}>🔥 BOARD FEED</p>
-          <h1 style={{ fontSize: isMobile ? 20 : 28, fontWeight:"bold", lineHeight:1.4, marginBottom:10, fontFamily:'"M PLUS Rounded 1c", sans-serif' }}>
-            転職掲示板
-          </h1>
-          <p style={{ fontSize: isMobile ? 12 : 14, opacity:0.92, lineHeight:1.7 }}>
-            登録不要・匿名で書き込み可能。気軽に情報交換しましょう。
-          </p>
-        </div>
-      </section>
-
-      {/* 最新の掲示板投稿 */}
-      <section style={{ marginBottom:24 }}>
-        <h2 style={{ fontSize:16, fontWeight:"bold", marginBottom:12, paddingBottom:8, borderBottom:"3px solid " + C.accent, color:C.ink }}>
-          最新の書き込み
-        </h2>
-        {boardPosts.length === 0 ? (
-          <Empty text="まだ投稿がありません。気になる企業ページから書き込んでみましょう。" />
-        ) : (
-          <div>
-            {boardPosts.slice(0, 30).map(p => {
-              const co = companies.find(c => c.id === p.companyId);
-              if (!co) return null;
-              const t = p.createdAt?.toDate ? p.createdAt.toDate() : null;
-              const tStr = t ? t.toLocaleString("ja-JP", { month:"numeric", day:"numeric", hour:"2-digit", minute:"2-digit" }) : "";
-              return (
-                <div key={p.id} style={{ background:"#fff", border:"1px solid " + C.border, borderRadius:8, padding:"12px 16px", marginBottom:8, cursor:"pointer" }} onClick={() => go("company", co, "board")}>
-                  <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:6, flexWrap:"wrap" }}>
-                    <CompanyLogo company={co} size={24} />
-                    <span style={{ fontSize:13, fontWeight:"bold", color:C.ink }}>{co.name}</span>
-                    {p.jobCategory && p.jobCategory !== "全職種" && (
-                      <span style={{ fontSize:10, background:"#EFF6FF", color:"#1E40AF", padding:"1px 7px", borderRadius:3 }}>{p.jobCategory}</span>
-                    )}
-                    <span style={{ fontSize:10, color:C.sub, marginLeft:"auto" }}>{tStr}</span>
-                  </div>
-                  <h3 style={{ fontSize:14, fontWeight:"bold", marginBottom:4, color:C.ink }}>{p.title}</h3>
-                  <p style={{ fontSize:12, color:C.sub, lineHeight:1.7, overflow:"hidden", display:"-webkit-box", WebkitLineClamp:2, WebkitBoxOrient:"vertical" }}>{p.content}</p>
-                  <div style={{ display:"flex", gap:10, marginTop:6, fontSize:11, color:C.sub }}>
-                    <span>by {p.author}</span>
-                    <span>💬 {(p.comments || []).length}</span>
-                    <span>❤️ {(p.likes || []).length}</span>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </section>
-
-      {/* 投稿が活発な企業 */}
-      {topCompanies.length > 0 && (
-        <section style={{ marginBottom:24 }}>
-          <h2 style={{ fontSize:16, fontWeight:"bold", marginBottom:12, paddingBottom:8, borderBottom:"3px solid " + C.accent, color:C.ink }}>
-            掲示板が盛り上がってる企業
-          </h2>
-          <div style={{ display:"grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap:8 }}>
-            {topCompanies.map(({ company, count }) => (
-              <div key={company.id} style={{ background:"#fff", border:"1px solid " + C.border, borderRadius:8, padding:"10px 14px", cursor:"pointer", display:"flex", alignItems:"center", gap:10 }} onClick={() => go("company", company, "board")}>
-                <CompanyLogo company={company} size={28} />
-                <span style={{ flex:1, fontSize:13, fontWeight:"bold", color:C.ink }}>{company.name}</span>
-                <span style={{ fontSize:11, background:C.light, color:C.accent, padding:"2px 8px", borderRadius:10, fontWeight:"bold" }}>{count}件の書き込み</span>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* 業種別への導線 */}
-      <section style={{ marginBottom:24 }}>
-        <h2 style={{ fontSize:14, fontWeight:"bold", marginBottom:10, color:C.ink }}>業界から探す</h2>
-        <div style={{ display:"flex", flexWrap:"wrap", gap:6 }}>
-          {ALL_GROUPS.map(g => (
-            <button key={g} style={{ background:"#fff", border:"1px solid " + C.border, padding:"6px 14px", fontSize:12, cursor:"pointer", fontFamily:"inherit", borderRadius:18, color:C.ink }} onClick={() => goSubTop(g)}>
-              {GROUP_THEMES[g]?.emoji || "🏢"} {g}
-            </button>
-          ))}
-        </div>
-      </section>
-    </div>
-  );
-}
-
 function SubTopPage({ go, goSubTop, grp, companies, posts, reviews, salaries, coPosts, coRevs, coSals, isAdmin, adminDelete, setEditTgt, setGrpFilter, setSubFilter, isMobile, sess, setAuthMode }) {
   const theme = GROUP_THEMES[grp] || { bg:"linear-gradient(135deg, #2B7BD1 0%, #4A95E5 100%)", emoji:"🏢", catch:grp, desc:grp + "の選考情報" };
   const grpCos = companies.filter(c => (c.group || getGroup(c.industry)) === grp);
@@ -3131,9 +2946,7 @@ function SubTopPage({ go, goSubTop, grp, companies, posts, reviews, salaries, co
       {/* ヒーロー（実写画像背景・コンパクト） */}
       <section style={{
         position:"relative",
-        backgroundImage: `linear-gradient(rgba(0,0,0,0.45), rgba(0,0,0,0.55)), url("${theme.img}")`,
-        backgroundSize:"cover",
-        backgroundPosition:"center",
+        background: "linear-gradient(135deg, " + C.accentDark + " 0%, " + C.accent + " 100%)",
         padding: isMobile ? "26px 20px" : "36px 40px",
         borderRadius: 14,
         marginTop: 12,
@@ -3144,7 +2957,7 @@ function SubTopPage({ go, goSubTop, grp, companies, posts, reviews, salaries, co
       }}>
         <div style={{ position:"relative", zIndex:1, maxWidth:760, margin:"0 auto", textAlign:"center", textShadow:"0 2px 12px rgba(0,0,0,0.5)" }}>
           <p style={{ fontSize:11, letterSpacing:"0.2em", marginBottom:6, opacity:0.95, fontWeight:"bold" }}>{theme.emoji} {grp}</p>
-          <h1 style={{ fontSize: isMobile ? 20 : 26, fontWeight:"bold", lineHeight:1.4, marginBottom:10, fontFamily:"\"M PLUS Rounded 1c\", sans-serif" }}>
+          <h1 style={{ fontSize: isMobile ? 20 : 26, fontWeight:"bold", lineHeight:1.4, marginBottom:10, fontFamily:"\"Zen Kaku Gothic New\", sans-serif" }}>
             {theme.catch}
           </h1>
           <p style={{ fontSize: isMobile ? 11 : 13, lineHeight:1.7, opacity:0.92, marginBottom:14, maxWidth:600, marginLeft:"auto", marginRight:"auto" }}>
@@ -3152,15 +2965,15 @@ function SubTopPage({ go, goSubTop, grp, companies, posts, reviews, salaries, co
           </p>
           <div style={{ display:"flex", gap:isMobile ? 14 : 24, justifyContent:"center", flexWrap:"wrap" }}>
             <div style={{ textAlign:"center" }}>
-              <div style={{ fontSize:isMobile ? 16 : 20, fontWeight:"bold", fontFamily:"\"M PLUS Rounded 1c\", sans-serif" }}>{grpCos.length}</div>
+              <div style={{ fontSize:isMobile ? 16 : 20, fontWeight:"bold", fontFamily:"\"Zen Kaku Gothic New\", sans-serif" }}>{grpCos.length}</div>
               <div style={{ fontSize:10, opacity:0.85 }}>掲載企業</div>
             </div>
             <div style={{ textAlign:"center" }}>
-              <div style={{ fontSize:isMobile ? 16 : 20, fontWeight:"bold", fontFamily:"\"M PLUS Rounded 1c\", sans-serif" }}>{grpPosts.length}</div>
+              <div style={{ fontSize:isMobile ? 16 : 20, fontWeight:"bold", fontFamily:"\"Zen Kaku Gothic New\", sans-serif" }}>{grpPosts.length}</div>
               <div style={{ fontSize:10, opacity:0.85 }}>体験談</div>
             </div>
             <div style={{ textAlign:"center" }}>
-              <div style={{ fontSize:isMobile ? 16 : 20, fontWeight:"bold", fontFamily:"\"M PLUS Rounded 1c\", sans-serif" }}>{grpReviews.length}</div>
+              <div style={{ fontSize:isMobile ? 16 : 20, fontWeight:"bold", fontFamily:"\"Zen Kaku Gothic New\", sans-serif" }}>{grpReviews.length}</div>
               <div style={{ fontSize:10, opacity:0.85 }}>口コミ</div>
             </div>
           </div>
@@ -3241,211 +3054,302 @@ function SubTopPage({ go, goSubTop, grp, companies, posts, reviews, salaries, co
   );
 }
 
-function HomePage({ sess, go, goSubTop, companies, posts, reviews, salaries, isAdmin, adminDelete, setEditTgt, coPosts, coRevs, coSals, isMobile, setAuthMode, doGlobalSearch }) {
-  const recent   = posts.slice(0, 8);
-  const topCos   = [...companies].sort((a,b) => {
+function ThreadPage({ post, posts, companies, go, goThread, uName, authUser, isAdmin, onAddComment, onToggleLike, adminDelete, getAuthorBadge, favorites, toggleFavorite, setBestAnswer, isMobile, setAuthMode }) {
+  const live = posts.find(x => x.id === post.id) || post;
+  const p = live;
+  const co = companies.find(c => c.id === p.companyId);
+  const isGen = p.companyId === GENERAL_ID;
+  const isQuestion = p.ptype === "board";
+  const authUserKey = authUser?.uid || ("guest:" + uName);
+  const canMarkBest = isQuestion && ((authUser && p.authorUid === authUser.uid) || isAdmin);
+  const ptypeLabel = isGen ? "相談" : p.ptype === "es" ? "ES例文" : p.ptype === "board" ? "選考掲示板" : "面接体験談";
+  return (
+    <div style={{ maxWidth:760, margin:"0 auto" }}>
+      <button onClick={() => (typeof window !== "undefined" && window.history.length > 1 ? window.history.back() : go("home"))}
+        style={{ background:"none", border:"none", color:C.accent, fontSize:13, fontWeight:"bold", cursor:"pointer", fontFamily:"inherit", margin:"16px 0 12px", padding:0 }}>← もどる</button>
+
+      <article style={{ background:C.surface, border:"1px solid " + C.border, borderRadius:14, padding: isMobile ? "18px 18px" : "22px 24px", boxShadow:"0 1px 2px rgba(28,43,58,.06)" }}>
+        <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:10, flexWrap:"wrap" }}>
+          <span style={{ fontSize:11, fontWeight:"bold", padding:"2px 8px", borderRadius:5, background: isGen ? "#FBEAE4" : "#EAF1F8", color: isGen ? C.warmAccent : C.accent }}>{ptypeLabel}</span>
+          {co
+            ? <span onClick={() => go("company", co, p.ptype || "interview")} style={{ display:"inline-flex", alignItems:"center", gap:5, fontSize:12.5, color:C.sub, fontWeight:500, cursor:"pointer" }}><CompanyLogo company={co} size={18} />{co.name}</span>
+            : <span style={{ fontSize:11, fontWeight:"bold", color:C.accentDark, background:C.light, border:"1px dashed #BCD2E6", borderRadius:5, padding:"1px 7px" }}>📣 みんなの相談</span>}
+          {p.bestAnswerId && <span style={{ fontSize:11, fontWeight:"bold", color:C.success, background:"#E8F1EB", border:"1px solid #BFDCC8", borderRadius:5, padding:"1px 8px" }}>\u2705 解決済み</span>}
+          <span style={{ marginLeft:"auto", fontSize:11.5, color:C.sub }}>{ago(p.createdAt)}</span>
+        </div>
+
+        <h1 style={{ fontFamily:"'Zen Kaku Gothic New', sans-serif", fontWeight:900, fontSize: isMobile ? 20 : 23, lineHeight:1.45, color:C.ink, marginBottom:12 }}>{p.title}</h1>
+
+        <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:14 }}>
+          <AC>{ini(p.author)}</AC>
+          <span style={{ fontSize:12.5, fontWeight:"bold", color:C.ink }}>{p.author}</span>
+          {getAuthorBadge && getAuthorBadge(p.authorUid) && <BadgeChip badge={getAuthorBadge(p.authorUid)} small />}
+        </div>
+
+        {p.ptype === "es" && p.esQuestion && (
+          <div style={{ background:"#FFF8E7", borderLeft:"3px solid " + C.warmAccent, padding:"8px 12px", marginBottom:10, fontSize:12.5, lineHeight:1.7 }}>
+            <strong style={{ color:"#92400E", display:"block", marginBottom:2 }}>📝 設問：</strong>{p.esQuestion}
+          </div>
+        )}
+
+        {p.ptype === "interview" && (
+          <div style={{ display:"flex", flexWrap:"wrap", gap:6, marginBottom:12 }}>
+            {(p.finalResult === "内定" || p.finalResult === "内定辞退") && (
+              <span style={{ background: p.finalResult === "内定" ? C.success : "#0891B2", color:"#fff", padding:"3px 10px", fontSize:11, fontWeight:"bold", borderRadius:3 }}>{p.finalResult}</span>
+            )}
+            {p.progressStage && <span style={{ background:"#EFF6FF", color:"#1E40AF", border:"1px solid #BFDBFE", padding:"3px 10px", fontSize:11, fontWeight:"bold", borderRadius:3 }}>{p.progressStage}</span>}
+            {p.applyMethod && <span style={{ background:"#FFF7ED", color:"#C2410C", border:"1px solid #FED7AA", padding:"3px 10px", fontSize:11, borderRadius:3 }}>応募: {p.applyMethod}</span>}
+          </div>
+        )}
+        {p.ptype === "interview" && (p.prevSalary || p.offerAmount) && (
+          <div style={{ background:"#F0F9FF", border:"1px solid #BAE6FD", padding:"10px 14px", borderRadius:6, marginBottom:12, fontSize:13, fontWeight:"bold", color:"#0C4A6E" }}>
+            {p.prevSalary && <span>現年収: {p.prevSalary}万円</span>}
+            {p.prevSalary && p.offerAmount && <span style={{ margin:"0 8px", color:C.accent }}>→</span>}
+            {p.offerAmount && <span>オファー年収: {p.offerAmount}万円</span>}
+          </div>
+        )}
+        {p.ptype === "interview" && ((p.stages && p.stages.length > 0) || (p.extraStages && p.extraStages.length > 0)) && (
+          <div style={{ marginBottom:12 }}>
+            {(p.stages || []).map((stg, i) => (
+              <div key={i} style={{ borderLeft:"3px solid " + C.accent, paddingLeft:10, marginBottom:8 }}>
+                <div style={{ display:"flex", gap:6, alignItems:"center", marginBottom:4, flexWrap:"wrap" }}>
+                  <span style={{ fontSize:11, fontWeight:"bold", color:C.accent }}>{stg.name}</span>
+                  {stg.days && <span style={{ fontSize:10, color:C.sub }}>結果通知: {stg.days}</span>}
+                </div>
+                {stg.content && <p style={{ fontSize:12.5, lineHeight:1.8, color:C.ink }}>{stg.content}</p>}
+              </div>
+            ))}
+            {(p.extraStages || []).filter(st => st.name && st.content).map((stg, i) => (
+              <div key={"ex"+i} style={{ borderLeft:"3px dashed " + C.accent, paddingLeft:10, marginBottom:8 }}>
+                <span style={{ fontSize:11, fontWeight:"bold", color:C.accent }}>{stg.name}</span>
+                {stg.content && <p style={{ fontSize:12.5, lineHeight:1.8, color:C.ink }}>{stg.content}</p>}
+              </div>
+            ))}
+          </div>
+        )}
+
+        <p style={{ fontSize:14.5, lineHeight:1.95, color:"#33414F", whiteSpace:"pre-line", marginBottom:16 }}>{p.content}</p>
+
+        <div style={{ display:"flex", alignItems:"center", gap:10, paddingTop:14, borderTop:"1px solid " + C.border, flexWrap:"wrap" }}>
+          <LikeButton liked={(p.likes || []).includes(authUserKey)} count={(p.likes || []).length} onClick={() => onToggleLike(p.id)} />
+          <button style={{ background:"#fff", border:"1px solid " + C.border, fontSize:12, cursor:"pointer", fontFamily:"inherit", color: favorites && favorites.includes(p.id) ? "#E8A000" : C.sub, padding:"6px 12px", borderRadius:18 }} onClick={() => toggleFavorite && toggleFavorite(p.id)}>
+            {favorites && favorites.includes(p.id) ? "\u2605 保存済み" : "\u2606 保存"}
+          </button>
+        </div>
+      </article>
+
+      {isQuestion && (
+        <div style={{ marginTop:18, marginBottom:4, fontSize:13, color: p.bestAnswerId ? C.success : C.sub, fontWeight:"bold" }}>
+          {p.bestAnswerId ? "\u2705 この相談は解決済みです" : (canMarkBest ? "💡 参考になった回答を「ベストアンサー」に設定すると解決済みになります" : "")}
+        </div>
+      )}
+
+      <div style={{ marginTop: isQuestion ? 4 : 18 }}>
+        <CommentThread
+          post={p}
+          uName={uName}
+          authUserKey={authUserKey}
+          authUser={authUser}
+          isAdmin={isAdmin}
+          onAddComment={onAddComment}
+          adminDelete={adminDelete}
+          getAuthorBadge={getAuthorBadge}
+          bestAnswerId={p.bestAnswerId}
+          onSetBestAnswer={(commentId) => setBestAnswer(p, commentId)}
+          canMarkBest={canMarkBest}
+        />
+      </div>
+    </div>
+  );
+}
+
+function GeneralBoardPage({ posts, go, uName, onAddPost, onToggleLike, onAddComment, isAdmin, adminDelete, setEditTgt, favorites, toggleFavorite, sess, setAuthMode, unlocked, getAuthorBadge, authUser, isMobile, goThread }) {
+  const genPosts = posts.filter(p => p.companyId === GENERAL_ID);
+  return (
+    <div>
+      <section style={{ marginTop:16, marginBottom:18, display:"flex", alignItems:"center", gap:13 }}>
+        <span style={{ fontSize: isMobile ? 30 : 36 }}>📣</span>
+        <div>
+          <h1 style={{ fontFamily:"'Zen Kaku Gothic New', sans-serif", fontWeight:900, fontSize: isMobile ? 22 : 27, color:C.ink, lineHeight:1.3 }}>みんなの相談</h1>
+          <p style={{ fontSize:12.5, color:C.sub, marginTop:3, lineHeight:1.7 }}>会社をまたぐ相談・雑談はここで。「外資とメガバンクどっち？」「退職理由どう話す？」「エージェントどこが当たり？」など、特定の企業に紐づかない話題を気軽に。</p>
+        </div>
+      </section>
+      <PostsTab posts={genPosts} ptype="board" label="相談" co={GENERAL_CO}
+        uName={uName} onAddPost={onAddPost} onToggleLike={onToggleLike} onAddComment={onAddComment}
+        isAdmin={isAdmin} adminDelete={adminDelete} setEditTgt={setEditTgt}
+        favorites={favorites} toggleFavorite={toggleFavorite} jobCat="全職種"
+        sess={sess} setAuthMode={setAuthMode} unlocked={unlocked} getAuthorBadge={getAuthorBadge}
+        authUser={authUser} hideBoardNotice={true} goThread={goThread} />
+    </div>
+  );
+}
+
+function HomePage({ sess, go, goSubTop, companies, posts, reviews, salaries, isAdmin, adminDelete, setEditTgt, coPosts, coRevs, coSals, isMobile, setAuthMode, doGlobalSearch, goThread }) {
+  const [feed, setFeed]       = useState("new");
+  const [visible, setVisible] = useState(12);
+  const FEEDS = [["new","新着"],["hot","盛り上がり"],["general","みんなの相談"],["board","選考掲示板"],["interview","面接体験談"],["es","ES例文"],["naitei","内定報告"]];
+
+  let list = [...posts];
+  if      (feed === "general")   list = list.filter(p => p.companyId === GENERAL_ID);
+  else if (feed === "board")     list = list.filter(p => p.ptype === "board" && p.companyId !== GENERAL_ID);
+  else if (feed === "interview") list = list.filter(p => p.ptype === "interview");
+  else if (feed === "es")        list = list.filter(p => p.ptype === "es");
+  else if (feed === "naitei")    list = list.filter(p => p.ptype === "interview" && (p.finalResult === "内定" || p.finalResult === "内定辞退"));
+  if (feed === "hot") list.sort((a,b) => ((b.likes?.length||0)+(b.comments?.length||0)) - ((a.likes?.length||0)+(a.comments?.length||0)));
+  else                list.sort((a,b) => (b.createdAt?.seconds||0) - (a.createdAt?.seconds||0));
+  const shown = list.slice(0, visible);
+
+  const topCos = [...companies].sort((a,b) => {
     const aAct = coRevs(a.id).length + coPosts(a.id).length;
     const bAct = coRevs(b.id).length + coPosts(b.id).length;
     if (aAct !== bAct) return bAct - aAct;
     return (a.sortRank || 99999) - (b.sortRank || 99999);
-  }).slice(0, 10);
-  const weekAgo  = Date.now() - 7 * 86400000;
-  const trending = [...posts].filter(p => {
-    const ts = p.createdAt?.toDate?.()?.getTime() || 0;
-    return ts > weekAgo;
-  }).sort((a,b) => (b.likes?.length || 0) - (a.likes?.length || 0)).slice(0, 4);
+  }).slice(0, 8);
+
+  const ptypeMeta = p =>
+    p.ptype === "board" ? { label:"選考掲示板", bg:"#EAF1F8", fg:C.accent }
+    : p.ptype === "es"  ? { label:"ES例文",   bg:"#EDE8F4", fg:"#6B4FA6" }
+    : { label:"面接体験談", bg:"#F1ECDB", fg:"#9A7B12" };
+
+  const Thread = ({ p }) => {
+    const co = companies.find(c => c.id === p.companyId);
+    const isGen = p.companyId === GENERAL_ID;
+    const m  = isGen ? { label:"相談", bg:"#FBEAE4", fg:C.warmAccent } : ptypeMeta(p);
+    const replies = (p.comments || []).length;
+    const likes   = (p.likes || []).length;
+    const hot     = likes >= 5 || replies >= 5;
+    return (
+      <article onClick={() => goThread(p)}
+        style={{ position:"relative", display:"flex", gap:13, background:C.surface,
+          border:"1px solid " + C.border, borderLeft:"4px solid " + (hot ? C.warmAccent : C.border),
+          borderRadius:12, padding:"15px 16px", marginBottom:11, cursor:"pointer" }}>
+        <div style={{ flex:1, minWidth:0 }}>
+          <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:6, flexWrap:"wrap" }}>
+            <span style={{ fontSize:11, fontWeight:"bold", padding:"2px 8px", borderRadius:5, background:m.bg, color:m.fg }}>{m.label}</span>
+            {co
+              ? <span style={{ display:"inline-flex", alignItems:"center", gap:5, fontSize:12, color:C.sub, fontWeight:500 }}><CompanyLogo company={co} size={16} />{co.name}</span>
+              : <span style={{ fontSize:11, fontWeight:"bold", color:C.accentDark, background:C.light, border:"1px dashed #BCD2E6", borderRadius:5, padding:"1px 7px" }}>📣 みんなの相談</span>}
+            <span style={{ marginLeft:"auto", fontSize:11, color:C.sub }}>{ago(p.createdAt)}</span>
+          </div>
+          <h3 style={{ fontSize:16, fontWeight:"bold", lineHeight:1.5, marginBottom:4, fontFamily:"'Zen Kaku Gothic New', sans-serif", color:C.ink }}>{p.title}{p.bestAnswerId && <span style={{ marginLeft:7, fontSize:10, fontWeight:"bold", color:C.success, background:"#E8F1EB", border:"1px solid #BFDCC8", borderRadius:5, padding:"1px 7px", verticalAlign:"middle" }}>✅ 解決済み</span>}</h3>
+          <p style={{ fontSize:12.5, color:C.sub, lineHeight:1.65, display:"-webkit-box", WebkitLineClamp:2, WebkitBoxOrient:"vertical", overflow:"hidden" }}>{p.content && p.content.slice(0,100)}</p>
+          <div style={{ display:"flex", alignItems:"center", gap:12, marginTop:10, fontSize:12, color:"#94A0AC" }}>
+            <span style={{ display:"flex", alignItems:"center", gap:6 }}><AC>{ini(p.author)}</AC>{p.author}</span>
+            <span className="tabnum">♡ {likes}</span>
+          </div>
+        </div>
+        <div style={{ display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", flexShrink:0, paddingLeft:8 }}>
+          <span className="tabnum" style={{ fontFamily:"'Zen Kaku Gothic New', sans-serif", fontWeight:800, fontSize:18, lineHeight:1, color: hot ? C.warmAccent : C.ink }}>{replies}</span>
+          <span style={{ fontSize:9.5, color:C.sub, marginTop:2 }}>返信</span>
+        </div>
+      </article>
+    );
+  };
 
   return (
     <div>
-      {/* ヒーローセクション - 実写画像背景・コンパクト */}
-      <section style={{
-        position: "relative",
-        backgroundImage: "linear-gradient(rgba(0,0,0,0.4), rgba(0,0,0,0.5)), url(\"https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=1400&q=70\")",
-        backgroundSize: "cover",
-        backgroundPosition: "center 40%",
-        padding: isMobile ? "28px 16px 28px" : "36px 32px 36px",
-        marginBottom: 20,
-        borderRadius: 14,
-        marginTop: 12,
-        overflow: "hidden",
-        color: "#fff",
-      }}>
-        <div style={{ maxWidth:840, margin:"0 auto", position:"relative", zIndex:1 }}>
-          <div style={{ textAlign:"center", marginBottom: isMobile ? 14 : 18, textShadow:"0 2px 12px rgba(0,0,0,0.4)" }}>
-            <p style={{ fontSize:10, fontWeight:"bold", letterSpacing:"0.18em", color:"#FCD34D", marginBottom:6, opacity:0.95 }}>
-              CAREER COMMUNITY
-            </p>
-            <h1 style={{ fontSize: isMobile ? 20 : 26, fontWeight:"bold", lineHeight:1.4, color:"#fff", fontFamily:"\"M PLUS Rounded 1c\", sans-serif" }}>
-              転職・就活の<span style={{ color:"#FCD34D" }}>リアル</span>がわかる
-            </h1>
-            <p style={{ fontSize: isMobile ? 12 : 13, color:"rgba(255,255,255,0.9)", marginTop:6, lineHeight:1.7 }}>
-              面接体験談・年収・口コミ・選考情報をみんなで共有するコミュニティ
-            </p>
-          </div>
-          {/* 大きな検索窓 */}
-          <div style={{ position:"relative", maxWidth:560, margin:"0 auto" }}>
-            <input
-              type="text"
-              placeholder="企業名・キーワードを入力（例：トヨタ、外資金融、ベンチャー）"
-              onKeyDown={(e) => { if (e.key === "Enter" && doGlobalSearch) doGlobalSearch(e.target.value); }}
-              style={{
-                width:"100%", padding: isMobile ? "12px 16px 12px 44px" : "14px 18px 14px 50px",
-                background:"rgba(255,255,255,0.95)", border:"2px solid rgba(255,255,255,0.8)", borderRadius:30,
-                fontSize: isMobile ? 13 : 14, fontFamily:"inherit", outline:"none",
-                boxShadow:"0 4px 20px rgba(0,0,0,0.2)",
-                color:"#1F3A5F"
-              }}
-            />
-            <span style={{ position:"absolute", left: isMobile ? 16 : 20, top:"50%", transform:"translateY(-50%)", fontSize:18, color:C.accent }}>🔍</span>
-          </div>
-          {/* 統計と CTA */}
-          <div style={{ display:"flex", gap: isMobile ? 12 : 24, justifyContent:"center", marginTop: isMobile ? 14 : 20, flexWrap:"wrap", alignItems:"center" }}>
-            {[[companies.length,"企業"],[posts.length,"体験談"],[reviews.length,"口コミ"]].map(([n,l]) => (
-              <div key={l} style={{ textAlign:"center" }}>
-                <div style={{ fontSize: isMobile ? 16 : 20, fontWeight:"bold", color:"#fff", fontFamily:"\"M PLUS Rounded 1c\", sans-serif", lineHeight:1, textShadow:"0 1px 4px rgba(0,0,0,0.3)" }}>{n.toLocaleString()}<span style={{ fontSize:11, color:"rgba(255,255,255,0.8)", fontWeight:"normal", marginLeft:2 }}>件</span></div>
-                <div style={{ fontSize:10, color:"rgba(255,255,255,0.8)", marginTop:2 }}>{l}</div>
-              </div>
-            ))}
-            {!sess && (
-              <button style={{
-                background:"#F59E0B", color:"#fff", border:"none",
-                padding: isMobile ? "10px 20px" : "11px 28px",
-                fontSize:13, fontWeight:"bold",
-                fontFamily:"inherit", cursor:"pointer", borderRadius:22,
-                boxShadow:"0 4px 16px rgba(245,158,11,0.4)",
-                marginLeft: isMobile ? 0 : 6
-              }} onClick={() => setAuthMode("register")}>
-                無料会員登録（30秒）→
-              </button>
-            )}
-          </div>
+      {/* ステートメント・ヒーロー（写真なし／掲示板が主役） */}
+      <section style={{ marginTop:16, marginBottom:18 }}>
+        <h1 style={{ fontFamily:"'Zen Kaku Gothic New', sans-serif", fontWeight:900, fontSize: isMobile ? 21 : 26, lineHeight:1.4, letterSpacing:"0.01em", color:C.ink }}>
+          会社の中の人と、<span style={{ color:C.accent }}>受けた人</span>が、ここで話す。
+        </h1>
+        <p style={{ color:C.sub, fontSize:13.5, marginTop:8, maxWidth:680, lineHeight:1.8 }}>
+          面接の逆質問、退職理由の伝え方、年収交渉、エージェント選び — 企業をまたいだ相談も、企業ごとの選考情報も、ひとつの掲示板に。
+        </p>
+        <div style={{ position:"relative", maxWidth:560, marginTop:14 }}>
+          <input type="text" placeholder="スレッド・企業名・キーワードで検索"
+            onKeyDown={(e) => { if (e.key === "Enter" && doGlobalSearch) doGlobalSearch(e.target.value); }}
+            style={{ width:"100%", padding:"12px 16px 12px 44px", background:C.surface, border:"1.5px solid " + C.border, borderRadius:24, fontSize:14, fontFamily:"inherit", outline:"none", color:C.ink }} />
+          <span style={{ position:"absolute", left:16, top:"50%", transform:"translateY(-50%)", fontSize:16, color:C.sub }}>🔍</span>
         </div>
+        <button onClick={() => go("board")} style={{ marginTop:14, background:C.warmAccent, color:"#fff", border:"none", padding:"11px 20px", fontSize:13.5, fontWeight:"bold", fontFamily:"inherit", cursor:"pointer", borderRadius:10, boxShadow:"0 2px 8px rgba(224,81,47,0.28)" }}>📣 みんなに相談する（会社をまたいでOK）→</button>
       </section>
 
-      {/* 未ログインユーザー向けの登録誘導 */}
       {!sess && (
-        <section style={{
-          background:"#FFF8E7", border:"1px solid #F5D982", borderRadius:8,
-          padding: isMobile ? "16px 18px" : "20px 28px", marginBottom:24,
-          display:"flex", alignItems:"center", gap:16, flexWrap:"wrap"
-        }}>
-          <div style={{ fontSize:32, flexShrink:0 }}>🎁</div>
+        <section style={{ background:C.warm, border:"1px solid #EBD9B8", borderRadius:10, padding: isMobile ? "14px 16px" : "16px 22px", marginBottom:18, display:"flex", alignItems:"center", gap:14, flexWrap:"wrap" }}>
           <div style={{ flex:1, minWidth:200 }}>
-            <div style={{ fontWeight:"bold", fontSize:15, color:"#92400E", marginBottom:4 }}>
-              会員登録（無料）でできること
-            </div>
-            <div style={{ fontSize:13, color:"#78350F", lineHeight:1.7 }}>
-              ✓ 企業の口コミ・年収を全文閲覧 &nbsp; ✓ 体験談・選考情報を投稿 &nbsp; ✓ お気に入り企業を保存
-            </div>
+            <div style={{ fontWeight:"bold", fontSize:14, color:"#7A5A12", marginBottom:2 }}>無料登録でできること</div>
+            <div style={{ fontSize:12.5, color:"#8A6A1A", lineHeight:1.7 }}>✓ 口コミ・年収を全文閲覧 ✓ 体験談・相談を投稿 ✓ 気になる企業をフォロー</div>
           </div>
-          <button style={{
-            background:"#1E5A96", color:"#fff", border:"none",
-            padding:"10px 24px", fontSize:13, fontWeight:"bold",
-            fontFamily:"inherit", cursor:"pointer", borderRadius:6, whiteSpace:"nowrap"
-          }} onClick={() => setAuthMode("register")}>
-            無料会員登録 →
-          </button>
+          <button style={{ background:C.warmAccent, color:"#fff", border:"none", padding:"10px 22px", fontSize:13, fontWeight:"bold", fontFamily:"inherit", cursor:"pointer", borderRadius:9, whiteSpace:"nowrap" }} onClick={() => setAuthMode("register")}>無料会員登録 →</button>
         </section>
       )}
 
-      {/* 🎉 内定速報タイムライン */}
+      {/* 内定速報（賑わいの可視化として上部に維持） */}
       <NaiteiTimeline posts={posts} companies={companies} go={go} isMobile={isMobile} />
 
-      {/* メインコンテンツ：2カラム */}
+      {/* 2カラム：左＝掲示板フィード（主役） / 右＝評価から探す（裏取り） */}
       <div style={{ display:"grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 300px", gap:24, alignItems:"start" }}>
-        {/* 左カラム：トレンドと最新投稿 */}
         <section>
-          {trending.length > 0 && (
-            <div style={{ marginBottom:24 }}>
-              <h2 style={{ fontSize:16, fontWeight:"bold", marginBottom:12, paddingBottom:8, borderBottom:"3px solid " + C.accent, color:C.ink, display:"flex", alignItems:"center", gap:8 }}>
-                <span style={{ background:C.accent, color:"#fff", padding:"3px 10px", fontSize:11, borderRadius:4 }}>HOT</span>
-                今週のトレンド
-              </h2>
-              <div style={{ display:"grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap:12 }}>
-                {trending.map(p => (
-                  <PostCard key={p.id} post={p} co={companies.find(c => c.id === p.companyId)} go={go} isAdmin={isAdmin} onDelete={adminDelete} onEdit={d => setEditTgt({ type:"post", data:d })} />
-                ))}
-              </div>
-            </div>
-          )}
-
-          <div>
-            <h2 style={{ fontSize:16, fontWeight:"bold", marginBottom:12, paddingBottom:8, borderBottom:"3px solid " + C.accent, color:C.ink }}>
-              最新の体験談・口コミ
-            </h2>
-            {recent.length === 0
-              ? <Empty text="まだ投稿がありません。最初の投稿をしてみましょう！" />
-              : recent.map(p => (
-                  <PostCard key={p.id} post={p} co={companies.find(c => c.id === p.companyId)} go={go} isAdmin={isAdmin} onDelete={adminDelete} onEdit={d => setEditTgt({ type:"post", data:d })} />
-                ))
-            }
+          <div style={{ display:"flex", gap:2, background:C.surface, border:"1px solid " + C.border, borderRadius:11, padding:3, marginBottom:14, overflowX:"auto" }}>
+            {FEEDS.map(([k,l]) => (
+              <button key={k} onClick={() => { setFeed(k); setVisible(12); }}
+                style={{ padding:"7px 13px", fontSize:13, fontWeight:"bold", borderRadius:8, whiteSpace:"nowrap", border:"none", cursor:"pointer", fontFamily:"inherit",
+                  background: feed===k ? C.accent : "transparent", color: feed===k ? "#fff" : C.sub }}>{l}</button>
+            ))}
           </div>
+          {shown.length === 0
+            ? <Empty text="この条件の投稿はまだありません。最初の一件を投稿してみましょう。" />
+            : shown.map(p => <Thread key={p.id} p={p} />)}
+          {visible < list.length && (
+            <button onClick={() => setVisible(v => v + 12)}
+              style={{ width:"100%", border:"1px solid " + C.border, background:C.surface, borderRadius:10, padding:11, fontWeight:"bold", color:C.accentDark, fontSize:13.5, fontFamily:"inherit", cursor:"pointer", marginTop:4 }}>
+              さらに表示（残り {list.length - visible} 件）
+            </button>)}
         </section>
 
-        {/* 右カラム：注目企業＋業種ナビ */}
         {!isMobile && (
           <aside>
-            <div style={{ background:"#fff", border:"1px solid " + C.border, borderRadius:8, padding:"16px 18px", marginBottom:16 }}>
-              <h3 style={{ fontSize:14, fontWeight:"bold", marginBottom:12, color:C.ink, paddingBottom:8, borderBottom:"2px solid " + C.accent }}>
-                ⭐ 注目の企業
-              </h3>
-              {topCos.slice(0,8).map((co,i) => {
+            <div style={{ background:C.surface, border:"1px solid " + C.border, borderRadius:12, padding:"16px 17px", marginBottom:16 }}>
+              <div style={{ fontSize:10, fontWeight:"bold", color:C.accent, letterSpacing:"0.08em", marginBottom:3 }}>EVIDENCE</div>
+              <h3 style={{ fontSize:13.5, fontWeight:"bold", color:C.ink, marginBottom:4, fontFamily:"'Zen Kaku Gothic New', sans-serif" }}>企業の評価から探す</h3>
+              <p style={{ fontSize:11, color:C.sub, marginBottom:12, lineHeight:1.6 }}>口コミ・年収・面接体験談を企業ごとに。気になる会社の裏取りに。</p>
+              {ALL_GROUPS.map(grp => {
+                const count = companies.filter(c => (c.group || getGroup(c.industry)) === grp).length;
+                return (
+                  <div key={grp} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"7px 0", borderBottom:"1px solid " + C.border, cursor:"pointer", fontSize:13 }} onClick={() => goSubTop(grp)}>
+                    <span style={{ color:C.ink }}>{grp}</span>
+                    <span className="tabnum" style={{ color:C.sub, fontSize:11 }}>{count}社</span>
+                  </div>
+                );
+              })}
+              <button style={{ width:"100%", border:"1px solid " + C.accent, color:C.accent, background:C.surface, fontWeight:"bold", fontSize:12.5, borderRadius:8, padding:8, marginTop:12, cursor:"pointer", fontFamily:"inherit" }} onClick={() => go("companies")}>企業一覧を見る →</button>
+            </div>
+
+            <div style={{ background:C.surface, border:"1px solid " + C.border, borderRadius:12, padding:"16px 17px", marginBottom:16 }}>
+              <h3 style={{ fontSize:13.5, fontWeight:"bold", color:C.ink, marginBottom:10, fontFamily:"'Zen Kaku Gothic New', sans-serif" }}>🔥 注目の企業</h3>
+              {topCos.map((co,i) => {
                 const a   = calcAvg(coRevs(co.id));
                 const sal = calcAvgSal(coSals(co.id));
                 return (
-                  <div key={co.id} style={{ padding:"8px 0", borderBottom: i < 7 ? "1px solid " + C.border : "none", cursor:"pointer", display:"flex", alignItems:"center", gap:8 }} onClick={() => go("company", co)}>
-                    <span style={{ fontSize:11, color:C.accent, fontWeight:"bold", width:18 }}>{i+1}</span>
+                  <div key={co.id} style={{ display:"flex", alignItems:"center", gap:8, padding:"8px 0", borderBottom: i<7 ? "1px solid " + C.border : "none", cursor:"pointer" }} onClick={() => go("company", co)}>
+                    <span className="tabnum" style={{ fontSize:12, color: i<2 ? C.warmAccent : C.sub, fontWeight:"bold", width:16, fontFamily:"'Zen Kaku Gothic New', sans-serif" }}>{i+1}</span>
+                    <CompanyLogo company={co} size={28} />
                     <div style={{ flex:1, minWidth:0 }}>
-                      <div style={{ fontSize:13, fontWeight:"bold", color:C.ink, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{co.name}</div>
-                      <div style={{ fontSize:10, color:C.sub, marginTop:1 }}>
-                        {a && <span style={{ color:C.accent, fontWeight:"bold" }}>★{a.overall.toFixed(1)}</span>}
+                      <div style={{ fontSize:13, fontWeight:"bold", color:C.ink, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", fontFamily:"'Zen Kaku Gothic New', sans-serif" }}>{co.name}</div>
+                      <div style={{ fontSize:11, color:C.sub, marginTop:1 }}>
+                        {a && <span style={{ color:C.warmAccent, fontWeight:"bold" }}>★{a.overall.toFixed(1)}</span>}
                         {a && sal && " · "}
-                        {sal && <span>{sal}万円</span>}
+                        {sal && <span className="tabnum">{sal}万円</span>}
                       </div>
                     </div>
                   </div>
                 );
               })}
-              <button style={{
-                width:"100%", background:"#fff", border:"1px solid " + C.accent,
-                color:C.accent, padding:"8px", fontSize:12, fontWeight:"bold",
-                marginTop:10, cursor:"pointer", fontFamily:"inherit", borderRadius:4
-              }} onClick={() => go("ranking")}>
-                ランキングをもっと見る →
-              </button>
             </div>
 
-            {/* 投稿者ランキング */}
             <TopContributors posts={posts} reviews={reviews} salaries={salaries} />
-            <PopularPosters posts={posts} reviews={reviews} />
             <div style={{ marginTop:16 }} />
-            <div style={{ background:"#fff", border:"1px solid " + C.border, borderRadius:8, padding:"16px 18px" }}>
-              <h3 style={{ fontSize:14, fontWeight:"bold", marginBottom:12, color:C.ink, paddingBottom:8, borderBottom:"2px solid " + C.accent }}>
-                🏢 業種別に企業を探す
-              </h3>
-              {ALL_GROUPS.map(grp => {
-                const count = companies.filter(c => (c.group || getGroup(c.industry)) === grp).length;
-                return (
-                  <div key={grp} style={{ padding:"6px 0", display:"flex", justifyContent:"space-between", alignItems:"center", cursor:"pointer", fontSize:12 }} onClick={() => goSubTop(grp)}>
-                    <span style={{ color:C.ink }}>{grp}</span>
-                    <span style={{ color:C.sub, fontSize:11 }}>{count}社</span>
-                  </div>
-                );
-              })}
-            </div>
+            <PopularPosters posts={posts} reviews={reviews} />
           </aside>
         )}
       </div>
 
-      {/* SEO用の隠しテキストではなく、フッター上部に検索キーワード関連のリンク集 */}
-      <section style={{ marginTop:32, padding:"20px 24px", background:"#fff", border:"1px solid " + C.border, borderRadius:8 }}>
-        <h2 style={{ fontSize:14, fontWeight:"bold", marginBottom:12, color:C.ink }}>転職・就活でよく検索されるキーワード</h2>
-        <div style={{ display:"flex", flexWrap:"wrap", gap:6 }}>
-          {["面接体験談","年収口コミ","選考フロー","中途採用","新卒採用","残業時間","内定","退職金","面接対策","志望動機","ES通過","年収比較","給料","ボーナス","働き方","企業研究"].map(kw => (
-            <span key={kw} style={{
-              background:C.light, color:C.accent, border:"1px solid " + C.border,
-              padding:"4px 10px", fontSize:11, borderRadius:14, cursor:"pointer"
-            }} onClick={() => go("companies")}>#{kw}</span>
+      <section style={{ marginTop:32, padding:"20px 22px", background:C.surface, border:"1px solid " + C.border, borderRadius:12 }}>
+        <h2 style={{ fontSize:14, fontWeight:"bold", marginBottom:12, color:C.ink, fontFamily:"'Zen Kaku Gothic New', sans-serif" }}>よく検索されるテーマ</h2>
+        <div style={{ display:"flex", flexWrap:"wrap", gap:7 }}>
+          {["面接の逆質問","退職理由の伝え方","ガクチカ","年収交渉","内定報告","エージェント比較","第二新卒","Webテスト対策","残業の実態","志望動機","ES通過","企業研究"].map(kw => (
+            <span key={kw} style={{ background:C.light, color:C.accent, border:"1px solid " + C.border, padding:"4px 11px", fontSize:11.5, borderRadius:14, cursor:"pointer" }} onClick={() => go("companies")}>#{kw}</span>
           ))}
         </div>
       </section>
@@ -3567,8 +3471,8 @@ function CompanyPage({ go, co, cposts, crevs, csals, cjobs, initTab, onToggleLik
   const es = filterByJob(cposts.filter(p => p.ptype === "es"));
   // 選考者(求職者)向け / 在籍者向け の2グループに分離
   const tabsCandidate = [
-    ["board",     "転職掲示板", bd.length],
     ["interview", "面接体験談", iv.length],
+    ["board",     "選考掲示板", bd.length],
     ["es",        "ES例文",     es.length],
   ];
   const tabsEmployee = [
@@ -3589,21 +3493,21 @@ function CompanyPage({ go, co, cposts, crevs, csals, cjobs, initTab, onToggleLik
         <div style={{ display:"flex", alignItems:"center", gap:16, flexWrap:"wrap" }}>
           <CompanyLogo company={co} size={isMobile ? 48 : 64} />
           <div style={{ flex:1 }}>
-            <h1 style={{ fontWeight:"bold", fontFamily:"'M PLUS Rounded 1c', sans-serif", fontSize: isMobile ? 18 : 24 }}>{co.name}</h1>
+            <h1 style={{ fontWeight:"bold", fontFamily:"'Zen Kaku Gothic New', sans-serif", fontSize: isMobile ? 18 : 24 }}>{co.name}</h1>
             <p style={{ fontSize:12, color:C.sub, marginTop:3 }}>{co.group || getGroup(co.industry)} &gt; {co.industry}</p>
           </div>
           <div style={{ display:"flex", gap:10, flexWrap:"wrap" }}>
             {a && (
               <div style={{ textAlign:"center", border:"1px solid " + C.border, padding:"10px 14px", minWidth:90 }}>
                 <div style={{ fontSize:10, color:C.sub, marginBottom:3 }}>総合評価</div>
-                <div style={{ fontSize:26, fontWeight:"bold", color:C.accent, fontFamily:"'M PLUS Rounded 1c', sans-serif", lineHeight:1 }}>{a.overall.toFixed(1)}</div>
+                <div style={{ fontSize:26, fontWeight:"bold", color:C.accent, fontFamily:"'Zen Kaku Gothic New', sans-serif", lineHeight:1 }}>{a.overall.toFixed(1)}</div>
                 <Stars r={a.overall} size={11} />
               </div>
             )}
             {sal && (
               <div style={{ textAlign:"center", border:"1px solid " + C.border, padding:"10px 14px", minWidth:90 }}>
                 <div style={{ fontSize:10, color:C.sub, marginBottom:3 }}>平均年収</div>
-                <div style={{ fontSize:22, fontWeight:"bold", color:"#1a5276", fontFamily:"'M PLUS Rounded 1c', sans-serif", lineHeight:1 }}>{sal}<span style={{ fontSize:12, fontWeight:"normal" }}>万円</span></div>
+                <div style={{ fontSize:22, fontWeight:"bold", color:"#1a5276", fontFamily:"'Zen Kaku Gothic New', sans-serif", lineHeight:1 }}>{sal}<span style={{ fontSize:12, fontWeight:"normal" }}>万円</span></div>
                 <div style={{ fontSize:10, color:C.sub, marginTop:3 }}>{csals.length}件</div>
               </div>
             )}
@@ -3630,74 +3534,47 @@ function CompanyPage({ go, co, cposts, crevs, csals, cjobs, initTab, onToggleLik
           })()}
         </div>
       </div>
-      {/* タブグループ - スマホは縦に分割表示、PCは横並び */}
-      <div style={{ marginTop:14, marginBottom:0 }}>
-        {isMobile ? (
-          <>
-            {/* スマホ：選考者向けセクション */}
-            <div style={{ marginBottom:8 }}>
-              <div style={{ fontSize:10, color:"#C2410C", fontWeight:"bold", letterSpacing:"0.06em", marginBottom:4 }}>📝 選考を受けた人の情報</div>
-              <div style={{ display:"flex", overflowX:"auto", borderBottom:"2px solid #FDBA74" }}>
-                {tabsCandidate.map(([k,l,n]) => (
-                  <button key={k} style={{ background:"none", border:"none", padding:"8px 10px", fontSize:12, fontFamily:"inherit", cursor:"pointer", color: tab===k ? "#C2410C" : C.sub, borderBottom:"3px solid " + (tab===k ? "#F59E0B" : "transparent"), marginBottom:-2, fontWeight: tab===k ? "bold" : "500", whiteSpace:"nowrap" }} onClick={() => setTab(k)}>
-                    {l}<span style={{ fontSize:10, background: tab===k ? "#F59E0B" : "#eee", color: tab===k ? "#fff" : C.sub, padding:"1px 5px", marginLeft:3, borderRadius:2 }}>{n}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div style={{ marginBottom:8 }}>
-              <div style={{ fontSize:10, color:C.accent, fontWeight:"bold", letterSpacing:"0.06em", marginBottom:4 }}>🏢 在籍者・元社員の情報</div>
-              <div style={{ display:"flex", overflowX:"auto", borderBottom:"2px solid " + C.accent }}>
-                {tabsEmployee.map(([k,l,n]) => (
-                  <button key={k} style={{ background:"none", border:"none", padding:"8px 10px", fontSize:12, fontFamily:"inherit", cursor:"pointer", color: tab===k ? C.accent : C.sub, borderBottom:"3px solid " + (tab===k ? C.accent : "transparent"), marginBottom:-2, fontWeight: tab===k ? "bold" : "500", whiteSpace:"nowrap" }} onClick={() => setTab(k)}>
-                    {l}<span style={{ fontSize:10, background: tab===k ? C.accent : "#eee", color: tab===k ? "#fff" : C.sub, padding:"1px 5px", marginLeft:3, borderRadius:2 }}>{n}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div style={{ marginBottom:8 }}>
-              <div style={{ display:"flex", overflowX:"auto", borderBottom:"2px solid " + C.ink }}>
-                {tabsOther.map(([k,l,n]) => (
-                  <button key={k} style={{ background:"none", border:"none", padding:"8px 10px", fontSize:12, fontFamily:"inherit", cursor:"pointer", color: tab===k ? C.ink : C.sub, borderBottom:"3px solid " + (tab===k ? C.ink : "transparent"), marginBottom:-2, fontWeight: tab===k ? "bold" : "500", whiteSpace:"nowrap" }} onClick={() => setTab(k)}>
-                    {l}<span style={{ fontSize:10, background: tab===k ? C.ink : "#eee", color: tab===k ? "#fff" : C.sub, padding:"1px 5px", marginLeft:3, borderRadius:2 }}>{n}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          </>
-        ) : (
-          <div style={{ display:"flex", flexWrap:"wrap", gap:0, borderBottom:"2px solid " + C.ink, paddingTop:18 }}>
-            <div style={{ display:"flex", paddingRight:14, borderRight:"1px solid " + C.border, position:"relative" }}>
-              <span style={{ position:"absolute", top:-14, left:0, fontSize:9, color:"#C2410C", fontWeight:"bold", letterSpacing:"0.06em", whiteSpace:"nowrap" }}>📝 選考を受けた人の情報</span>
-              {tabsCandidate.map(([k,l,n]) => (
-                <button key={k} style={{ background:"none", border:"none", padding:"9px 12px", fontSize:12, fontFamily:"inherit", cursor:"pointer", color: tab===k ? "#C2410C" : C.sub, borderBottom:"3px solid " + (tab===k ? "#F59E0B" : "transparent"), marginBottom:-2, fontWeight: tab===k ? "bold" : "500", whiteSpace:"nowrap" }} onClick={() => setTab(k)}>
-                  {l}<span style={{ fontSize:10, background: tab===k ? "#F59E0B" : "#eee", color: tab===k ? "#fff" : C.sub, padding:"1px 5px", marginLeft:3, borderRadius:2 }}>{n}</span>
+      {/* セグメント（6タブ→3つに集約：みんなの投稿 / 企業の評価 / 募集要項） */}
+      <div style={{ marginTop:14 }}>
+        <div style={{ display:"flex", gap:6 }}>
+          {[
+            ["posts","みんなの投稿","掲示板・面接・ES","board"],
+            ["eval","企業の評価","口コミ・年収","review"],
+            ["jobs","募集要項","求人","jobs"],
+          ].map(([seg,t,d,first]) => {
+            const active = seg === "eval" ? (tab==="review"||tab==="salary") : seg === "jobs" ? tab==="jobs" : (tab==="interview"||tab==="board"||tab==="es");
+            return (
+              <button key={seg} onClick={() => setTab(first)}
+                style={{ flex:1, background:"#fff", border:"1px solid " + (active ? C.accent : C.border), borderBottom:"none", borderRadius:"11px 11px 0 0", padding: isMobile ? "10px 6px" : "12px 10px", textAlign:"center", cursor:"pointer", fontFamily:"inherit", boxShadow: active ? ("inset 0 -3px 0 " + C.accent) : "none", position:"relative", top:1 }}>
+                <span style={{ display:"block", fontSize: isMobile ? 13 : 14, fontWeight:"bold", color: active ? C.accentDark : C.ink, fontFamily:"'Zen Kaku Gothic New', sans-serif" }}>{t}</span>
+                {!isMobile && <span style={{ display:"block", fontSize:10.5, color:C.sub, marginTop:2 }}>{d}</span>}
+              </button>
+            );
+          })}
+        </div>
+        <div style={{ borderTop:"2px solid " + C.accent, paddingTop:14 }}>
+          <div style={{ display:"flex", gap:7, flexWrap:"wrap", alignItems:"center" }}>
+            <span style={{ fontSize:11.5, color:C.sub, marginRight:2 }}>表示</span>
+            {(() => {
+              const seg = (tab==="review"||tab==="salary") ? "eval" : tab==="jobs" ? "jobs" : "posts";
+              const subs = seg === "eval" ? [["review","口コミ",crevs.length],["salary","年収",csals.length]]
+                : seg === "jobs" ? [["jobs","募集要項",cjobs.length]]
+                : [["board","選考掲示板",bd.length],["interview","面接体験談",iv.length],["es","ES例文",es.length]];
+              return subs.map(([k,l,n]) => (
+                <button key={k} onClick={() => setTab(k)}
+                  style={{ fontSize:12, fontWeight:500, border:"1px solid " + (tab===k ? C.ink : C.border), background: tab===k ? C.ink : "#fff", color: tab===k ? "#fff" : C.ink, borderRadius:16, padding:"5px 12px", cursor:"pointer", fontFamily:"inherit" }}>
+                  {l}<span className="tabnum" style={{ fontSize:10, marginLeft:4, opacity:0.7 }}>{n}</span>
                 </button>
-              ))}
-            </div>
-            <div style={{ display:"flex", paddingLeft:14, paddingRight:14, borderRight:"1px solid " + C.border, position:"relative" }}>
-              <span style={{ position:"absolute", top:-14, left:14, fontSize:9, color:C.accent, fontWeight:"bold", letterSpacing:"0.06em", whiteSpace:"nowrap" }}>🏢 在籍者・元社員の情報</span>
-              {tabsEmployee.map(([k,l,n]) => (
-                <button key={k} style={{ background:"none", border:"none", padding:"9px 12px", fontSize:12, fontFamily:"inherit", cursor:"pointer", color: tab===k ? C.accent : C.sub, borderBottom:"3px solid " + (tab===k ? C.accent : "transparent"), marginBottom:-2, fontWeight: tab===k ? "bold" : "500", whiteSpace:"nowrap" }} onClick={() => setTab(k)}>
-                  {l}<span style={{ fontSize:10, background: tab===k ? C.accent : "#eee", color: tab===k ? "#fff" : C.sub, padding:"1px 5px", marginLeft:3, borderRadius:2 }}>{n}</span>
-                </button>
-              ))}
-            </div>
-            <div style={{ display:"flex", paddingLeft:14 }}>
-              {tabsOther.map(([k,l,n]) => (
-                <button key={k} style={{ background:"none", border:"none", padding:"9px 12px", fontSize:12, fontFamily:"inherit", cursor:"pointer", color: tab===k ? C.ink : C.sub, borderBottom:"3px solid " + (tab===k ? C.ink : "transparent"), marginBottom:-2, fontWeight: tab===k ? "bold" : "500", whiteSpace:"nowrap" }} onClick={() => setTab(k)}>
-                  {l}<span style={{ fontSize:10, background: tab===k ? C.ink : "#eee", color: tab===k ? "#fff" : C.sub, padding:"1px 5px", marginLeft:3, borderRadius:2 }}>{n}</span>
-                </button>
-              ))}
-            </div>
+              ));
+            })()}
           </div>
-        )}
+        </div>
       </div>
       <div style={{ marginTop:14 }} />
       <div style={{ paddingTop:20 }}>
-        {tab === "interview" && <PostsTab posts={iv} ptype="interview" label="面接体験談" co={co} uName={uName} onAddPost={onAddPost} onToggleLike={onToggleLike} onAddComment={onAddComment} isAdmin={isAdmin} adminDelete={adminDelete} setEditTgt={setEditTgt} favorites={favorites} toggleFavorite={toggleFavorite} jobCat={jobCat} sess={sess} setAuthMode={setAuthMode} unlocked={unlocked} getAuthorBadge={getAuthorBadge} authUser={authUser} />}
-        {tab === "board"     && <PostsTab posts={bd} ptype="board"     label="転職掲示板" co={co} uName={uName} onAddPost={onAddPost} onToggleLike={onToggleLike} onAddComment={onAddComment} isAdmin={isAdmin} adminDelete={adminDelete} setEditTgt={setEditTgt} favorites={favorites} toggleFavorite={toggleFavorite} jobCat={jobCat} sess={sess} setAuthMode={setAuthMode} unlocked={unlocked} getAuthorBadge={getAuthorBadge} authUser={authUser} />}
-        {tab === "es"        && <PostsTab posts={es} ptype="es"        label="ES例文"     co={co} uName={uName} onAddPost={onAddPost} onToggleLike={onToggleLike} onAddComment={onAddComment} isAdmin={isAdmin} adminDelete={adminDelete} setEditTgt={setEditTgt} favorites={favorites} toggleFavorite={toggleFavorite} jobCat={jobCat} sess={sess} setAuthMode={setAuthMode} unlocked={unlocked} getAuthorBadge={getAuthorBadge} authUser={authUser} />}
+        {tab === "interview" && <PostsTab posts={iv} ptype="interview" label="面接体験談" co={co} uName={uName} onAddPost={onAddPost} onToggleLike={onToggleLike} onAddComment={onAddComment} isAdmin={isAdmin} adminDelete={adminDelete} setEditTgt={setEditTgt} favorites={favorites} toggleFavorite={toggleFavorite} jobCat={jobCat} sess={sess} setAuthMode={setAuthMode} unlocked={unlocked} getAuthorBadge={getAuthorBadge} authUser={authUser} goThread={goThread} />}
+        {tab === "board"     && <PostsTab posts={bd} ptype="board"     label="選考掲示板" co={co} uName={uName} onAddPost={onAddPost} onToggleLike={onToggleLike} onAddComment={onAddComment} isAdmin={isAdmin} adminDelete={adminDelete} setEditTgt={setEditTgt} favorites={favorites} toggleFavorite={toggleFavorite} jobCat={jobCat} sess={sess} setAuthMode={setAuthMode} unlocked={unlocked} getAuthorBadge={getAuthorBadge} authUser={authUser} goThread={goThread} />}
+        {tab === "es"        && <PostsTab posts={es} ptype="es"        label="ES例文"     co={co} uName={uName} onAddPost={onAddPost} onToggleLike={onToggleLike} onAddComment={onAddComment} isAdmin={isAdmin} adminDelete={adminDelete} setEditTgt={setEditTgt} favorites={favorites} toggleFavorite={toggleFavorite} jobCat={jobCat} sess={sess} setAuthMode={setAuthMode} unlocked={unlocked} getAuthorBadge={getAuthorBadge} authUser={authUser} goThread={goThread} />}
         {tab === "review"    && <ReviewsTab revs={crevs} avgData={a}   co={co} uName={uName} plan={plan} onAddReview={onAddReview} isAdmin={isAdmin} adminDelete={adminDelete} setEditTgt={setEditTgt} go={go} sess={sess} setAuthMode={setAuthMode} unlocked={unlocked} getAuthorBadge={getAuthorBadge} />}
         {tab === "salary"    && <SalaryTab  sals={csals} avgSalary={sal} co={co} uName={uName} plan={plan} onAddSalary={onAddSalary} isAdmin={isAdmin} adminDelete={adminDelete} setEditTgt={setEditTgt} go={go} sess={sess} setAuthMode={setAuthMode} unlocked={unlocked} getAuthorBadge={getAuthorBadge} />}
         {tab === "jobs"      && <JobsTab    jobs={cjobs} co={co} uName={uName} onAddJob={onAddJob} isAdmin={isAdmin} adminDelete={adminDelete} setEditTgt={setEditTgt} />}
@@ -3707,12 +3584,11 @@ function CompanyPage({ go, co, cposts, crevs, csals, cjobs, initTab, onToggleLik
 }
 
 // ─── 掲示板・体験談タブ ───────────────────────────────────────────────────────
-function PostsTab({ posts, ptype, label, co, uName, onAddPost, onToggleLike, onAddComment, isAdmin, adminDelete, setEditTgt, favorites, toggleFavorite, jobCat, sess, setAuthMode, unlocked, getAuthorBadge, authUser }) {
+function PostsTab({ posts, ptype, label, co, uName, onAddPost, onToggleLike, onAddComment, isAdmin, adminDelete, setEditTgt, favorites, toggleFavorite, jobCat, sess, setAuthMode, unlocked, getAuthorBadge, authUser, hideBoardNotice, goThread }) {
   const authUserKey = authUser?.uid || ("guest:" + uName);
   const [exp,  setExp]  = useState(null);
   const [cmt,  setCmt]  = useState("");
   const [form, setForm] = useState(null);
-  const [boardViewMode, setBoardViewMode] = React.useState("full"); // "full" | "title-only"
   const [customStage, setCustomStage] = useState("");
   const [showCustomStage, setShowCustomStage] = useState(false);
   const [stages, setStages] = useState([{ stage:"", content:"" }]);
@@ -3732,9 +3608,8 @@ function PostsTab({ posts, ptype, label, co, uName, onAddPost, onToggleLike, onA
       }
     : isBoard
     ? {
-        companyId:co.id, ptype, stage:"掲示板", title:"", content:"", jobCategory: jobCat || "全職種",
-        guestEmail:"",
-        guestName: getRandomNickname(co.group || getGroup(co.industry), [...new Set((posts.filter(p => p.ptype === "board").map(p => p.author).filter(Boolean)))])
+        companyId:co.id, ptype, stage:"掲示板", title:"", content:"", jobCategory:"全職種",
+        guestEmail:"", guestName:""  // 未ログイン投稿用
       }
     : { companyId:co.id, ptype, stage:"", title:"", content:"", jobCategory:"全職種", offerAmount:"", offerBase:"", offerBonus:"" };
   const sorted = [...posts].sort((a,b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
@@ -3742,7 +3617,7 @@ function PostsTab({ posts, ptype, label, co, uName, onAddPost, onToggleLike, onA
   return (
     <div>
       {ptype === "interview" && <AISummary posts={posts} type="interview" />}
-      {ptype === "board" && (
+      {ptype === "board" && !hideBoardNotice && (
         <div style={{ background:"#FFFBEB", border:"1px solid #FDE68A", padding:"10px 14px", borderRadius:6, marginBottom:14, fontSize:12, color:"#92400E", lineHeight:1.7 }}>
           <strong>📋 職種ごとに掲示板が分かれています</strong><br />
           上部の「職種カテゴリ」で絞り込めます。投稿時も職種を選んでください。
@@ -3750,26 +3625,9 @@ function PostsTab({ posts, ptype, label, co, uName, onAddPost, onToggleLike, onA
       )}
       <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:14, paddingBottom:10, borderBottom:"1px solid " + C.border, flexWrap:"wrap", gap:8 }}>
         <span style={{ fontSize:12, color:C.sub }}>{posts.length}件の{label}{ptype === "board" && jobCat !== "全職種" ? ` (${jobCat})` : ""}</span>
-        <div style={{ display:"flex", gap:6, alignItems:"center" }}>
-          {isBoard && (
-            <div style={{ display:"flex", border:"1px solid " + C.border, borderRadius:5, overflow:"hidden" }}>
-              <button
-                style={{ background: boardViewMode === "title-only" ? C.accent : "#fff", color: boardViewMode === "title-only" ? "#fff" : C.sub, border:"none", padding:"5px 10px", fontSize:11, cursor:"pointer", fontFamily:"inherit" }}
-                onClick={() => setBoardViewMode("title-only")}
-              >📋 タイトルのみ</button>
-              <button
-                style={{ background: boardViewMode === "full" ? C.accent : "#fff", color: boardViewMode === "full" ? "#fff" : C.sub, border:"none", padding:"5px 10px", fontSize:11, cursor:"pointer", fontFamily:"inherit" }}
-                onClick={() => setBoardViewMode("full")}
-              >📄 記事内容</button>
-            </div>
-          )}
-          <button
-            style={{ ...S.primaryBtn, ...(isBoard && !form ? { background:"#F59E0B", boxShadow:"0 2px 8px rgba(245,158,11,0.3)" } : {}) }}
-            onClick={(e) => { e.preventDefault(); e.stopPropagation(); setForm(form ? null : initF); }}
-          >
-            {form ? "キャンセル" : isBoard ? "✏️ いますぐ書き込む" : "＋ " + label + "を投稿する"}
-          </button>
-        </div>
+        <button style={S.primaryBtn} onClick={() => setForm(form ? null : initF)}>
+          {form ? "キャンセル" : "＋ " + label + "を投稿する"}
+        </button>
       </div>
       {form && (
         <div style={{ background:C.surface, border:"1px solid " + C.border, borderTop:"3px solid " + C.accent, padding:"18px 20px", marginBottom:20 }}>
@@ -3779,22 +3637,20 @@ function PostsTab({ posts, ptype, label, co, uName, onAddPost, onToggleLike, onA
               他の方の体験談・口コミ・年収情報がすべて閲覧できるようになります。
             </div>
           )}
-          {!isBoard && (
-            <Fld label="職種カテゴリ">
-              <div style={{ display:"flex", gap:8 }}>
-                <select style={{...S.input, flex:1}} value={form.jobCategory === "__custom__" ? "__custom__" : (form.jobCategory || "全職種")} onChange={e => {
-                  if (e.target.value === "__custom__") setForm({...form, jobCategory:"__custom__"});
-                  else setForm({...form, jobCategory:e.target.value});
-                }}>
-                  {getJobCategories(co.group || co.industry).map(j => <option key={j} value={j}>{j}</option>)}
-                  <option value="__custom__">＋ 新しい職種を追加する</option>
-                </select>
-                {form.jobCategory === "__custom__" && (
-                  <input style={{...S.input, flex:1}} placeholder="例：CRMマーケター、広報、サステナ推進" autoFocus onChange={e => setForm({...form, jobCategory:e.target.value})} />
-                )}
-              </div>
-            </Fld>
-          )}
+          <Fld label="職種カテゴリ">
+            <div style={{ display:"flex", gap:8 }}>
+              <select style={{...S.input, flex:1}} value={form.jobCategory === "__custom__" ? "__custom__" : (form.jobCategory || "全職種")} onChange={e => {
+                if (e.target.value === "__custom__") setForm({...form, jobCategory:"__custom__"});
+                else setForm({...form, jobCategory:e.target.value});
+              }}>
+                {getJobCategories(co.group || co.industry).map(j => <option key={j} value={j}>{j}</option>)}
+                <option value="__custom__">＋ 新しい職種を追加する</option>
+              </select>
+              {form.jobCategory === "__custom__" && (
+                <input style={{...S.input, flex:1}} placeholder="例：CRMマーケター、広報、サステナ推進" autoFocus onChange={e => setForm({...form, jobCategory:e.target.value})} />
+              )}
+            </div>
+          </Fld>
           {isES && (
             <>
               <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
@@ -3814,30 +3670,35 @@ function PostsTab({ posts, ptype, label, co, uName, onAddPost, onToggleLike, onA
               </Fld>
             </>
           )}
-          {isBoard && (
-            <div style={{ background:"#F0F9FF", border:"1px solid #BAE6FD", padding:"14px 16px", borderRadius:8, marginBottom:14 }}>
-              <div style={{ fontSize:13, fontWeight:"bold", color:"#0C4A6E", marginBottom:10 }}>
-                💬 気軽に書き込もう（匿名・登録不要）
+          {isBoard && !sess && (
+            <div style={{ background:"#F0F9FF", border:"1px solid #BAE6FD", padding:"12px 14px", borderRadius:6, marginBottom:14 }}>
+              <div style={{ fontSize:13, fontWeight:"bold", color:"#0C4A6E", marginBottom:8 }}>
+                💬 メールアドレスだけで投稿できます（パスワード不要）
               </div>
-              <Fld label="お名前（ランダム自動セット済み・編集も可）">
-                <div style={{ display:"flex", gap:6 }}>
-                  <input style={{...S.input, flex:1}} placeholder="例：伝説のバンカー" value={sess ? uName : form.guestName} onChange={e => { if (!sess) setForm({ ...form, guestName:e.target.value }); }} readOnly={!!sess} />
-                  {!sess && (
-                    <button type="button" style={{ background:"#fff", border:"1px solid " + C.border, padding:"6px 12px", fontSize:12, cursor:"pointer", fontFamily:"inherit", borderRadius:5, whiteSpace:"nowrap" }} onClick={() => {
-                      const used = [...new Set(posts.filter(p => p.ptype === "board").map(p => p.author).filter(Boolean))].filter(n => n !== form.guestName);
-                      setForm({ ...form, guestName: getRandomNickname(co.group || getGroup(co.industry), used) });
-                    }}>
-                      🎲 シャッフル
-                    </button>
-                  )}
-                </div>
-              </Fld>
-              {!sess && (
-                <Fld label="メールアドレス（非公開・荒らし対策のみ）">
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
+                <Fld label="メールアドレス *">
                   <input style={S.input} type="email" placeholder="example@email.com" value={form.guestEmail} onChange={e => setForm({ ...form, guestEmail:e.target.value })} />
                 </Fld>
-              )}
+                <Fld label="表示名（コテハン） *">
+                  <input style={S.input} placeholder="例：転職検討中" value={form.guestName} onChange={e => setForm({ ...form, guestName:e.target.value })} />
+                </Fld>
+              </div>
+              <p style={{ fontSize:10, color:C.sub, marginTop:4, lineHeight:1.7 }}>
+                ※ メールアドレスは荒らし対策のためのみ使用し、公開されません。<br />
+                ※ 会員登録すると、このメールアドレスでそのままログインできます。
+              </p>
             </div>
+          )}
+          {isBoard && (
+            <Fld label="投稿カテゴリ">
+              <select style={S.input} value={form.stage} onChange={e => setForm({...form, stage:e.target.value})}>
+                <option value="掲示板">通常の質問・情報共有</option>
+                <option value="選考情報">選考情報・通過率</option>
+                <option value="質問">質問</option>
+                <option value="OB訪問">OB訪問・面談</option>
+                <option value="その他">その他</option>
+              </select>
+            </Fld>
           )}
           {!isES && !isInterview && !isBoard && (
           <Fld label="選考段階 *">
@@ -4047,87 +3908,11 @@ function PostsTab({ posts, ptype, label, co, uName, onAddPost, onToggleLike, onA
       )}
       {sorted.map((p, idx) => {
         const isLocked = !unlocked && (
-          ptype === "board" ? false :
+          ptype === "board" ? false :  // 掲示板はロックしない
           ptype === "es" ? idx >= 0 :
           ptype === "interview" ? idx >= 1 :
           idx >= 1
         );
-        // 掲示板用 タイトル一覧モード
-        if (isBoard && boardViewMode === "title-only") {
-          return (
-            <div key={p.id} style={{ display:"flex", alignItems:"center", gap:10, padding:"10px 14px", background:"#fff", border:"1px solid " + C.border, borderRadius:6, marginBottom:6, cursor:"pointer", flexWrap:"wrap" }} onClick={() => { setBoardViewMode("full"); setTimeout(() => { const el = document.getElementById("post-" + p.id); if (el) el.scrollIntoView({ behavior:"smooth", block:"start" }); }, 50); }}>
-              <span style={{ background:"#1E3A8A", color:"#fff", padding:"2px 8px", fontSize:10, fontWeight:"bold", fontFamily:"monospace", borderRadius:3 }}>No.{(sorted.length - idx).toString().padStart(4, "0")}</span>
-              <span style={{ fontSize:13, fontWeight:"bold", color:C.ink, flex:1, minWidth:200 }}>{p.title}</span>
-              {(p.comments || []).length > 0 && (
-                <span style={{ fontSize:11, color:C.accent, fontWeight:"bold" }}>💬 {(p.comments || []).length}</span>
-              )}
-              {(p.likes || []).length > 0 && (
-                <span style={{ fontSize:11, color:"#DC2626" }}>❤️ {(p.likes || []).length}</span>
-              )}
-              <span style={{ fontSize:10, color:C.sub }}>投稿者: {p.author}</span>
-              {getAuthorId(p) && <span style={{ fontSize:9, color:"#C0C0C0", fontFamily:"monospace" }}>#{getAuthorId(p)}</span>}
-              <span style={{ fontSize:10, color:C.sub }}>{fmtDateTime(p.createdAt)}</span>
-            </div>
-          );
-        }
-        // 掲示板用 記事内容モード（クルーネット風ヘッダー）
-        if (isBoard && boardViewMode === "full") {
-          return (
-            <article key={p.id} id={"post-" + p.id} style={{ background:"#fff", border:"1px solid " + C.border, borderRadius:6, marginBottom:14, overflow:"hidden" }}>
-              {/* 番号付きヘッダー */}
-              <div style={{ background:"#1E3A8A", color:"#fff", padding:"8px 14px", display:"flex", alignItems:"center", gap:10, flexWrap:"wrap" }}>
-                <span style={{ fontSize:11, fontFamily:"monospace", opacity:0.9 }}>No.{(sorted.length - idx).toString().padStart(4, "0")}</span>
-                <span style={{ width:1, height:14, background:"rgba(255,255,255,0.3)" }} />
-                <span style={{ fontSize:14, fontWeight:"bold", flex:1, minWidth:0 }}>{p.title}</span>
-                {isAdmin && (
-                  <>
-                    <button style={{ background:"rgba(255,255,255,0.15)", color:"#fff", border:"1px solid rgba(255,255,255,0.3)", padding:"2px 8px", fontSize:10, cursor:"pointer", fontFamily:"inherit", borderRadius:3 }} onClick={() => setEditTgt({ type:"post", data:p })}>編集</button>
-                    <button style={{ background:"rgba(220,38,38,0.7)", color:"#fff", border:"1px solid rgba(255,255,255,0.3)", padding:"2px 8px", fontSize:10, cursor:"pointer", fontFamily:"inherit", borderRadius:3 }} onClick={() => adminDelete("post", p.id)}>削除</button>
-                  </>
-                )}
-              </div>
-              {/* メタ情報行 */}
-              <div style={{ background:"#F5F8FC", padding:"6px 14px", fontSize:11, color:C.sub, display:"flex", gap:14, flexWrap:"wrap", borderBottom:"1px solid " + C.border }}>
-                <span>投稿日：{fmtDateTime(p.createdAt)}</span>
-                <span>投稿者：<strong style={{ color:C.ink }}>{p.author}</strong>{getAuthorId(p) && <span style={{ color:"#C0C0C0", fontFamily:"monospace", marginLeft:4 }}>#{getAuthorId(p)}</span>}</span>
-                {p.jobCategory && p.jobCategory !== "全職種" && (
-                  <span style={{ background:"#EFF6FF", color:"#1E40AF", padding:"1px 7px", borderRadius:3 }}>{p.jobCategory}</span>
-                )}
-              </div>
-              {/* 本文 */}
-              <div style={{ padding:"14px 16px" }}>
-                <p style={{ fontSize:13, lineHeight:1.9, whiteSpace:"pre-wrap" }}>{p.content}</p>
-                <div style={{ display:"flex", alignItems:"center", gap:10, marginTop:12, paddingTop:10, borderTop:"1px solid " + C.border, flexWrap:"wrap" }}>
-                  {(p.likes || []).length >= 10 && (
-                    <span style={{ background:"#FEE2E2", color:"#DC2626", padding:"2px 8px", fontSize:10, fontWeight:"bold", borderRadius:10 }}>🔥 人気</span>
-                  )}
-                  <div style={{ marginLeft:"auto", display:"flex", gap:6 }}>
-                    <LikeButton liked={(p.likes || []).includes(authUserKey)} count={(p.likes || []).length} onClick={() => onToggleLike(p.id)} />
-                    <button style={{ background:"#fff", border:"1px solid " + C.border, color:C.sub, fontSize:12, cursor:"pointer", fontFamily:"inherit", padding:"6px 12px", borderRadius:18 }} onClick={() => setExp(exp === p.id ? null : p.id)}>
-                      💬 コメントを書く ({(p.comments || []).length})
-                    </button>
-                  </div>
-                </div>
-              </div>
-              {/* コメントツリー */}
-              {exp === p.id && (
-                <div style={{ borderTop:"1px solid " + C.border, background:"#FAFCFE", padding:"10px 14px" }}>
-                  <CommentThread
-                    post={p}
-                    uName={uName}
-                    authUserKey={authUserKey}
-                    authUser={authUser}
-                    co={co}
-                    isAdmin={isAdmin}
-                    onAddComment={onAddComment}
-                    adminDelete={adminDelete}
-                    getAuthorBadge={getAuthorBadge}
-                  />
-                </div>
-              )}
-            </article>
-          );
-        }
         return (
             <article key={p.id} style={{ background:C.surface, padding:"12px 0", borderBottom:"1px solid " + C.border, position:"relative", filter: isLocked ? "blur(5px)" : "none", pointerEvents: isLocked ? "none" : "auto", userSelect: isLocked ? "none" : "auto" }}>
               {isAdmin && (
@@ -4149,7 +3934,10 @@ function PostsTab({ posts, ptype, label, co, uName, onAddPost, onToggleLike, onA
                   {p.esQuestion}
                 </div>
               )}
-              <h3 style={{ fontSize:15, fontWeight:"bold", marginBottom:8, lineHeight:1.55, fontFamily:"'M PLUS Rounded 1c', sans-serif" }}>{p.title}</h3>
+              <h3 style={{ fontSize:15, fontWeight:"bold", marginBottom:8, lineHeight:1.55, fontFamily:"'Zen Kaku Gothic New', sans-serif" }}>
+                {goThread ? <span onClick={() => goThread(p)} style={{ cursor:"pointer" }}>{p.title}</span> : p.title}
+                {p.bestAnswerId && <span style={{ marginLeft:8, fontSize:10, fontWeight:"bold", color:C.success, background:"#E8F1EB", border:"1px solid #BFDCC8", borderRadius:5, padding:"1px 7px", verticalAlign:"middle" }}>✅ 解決済み</span>}
+              </h3>
               {p.year && p.ptype === "es" && (
                 <div style={{ fontSize:11, color:C.sub, marginBottom:6 }}>応募: {p.year}年 / 結果: {p.stage}</div>
               )}
@@ -4215,7 +4003,6 @@ function PostsTab({ posts, ptype, label, co, uName, onAddPost, onToggleLike, onA
               <div style={{ display:"flex", alignItems:"center", gap:10, borderTop:"1px solid " + C.border, paddingTop:10, flexWrap:"wrap" }}>
                 <AC>{ini(p.author)}</AC>
                 <span style={{ fontSize:12, color:C.sub }}>{p.author}</span>
-                {getAuthorId(p) && <span style={{ fontSize:10, color:"#C0C0C0", fontFamily:"monospace", marginLeft:-2 }}>#{getAuthorId(p)}</span>}
                 {getAuthorBadge && getAuthorBadge(p.authorUid) && <BadgeChip badge={getAuthorBadge(p.authorUid)} small />}
                 {(p.likes || []).length >= 10 && (
                   <span style={{ background:"#FEE2E2", color:"#DC2626", padding:"2px 8px", fontSize:10, fontWeight:"bold", borderRadius:10 }}>
@@ -4238,11 +4025,11 @@ function PostsTab({ posts, ptype, label, co, uName, onAddPost, onToggleLike, onA
                   uName={uName}
                   authUserKey={authUserKey}
                   authUser={authUser}
-                  co={co}
                   isAdmin={isAdmin}
                   onAddComment={onAddComment}
                   adminDelete={adminDelete}
                   getAuthorBadge={getAuthorBadge}
+                  bestAnswerId={p.bestAnswerId}
                 />
               )}
             </article>
@@ -4315,7 +4102,7 @@ function ReviewsTab({ revs, avgData: a, co, uName, plan, onAddReview, isAdmin, a
         <div style={{ display:"flex", gap:20, flexWrap:"wrap", padding:"14px 0", borderBottom:"1px solid " + C.border, marginBottom:16 }}>
           <div style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:4, minWidth:80, paddingRight:18, borderRight:"1px solid " + C.border }}>
             <div style={{ fontSize:11, color:C.sub, marginBottom:4 }}>総合評価</div>
-            <div style={{ fontSize:46, fontWeight:"bold", color:C.accent, lineHeight:1, fontFamily:"'M PLUS Rounded 1c', sans-serif" }}>{filteredAvg.overall.toFixed(1)}</div>
+            <div style={{ fontSize:46, fontWeight:"bold", color:C.accent, lineHeight:1, fontFamily:"'Zen Kaku Gothic New', sans-serif" }}>{filteredAvg.overall.toFixed(1)}</div>
             <Stars r={filteredAvg.overall} size={14} />
             <div style={{ fontSize:11, color:C.sub, marginTop:4 }}>{filteredRevs.length}件</div>
             {deptFilter !== "全部門" && <div style={{ fontSize:10, color:C.accent, marginTop:2 }}>{deptFilter}のみ</div>}
@@ -4532,7 +4319,6 @@ function ReviewsTab({ revs, avgData: a, co, uName, plan, onAddReview, isAdmin, a
           {r.advice && <div style={{ marginBottom:10 }}><div style={{ fontSize:11, fontWeight:"bold", color:C.sub, marginBottom:3 }}>アドバイス</div><p style={{ fontSize:13, lineHeight:1.9 }}>{r.advice}</p></div>}
           <div style={{ display:"flex", alignItems:"center", gap:8, marginTop:10, paddingTop:10, borderTop:"1px solid " + C.border }}>
             <AC>{ini(r.author)}</AC><span style={{ fontSize:12, color:C.sub }}>{r.author}</span>
-            {getAuthorId(r) && <span style={{ fontSize:10, color:"#C0C0C0", fontFamily:"monospace" }}>#{getAuthorId(r)}</span>}
             {getAuthorBadge && getAuthorBadge(r.authorUid) && <BadgeChip badge={getAuthorBadge(r.authorUid)} small />}
           </div>
         </div>
@@ -4557,7 +4343,7 @@ function SalaryTab({ sals, avgSalary, co, uName, plan, onAddSalary, isAdmin, adm
         <div style={{ display:"flex", gap:20, flexWrap:"wrap", padding:"14px 0", borderBottom:"1px solid " + C.border, marginBottom:16 }}>
           <div style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:4, minWidth:80, paddingRight:18, borderRight:"1px solid " + C.border }}>
             <div style={{ fontSize:11, color:C.sub, marginBottom:4 }}>平均年収</div>
-            <div style={{ fontSize:36, fontWeight:"bold", color:"#1a5276", lineHeight:1, fontFamily:"'M PLUS Rounded 1c', sans-serif" }}>{avgSalary}<span style={{ fontSize:13, fontWeight:"normal" }}>万円</span></div>
+            <div style={{ fontSize:36, fontWeight:"bold", color:"#1a5276", lineHeight:1, fontFamily:"'Zen Kaku Gothic New', sans-serif" }}>{avgSalary}<span style={{ fontSize:13, fontWeight:"normal" }}>万円</span></div>
             <div style={{ fontSize:11, color:C.sub, marginTop:4 }}>{sals.length}件</div>
           </div>
           {Object.keys(byJob).length > 0 && (
@@ -4690,7 +4476,7 @@ function SalaryTab({ sals, avgSalary, co, uName, plan, onAddSalary, isAdmin, adm
           )}
           <div style={{ display:"flex", justifyContent:"space-between", flexWrap:"wrap", gap:8, marginBottom:10 }}>
             <div>
-              <div style={{ fontSize:22, fontWeight:"bold", color:"#1a5276", fontFamily:"'M PLUS Rounded 1c', sans-serif", marginBottom:4 }}>{s.annualSalary}<span style={{ fontSize:13, fontWeight:"normal", color:C.sub }}>万円/年</span></div>
+              <div style={{ fontSize:22, fontWeight:"bold", color:"#1a5276", fontFamily:"'Zen Kaku Gothic New', sans-serif", marginBottom:4 }}>{s.annualSalary}<span style={{ fontSize:13, fontWeight:"normal", color:C.sub }}>万円/年</span></div>
               {[s.jobType, s.position, s.ageRange, s.empType].filter(Boolean).map(t => (
                 <span key={t} style={{ fontSize:11, color:C.sub, border:"1px solid " + C.border, padding:"1px 6px", marginRight:4 }}>{t}</span>
               ))}
@@ -4731,7 +4517,6 @@ function SalaryTab({ sals, avgSalary, co, uName, plan, onAddSalary, isAdmin, adm
           {s.comment && <p style={{ fontSize:13, lineHeight:1.85, borderTop:"1px solid " + C.border, paddingTop:10, marginTop:8 }}>{s.comment}</p>}
           <div style={{ display:"flex", alignItems:"center", gap:8, marginTop:10, paddingTop:10, borderTop:"1px solid " + C.border }}>
             <AC>{ini(s.author)}</AC><span style={{ fontSize:12, color:C.sub }}>{s.author}</span>
-            {getAuthorId(s) && <span style={{ fontSize:10, color:"#C0C0C0", fontFamily:"monospace" }}>#{getAuthorId(s)}</span>}
             {getAuthorBadge && getAuthorBadge(s.authorUid) && <BadgeChip badge={getAuthorBadge(s.authorUid)} small />}
           </div>
         </div>
@@ -4810,7 +4595,7 @@ function JobsTab({ jobs, co, uName, onAddJob, isAdmin, adminDelete, setEditTgt }
             )}
             <div style={{ display:"flex", justifyContent:"space-between", flexWrap:"wrap", gap:8, marginBottom:10 }}>
               <div>
-                <h3 style={{ fontSize:15, fontWeight:"bold", marginBottom:6, fontFamily:"'M PLUS Rounded 1c', sans-serif" }}>{j.title}</h3>
+                <h3 style={{ fontSize:15, fontWeight:"bold", marginBottom:6, fontFamily:"'Zen Kaku Gothic New', sans-serif" }}>{j.title}</h3>
                 <div style={{ display:"flex", flexWrap:"wrap", gap:4 }}>
                   {[j.jobType, j.empType, j.location].filter(Boolean).map(t => (
                     <span key={t} style={{ fontSize:11, color:C.sub, border:"1px solid " + C.border, padding:"1px 8px" }}>{t}</span>
@@ -4893,7 +4678,7 @@ function RankingPage({ go, companies, coPosts, coRevs, coSals, isMobile }) {
         <tbody>
           {sorted.map((co, i) => (
             <tr key={co.id} style={{ ...S.tableRow, cursor:"pointer" }} onClick={() => go("company", co)}>
-              <td style={S.td}><span style={{ fontSize:15, fontWeight:"bold", color: i < 3 ? C.accent : "#bbb", fontFamily:"'M PLUS Rounded 1c', sans-serif" }}>{i + 1}</span></td>
+              <td style={S.td}><span style={{ fontSize:15, fontWeight:"bold", color: i < 3 ? C.accent : "#bbb", fontFamily:"'Zen Kaku Gothic New', sans-serif" }}>{i + 1}</span></td>
               <td style={S.td}><div style={{ display:"flex", alignItems:"center", gap:8 }}><CompanyLogo company={co} size={28} /><span style={{ fontWeight:"bold", fontSize:13 }}>{co.name}</span></div></td>
               {!isMobile && <td style={{ ...S.td, fontSize:12, color:C.sub }}>{co.industry}</td>}
               <td style={{ ...S.td, textAlign:"center" }}>
@@ -4941,7 +4726,7 @@ function PricingPage({ sess, go, setAuthMode, plan, upgradePlan, isMobile }) {
         <div style={{ display:"flex", gap:4, alignItems:"center", justifyContent:"center", marginBottom:6 }}>
           {countdown.map(([n,l], i) => (
             <span key={l} style={{ display:"inline-flex", flexDirection:"column", alignItems:"center" }}>
-              <span style={{ background:"rgba(255,255,255,0.2)", fontWeight:"bold", fontFamily:"'M PLUS Rounded 1c', sans-serif", fontSize:20, minWidth:34, textAlign:"center", padding:"3px 0", display:"block" }}>{pad(n)}</span>
+              <span style={{ background:"rgba(255,255,255,0.2)", fontWeight:"bold", fontFamily:"'Zen Kaku Gothic New', sans-serif", fontSize:20, minWidth:34, textAlign:"center", padding:"3px 0", display:"block" }}>{pad(n)}</span>
               <span style={{ fontSize:9, marginTop:2 }}>{l}</span>
             </span>
           ))}
@@ -4968,11 +4753,11 @@ function PricingPage({ sess, go, setAuthMode, plan, upgradePlan, isMobile }) {
               <div style={{ borderTop:"3px solid " + pl.color, padding:"18px 20px 14px" }}>
                 <div style={{ fontSize:10, fontWeight:"bold", color:pl.color, letterSpacing:"0.1em", marginBottom:5 }}>{pl.name.toUpperCase()}</div>
                 {pl.price === 0
-                  ? <div style={{ fontSize:24, fontWeight:"bold", fontFamily:"'M PLUS Rounded 1c', sans-serif", marginBottom:4 }}>無料</div>
+                  ? <div style={{ fontSize:24, fontWeight:"bold", fontFamily:"'Zen Kaku Gothic New', sans-serif", marginBottom:4 }}>無料</div>
                   : (
                     <div style={{ marginBottom:4 }}>
                       <div style={{ display:"flex", alignItems:"baseline", gap:6 }}>
-                        <span style={{ fontSize:24, fontWeight:"bold", fontFamily:"'M PLUS Rounded 1c', sans-serif", color:C.accent }}>{"¥" + disp.toLocaleString()}</span>
+                        <span style={{ fontSize:24, fontWeight:"bold", fontFamily:"'Zen Kaku Gothic New', sans-serif", color:C.accent }}>{"¥" + disp.toLocaleString()}</span>
                         <span style={{ fontSize:12, color:C.sub }}>/月</span>
                         <span style={{ fontSize:12, color:"#bbb", textDecoration:"line-through" }}>{"¥" + base.toLocaleString()}</span>
                       </div>
@@ -5401,7 +5186,7 @@ function DiarySection({ entries, onSave }) {
         <div key={e.id} style={{ ...S.cardItem, cursor:"default" }}>
           <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:8 }}>
             <span style={{ fontSize:20 }}>{e.mood}</span>
-            <span style={{ fontWeight:"bold", fontSize:14, fontFamily:"'M PLUS Rounded 1c', sans-serif", flex:1 }}>{e.title}</span>
+            <span style={{ fontWeight:"bold", fontSize:14, fontFamily:"'Zen Kaku Gothic New', sans-serif", flex:1 }}>{e.title}</span>
             <span style={{ fontSize:11, color:C.sub }}>{e.date}</span>
             <button style={{ background:"none", border:"1px solid #FAA", padding:"3px 8px", fontSize:11, cursor:"pointer", fontFamily:"inherit", color:"#C00", marginLeft:4 }} onClick={() => onSave(entries.filter(x => x.id !== e.id))}>削除</button>
           </div>
@@ -5480,7 +5265,7 @@ function AnalyticsPage({ companies, posts, reviews, salaries, isMobile }) {
         {[["投稿数",posts.length],["口コミ数",reviews.length],["年収情報",salaries.length],["掲載企業",companies.length],["今週の投稿",weekPosts]].map(([l,v],i) => (
           <div key={l} style={{ padding:"12px 14px", background:C.surface, textAlign:"center", ...(i > 0 ? { borderLeft:"1px solid " + C.border } : {}) }}>
             <div style={{ fontSize:11, color:C.sub, marginBottom:5 }}>{l}</div>
-            <div style={{ fontSize:22, fontWeight:"bold", color:C.accent, fontFamily:"'M PLUS Rounded 1c', sans-serif" }}>{v}</div>
+            <div style={{ fontSize:22, fontWeight:"bold", color:C.accent, fontFamily:"'Zen Kaku Gothic New', sans-serif" }}>{v}</div>
           </div>
         ))}
       </div>
@@ -5553,7 +5338,7 @@ function PostCard({ post, co, go, isAdmin, onDelete, onEdit }) {
         <StageBadge s={post.stage} />
         <span style={{ fontSize:10, color:C.sub, marginLeft:"auto" }}>{ago(post.createdAt)}</span>
       </div>
-      <h3 style={{ fontSize:14, fontWeight:"bold", marginBottom:6, lineHeight:1.5, fontFamily:"'M PLUS Rounded 1c', sans-serif" }}>{post.title}</h3>
+      <h3 style={{ fontSize:14, fontWeight:"bold", marginBottom:6, lineHeight:1.5, fontFamily:"'Zen Kaku Gothic New', sans-serif" }}>{post.title}</h3>
       <p style={{ fontSize:12, color:C.sub, lineHeight:1.8, marginBottom:8 }}>{post.content && post.content.slice(0, 90)}{post.content && post.content.length > 90 ? "..." : ""}</p>
       <div style={{ display:"flex", alignItems:"center", gap:8, borderTop:"1px solid " + C.border, paddingTop:8 }}>
         <AC>{ini(post.author)}</AC>
@@ -5573,7 +5358,7 @@ function STitle({ label }) {
 function PageHeader({ title, desc }) {
   return (
     <div style={{ borderTop:"3px solid " + C.ink, paddingTop:14, marginBottom:20 }}>
-      <h1 style={{ fontSize:"clamp(18px,3vw,26px)", fontWeight:"bold", fontFamily:"'M PLUS Rounded 1c', sans-serif" }}>{title}</h1>
+      <h1 style={{ fontSize:"clamp(18px,3vw,26px)", fontWeight:"bold", fontFamily:"'Zen Kaku Gothic New', sans-serif" }}>{title}</h1>
       {desc && <p style={{ color:C.sub, marginTop:6, fontSize:12 }}>{desc}</p>}
     </div>
   );
@@ -5595,7 +5380,7 @@ function AccessDenied({ go }) {
   return (
     <div style={{ textAlign:"center", padding:"72px 20px" }}>
       <div style={{ fontSize:44, marginBottom:14 }}>🔒</div>
-      <h2 style={{ fontSize:18, fontWeight:"bold", fontFamily:"'M PLUS Rounded 1c', sans-serif", marginBottom:10 }}>アクセス権限がありません</h2>
+      <h2 style={{ fontSize:18, fontWeight:"bold", fontFamily:"'Zen Kaku Gothic New', sans-serif", marginBottom:10 }}>アクセス権限がありません</h2>
       <p style={{ fontSize:13, color:C.sub, marginBottom:20, lineHeight:1.8 }}>このページは管理者のみが閲覧できます。</p>
       <button style={S.primaryBtn} onClick={() => go("home")}>トップに戻る</button>
     </div>
@@ -5824,30 +5609,21 @@ function AISummary({ posts, reviews, type }) {
   );
 }
 
-function CommentThread({ post, uName, authUserKey, authUser, co, isAdmin, onAddComment, adminDelete, getAuthorBadge }) {
+function CommentThread({ post, uName, authUserKey, authUser, isAdmin, onAddComment, adminDelete, getAuthorBadge, bestAnswerId, onSetBestAnswer, canMarkBest }) {
   const [cmt, setCmt] = React.useState("");
-  const [replyTo, setReplyTo] = React.useState(null);
+  const [replyTo, setReplyTo] = React.useState(null); // 返信先のコメントID
   const [replyText, setReplyText] = React.useState("");
-  const grpForName = (co && (co.group || getGroup(co.industry))) || "メーカー";
-  // 投稿者＋すべてのコメント参加者の名前を「使用済み」として渡す
-  const usedNames = React.useMemo(() => {
-    const names = new Set();
-    if (post.author) names.add(post.author);
-    (post.comments || []).forEach(c => c.author && names.add(c.author));
-    return Array.from(names);
-  }, [post.author, post.comments]);
-  const [guestNameLocal, setGuestNameLocal] = React.useState(() => getRandomNickname(grpForName, usedNames));
-  const isGuest = !authUser;
 
   const comments = post.comments || [];
   // 親 = parentId なし、子 = parentId あり
-  const tops = comments.filter(c => !c.parentId);
+  const topsRaw = comments.filter(c => !c.parentId);
+  const tops = bestAnswerId ? [...topsRaw.filter(c => c.id === bestAnswerId), ...topsRaw.filter(c => c.id !== bestAnswerId)] : topsRaw;
   const childrenOf = (id) => comments.filter(c => c.parentId === id);
 
   const handleSubmit = async (parentId) => {
     const text = parentId ? replyText : cmt;
     if (!text.trim()) return;
-    await onAddComment(post.id, text.trim(), parentId, guestNameLocal);
+    await onAddComment(post.id, text.trim(), parentId);
     if (parentId) { setReplyText(""); setReplyTo(null); }
     else setCmt("");
   };
@@ -5856,15 +5632,16 @@ function CommentThread({ post, uName, authUserKey, authUser, co, isAdmin, onAddC
     const kids = childrenOf(c.id);
     const indent = Math.min(depth, 2) * 18; // 最大2レベル下までインデント
     const liked = (c.likes || []).includes(authUserKey);
+    const isBest = c.id && c.id === bestAnswerId;
     return (
       <div key={c.id} style={{ marginLeft:indent, marginBottom:8 }}>
-        <div style={{ background: depth === 0 ? "#FAFCFE" : "#fff", border:"1px solid " + C.border, borderRadius:8, padding:"10px 12px" }}>
+        <div style={{ background: isBest ? "#F0FAF4" : (depth === 0 ? "#FAFCFE" : "#fff"), border: isBest ? "2px solid " + C.success : "1px solid " + C.border, borderRadius:8, padding:"10px 12px" }}>
+          {isBest && <div style={{ display:"inline-flex", alignItems:"center", gap:5, background:C.success, color:"#fff", fontSize:11, fontWeight:"bold", padding:"2px 9px", borderRadius:5, marginBottom:8 }}>✅ ベストアンサー</div>}
           <div style={{ display:"flex", alignItems:"center", gap:6, marginBottom:6, flexWrap:"wrap" }}>
             <AC>{ini(c.author)}</AC>
             <span style={{ fontSize:12, fontWeight:"bold", color:C.ink }}>{c.author}</span>
-            {getAuthorId(c) && <span style={{ fontSize:10, color:"#C0C0C0", fontFamily:"monospace" }}>#{getAuthorId(c)}</span>}
             {getAuthorBadge && getAuthorBadge(c.authorUid) && <BadgeChip badge={getAuthorBadge(c.authorUid)} small />}
-            <span style={{ fontSize:10, color:C.sub }}>{fmtDateTime(c.ts || c.date)}</span>
+            <span style={{ fontSize:10, color:C.sub }}>{c.date}</span>
             {isAdmin && <SmBtn red onClick={() => adminDelete("comment", post.id + ":" + c.id)}>削除</SmBtn>}
           </div>
           <p style={{ fontSize:13, lineHeight:1.8, color:C.ink, marginBottom:6 }}>{c.content}</p>
@@ -5883,27 +5660,17 @@ function CommentThread({ post, uName, authUserKey, authUser, co, isAdmin, onAddC
             <button style={{ background:"none", border:"1px solid " + C.border, color:C.sub, fontSize:11, cursor:"pointer", fontFamily:"inherit", padding:"3px 10px", borderRadius:14 }} onClick={() => setReplyTo(replyTo === c.id ? null : c.id)}>
               💬 返信
             </button>
+            {canMarkBest && depth === 0 && (
+              <button style={{ background: isBest ? C.success : "none", border:"1px solid " + C.success, color: isBest ? "#fff" : C.success, fontSize:11, cursor:"pointer", fontFamily:"inherit", padding:"3px 10px", borderRadius:14, fontWeight:"bold" }} onClick={() => onSetBestAnswer && onSetBestAnswer(c.id)}>
+                {isBest ? "★ 解除" : "★ ベストアンサーにする"}
+              </button>
+            )}
           </div>
         </div>
         {replyTo === c.id && (
           <div style={{ marginLeft:24, marginTop:6, display:"flex", gap:6, alignItems:"flex-start" }}>
-            <AC>{ini(isGuest ? (guestNameLocal || "匿") : uName)}</AC>
+            <AC>{ini(uName)}</AC>
             <div style={{ flex:1 }}>
-              {isGuest && (
-                <div style={{ display:"flex", gap:6, marginBottom:4 }}>
-                  <input
-                    style={{ ...S.input, flex:1, fontSize:12 }}
-                    placeholder="お名前（ランダム自動セット済み）"
-                    value={guestNameLocal}
-                    onChange={e => setGuestNameLocal(e.target.value)}
-                  />
-                  <button
-                    type="button"
-                    style={{ background:"#fff", border:"1px solid " + C.border, padding:"4px 10px", fontSize:11, cursor:"pointer", fontFamily:"inherit", borderRadius:5, whiteSpace:"nowrap" }}
-                    onClick={() => setGuestNameLocal(getRandomNickname(grpForName, usedNames.filter(n => n !== guestNameLocal)))}
-                  >🎲</button>
-                </div>
-              )}
               <textarea style={{ ...S.input, resize:"vertical", width:"100%" }} rows={2} placeholder={`${c.author}さんへの返信`} value={replyText} onChange={e => setReplyText(e.target.value)} />
               <div style={{ display:"flex", gap:6, marginTop:4 }}>
                 <button style={{ ...S.primaryBtn, fontSize:11, padding:"5px 12px" }} onClick={() => handleSubmit(c.id)}>
@@ -5931,23 +5698,8 @@ function CommentThread({ post, uName, authUserKey, authUser, co, isAdmin, onAddC
       {tops.length === 0 && <p style={{ fontSize:11, color:C.sub, textAlign:"center", padding:"8px 0" }}>まだコメントがありません。最初のコメントを残しましょう。</p>}
       {tops.map(c => renderComment(c, 0))}
       <div style={{ display:"flex", gap:8, marginTop:12, alignItems:"flex-start", paddingTop:10, borderTop:"1px solid " + C.border }}>
-        <AC>{ini(isGuest ? (guestNameLocal || "匿") : uName)}</AC>
+        <AC>{ini(uName)}</AC>
         <div style={{ flex:1 }}>
-          {isGuest && (
-            <div style={{ display:"flex", gap:6, marginBottom:6 }}>
-              <input
-                style={{ ...S.input, flex:1, fontSize:12 }}
-                placeholder="お名前（ランダム自動セット済み）"
-                value={guestNameLocal}
-                onChange={e => setGuestNameLocal(e.target.value)}
-              />
-              <button
-                type="button"
-                style={{ background:"#fff", border:"1px solid " + C.border, padding:"4px 10px", fontSize:11, cursor:"pointer", fontFamily:"inherit", borderRadius:5, whiteSpace:"nowrap" }}
-                onClick={() => setGuestNameLocal(getRandomNickname(grpForName, usedNames.filter(n => n !== guestNameLocal)))}
-              >🎲 シャッフル</button>
-            </div>
-          )}
           <textarea style={{ ...S.input, resize:"vertical", width:"100%" }} rows={2} placeholder="コメントを入力" value={cmt} onChange={e => setCmt(e.target.value)} />
           <button style={{ ...S.primaryBtn, marginTop:6, fontSize:12, padding:"7px 14px" }} onClick={() => handleSubmit(null)}>
             コメントする
@@ -6084,30 +5836,30 @@ function AC({ children }) {
 
 // ─── スタイル ─────────────────────────────────────────────────────────────────
 const CSS = `
-  @import url('https://fonts.googleapis.com/css2?family=BIZ+UDPGothic:wght@400;700&family=M+PLUS+Rounded+1c:wght@400;500;700;800&family=Noto+Sans+JP:wght@400;500;700&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&family=Zen+Kaku+Gothic+New:wght@500;700;900&family=Zen+Maru+Gothic:wght@700;900&display=swap');
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: "M PLUS Rounded 1c", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "BIZ UDPGothic", "Yu Gothic", "Noto Sans JP", sans-serif; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+  body { font-family: "Noto Sans JP", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; font-feature-settings: "palt" 1; }
   button { cursor: pointer; transition: all .15s; font-family: inherit; }
-  button:hover { opacity: .85; }
+  button:hover { opacity: .9; }
   textarea, input, select { font-family: inherit; }
   @keyframes fadeUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
   .fadeUp { animation: fadeUp .18s ease; }
-  tr:hover td { background: #FAFCFE; }
+  tr:hover td { background: #FBF9F4; }
   a { color: inherit; }
-  /* 数字は Tabular で並びを揃える */
-  .tabnum { font-variant-numeric: tabular-nums; }
+  .tabnum { font-variant-numeric: tabular-nums; letter-spacing: .01em; }
+  @media (prefers-reduced-motion: reduce){ * { animation: none !important; } }
 `;
 
 const S = {
-  root:        { fontFamily:"'M PLUS Rounded 1c', 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'BIZ UDPGothic', 'Yu Gothic', 'Noto Sans JP', sans-serif", background:C.bg, minHeight:"100vh", color:C.ink, fontSize:14 },
+  root:        { fontFamily:"'Zen Kaku Gothic New', 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'BIZ UDPGothic', 'Yu Gothic', 'Noto Sans JP', sans-serif", background:C.bg, minHeight:"100vh", color:C.ink, fontSize:14 },
   pageWrap:    { background:C.bg },
   nav:         { background:"#fff", position:"sticky", top:0, zIndex:200, borderBottom:"1px solid " + C.border, boxShadow:"0 2px 8px rgba(43,123,209,0.06)" },
   logoBtn:     { background:"none", border:"none", textAlign:"left", cursor:"pointer" },
-  logoText:    { display:"block", fontWeight:800, color:"#2B7BD1", fontFamily:"'M PLUS Rounded 1c', sans-serif", letterSpacing:"0.04em" },
+  logoText:    { display:"block", fontWeight:900, color:C.accentDark, fontFamily:"'Zen Maru Gothic', sans-serif", letterSpacing:"0.02em" },
   toast:       { position:"fixed", bottom:20, left:"50%", transform:"translateX(-50%)", background:C.ink, color:"#fff", padding:"9px 20px", fontSize:12, zIndex:600, boxShadow:"0 2px 10px rgba(0,0,0,0.25)", whiteSpace:"nowrap" },
   overlay:     { position:"fixed", inset:0, background:"rgba(0,0,0,0.45)", zIndex:400, display:"flex", alignItems:"center", justifyContent:"center", padding:16 },
   modal:       { background:"#fff", padding:"24px 22px", width:"100%", maxWidth:420, maxHeight:"94vh", overflowY:"auto", borderTop:"4px solid " + C.accent },
-  modalTitle:  { fontSize:17, fontWeight:"bold", fontFamily:"'M PLUS Rounded 1c', sans-serif", marginBottom:12 },
+  modalTitle:  { fontSize:17, fontWeight:"bold", fontFamily:"'Zen Kaku Gothic New', sans-serif", marginBottom:12 },
   modalHr:     { height:1, background:C.border, marginBottom:14 },
   errBox:      { background:"#FFF5F5", border:"1px solid #F5AAAA", color:"#8B0000", padding:"8px 12px", fontSize:12, marginBottom:12 },
   main:        { maxWidth:1160, margin:"0 auto" },
