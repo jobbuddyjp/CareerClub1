@@ -192,6 +192,25 @@ const C = {
 const GENERAL_ID = "__general__";
 const GENERAL_CO = { id: GENERAL_ID, name: "みんなの相談", emoji: "📣", group: "総合", industry: "総合", isGeneral: true };
 
+// ゲスト（未ログイン）の表示名を自動生成（変更可・localStorageで保持）
+// 投稿者名の自動生成（業種に合わせたウィットのある表示名・変更可）
+const GUEST_NAME_POOLS = {
+  "金融・銀行": ["数字に強い人", "M&Aのプロ", "元バンカー志望", "与信は任せろ", "金利が気になる", "決算オタク", "リスク管理担当", "融資の現場から", "簿記2級保持"],
+  "コンサル": ["論点整理する人", "スライド職人", "フレームワーク好き", "仮説思考の人", "稼働率200%", "パワポの達人", "元コンサル志望", "示唆出しマン"],
+  "IT・テック": ["コード書く人", "元エンジニア志望", "深夜デプロイ", "技術選定中", "UXが気になる", "PdM志望", "スタートアップ脳", "型は大事"],
+  "メーカー": ["ものづくり志望", "現場が好き", "品質第一", "図面読める人", "生産管理志望", "技術で勝負", "試作品マニア"],
+  "商社": ["駐在したい人", "ラーメンより商社", "資源好き", "語学勉強中", "出張多め希望", "ラオスに行きたい", "トレード志望"],
+  "不動産・建設": ["街をつくる人", "元デベ志望", "再開発が好き", "間取り厨", "容積率を語る", "現場監督志望", "都市計画クラスタ"],
+  "サービス": ["接客のプロ", "現場たたき上げ", "CS志望", "おもてなし担当"],
+  "小売・流通": ["売場が好き", "元バイヤー志望", "物流の人", "棚割り職人"],
+  "医療・ヘルス": ["白衣の志望者", "MR志望", "治験に詳しい", "元看護志望"],
+};
+const GUEST_NAME_GENERAL = ["名無しの求職者", "就活生", "転職検討中", "キャリア迷子", "情報収集中", "次の一手を探す人", "面接帰りの人", "ESに追われる人", "内定ほしい人", "逆質問は準備済み", "沈黙が苦手", "逆求人待ち", "名無しさん"];
+const genGuestName = (group) => {
+  const pool = (group && GUEST_NAME_POOLS[group]) ? GUEST_NAME_POOLS[group].concat(GUEST_NAME_GENERAL) : GUEST_NAME_GENERAL;
+  return pool[Math.floor(Math.random() * pool.length)];
+};
+
 // ─── ユーティリティ ────────────────────────────────────────────────────────────
 const ini   = (n) => n ? String(n).slice(0,2) : "?";
 const today = () => new Date().toISOString().slice(0,10);
@@ -1739,6 +1758,21 @@ export default function App() {
   const [selCo,    setSelCo]    = useState(null);
   const [selTab,   setSelTab]   = useState("interview");
   const [selPost,  setSelPost]  = useState(null);
+  const [guestName, setGuestNameState] = useState(() => {
+    if (typeof window === "undefined") return "名無しさん";
+    let n = localStorage.getItem("guestName");
+    if (!n) { n = genGuestName(); localStorage.setItem("guestName", n); }
+    return n;
+  });
+  const setGuestName = (name) => {
+    const v = (name || "").slice(0, 24);
+    setGuestNameState(v);
+    if (typeof window !== "undefined") localStorage.setItem("guestName", v);
+  };
+
+  // 共有リンク（#thread/{id} など）対応：初回ロード時のURLハッシュを保持
+  const bootHash = useRef(typeof window !== "undefined" ? window.location.hash.replace(/^#/, "") : "");
+  const [bootDone, setBootDone] = useState(false);
   const [authMode, setAuthMode] = useState(null);
   const [toast,    setToast]    = useState(null);
   const [editTgt,  setEditTgt]  = useState(null);
@@ -2044,12 +2078,38 @@ export default function App() {
     return () => window.removeEventListener("popstate", handler);
   }, [companies, posts]);
 
+  // 共有リンクで開いた時にURLハッシュから画面を復元（データ読み込み後に一度だけ）
+  useEffect(() => {
+    if (bootDone) return;
+    const h = bootHash.current;
+    if (!h || h === "home") { setBootDone(true); return; }
+    const slash = h.indexOf("/");
+    const route = slash === -1 ? h : h.slice(0, slash);
+    const arg   = slash === -1 ? "" : h.slice(slash + 1);
+    if ((route === "thread" || route === "company") && !companies.length && !posts.length) return;
+    if (route === "thread" && arg) {
+      const post = posts.find(pp => pp.id === arg);
+      if (post) { setSelPost(post); setPage("thread"); window.history.replaceState({ p:"thread", postId: arg }, "", "#thread/" + arg); }
+      setBootDone(true);
+    } else if (route === "company" && arg) {
+      const co = companies.find(c => c.id === arg);
+      if (co) { setSelCo(co); setSelTab("interview"); setPage("company"); window.history.replaceState({ p:"company", coId: arg, tab:"interview" }, "", "#company/" + arg); }
+      setBootDone(true);
+    } else if (route === "subtop" && arg) {
+      setSubTopGroup(decodeURIComponent(arg)); setPage("subTop"); setBootDone(true);
+    } else if (["board", "companies", "ranking", "pricing", "mypage"].includes(route)) {
+      setPage(route); setBootDone(true);
+    } else {
+      setBootDone(true);
+    }
+  }, [companies, posts, bootDone]);
+
   // ── 派生値
   const plan    = profile?.plan    || "free";
   const isAdmin = !!profile?.isAdmin;
   const sess    = authUser && profile ? { ...profile, uid: authUser.uid } : null;
   // 登録不要投稿のため、ログインしていなくても名前を使える
-  const uName   = profile?.displayName || "匿名ユーザー";
+  const uName   = profile?.displayName || guestName || "名無しさん";
 
   // 匿名ユーザーのいいね識別
   const anonKey = () => {
@@ -2113,7 +2173,7 @@ export default function App() {
 
   const addPost = async (d) => {
     if (!authUser) { setAuthMode("login"); toast2("ログイン後に投稿できます"); return; }
-    const data = { ...d, author: uName, authorUid: authUser?.uid || null, likes: [], comments: [] };
+    const data = { ...d, author: d.author || uName, authorUid: authUser?.uid || null, likes: [], comments: [] };
     const id   = await fsAdd("posts", data);
     setPosts(prev => [{ id, ...data, createdAt: null }, ...prev]);
     await grantUnlock();
@@ -2297,7 +2357,7 @@ export default function App() {
     return getBadge(authorPostCounts[authorUid] || 0);
   };
 
-  const sp = { sess, go, goSubTop, companies, posts, reviews, salaries, jobListings, plan, isAdmin, adminDelete, adminEdit, setEditTgt, setAuthMode, isMobile, uName, upgradePlan, authUser, favorites, toggleFavorite, unlocked, profile, getAuthorBadge, authorPostCounts, goThread, setBestAnswer };
+  const sp = { sess, go, goSubTop, companies, posts, reviews, salaries, jobListings, plan, isAdmin, adminDelete, adminEdit, setEditTgt, setAuthMode, isMobile, uName, upgradePlan, authUser, favorites, toggleFavorite, unlocked, profile, getAuthorBadge, authorPostCounts, goThread, setBestAnswer, guestName, setGuestName };
 
   return (
     <ErrorBoundary>
@@ -2943,39 +3003,23 @@ function SubTopPage({ go, goSubTop, grp, companies, posts, reviews, salaries, co
 
   return (
     <div>
-      {/* ヒーロー（実写画像背景・コンパクト） */}
-      <section style={{
-        position:"relative",
-        background: "linear-gradient(135deg, " + C.accentDark + " 0%, " + C.accent + " 100%)",
-        padding: isMobile ? "26px 20px" : "36px 40px",
-        borderRadius: 14,
-        marginTop: 12,
-        marginBottom: 24,
-        color: "#fff",
-        overflow: "hidden",
-        minHeight: isMobile ? 180 : 220,
-      }}>
-        <div style={{ position:"relative", zIndex:1, maxWidth:760, margin:"0 auto", textAlign:"center", textShadow:"0 2px 12px rgba(0,0,0,0.5)" }}>
-          <p style={{ fontSize:11, letterSpacing:"0.2em", marginBottom:6, opacity:0.95, fontWeight:"bold" }}>{theme.emoji} {grp}</p>
-          <h1 style={{ fontSize: isMobile ? 20 : 26, fontWeight:"bold", lineHeight:1.4, marginBottom:10, fontFamily:"\"Zen Kaku Gothic New\", sans-serif" }}>
-            {theme.catch}
-          </h1>
-          <p style={{ fontSize: isMobile ? 11 : 13, lineHeight:1.7, opacity:0.92, marginBottom:14, maxWidth:600, marginLeft:"auto", marginRight:"auto" }}>
-            {theme.desc}
-          </p>
-          <div style={{ display:"flex", gap:isMobile ? 14 : 24, justifyContent:"center", flexWrap:"wrap" }}>
-            <div style={{ textAlign:"center" }}>
-              <div style={{ fontSize:isMobile ? 16 : 20, fontWeight:"bold", fontFamily:"\"Zen Kaku Gothic New\", sans-serif" }}>{grpCos.length}</div>
-              <div style={{ fontSize:10, opacity:0.85 }}>掲載企業</div>
-            </div>
-            <div style={{ textAlign:"center" }}>
-              <div style={{ fontSize:isMobile ? 16 : 20, fontWeight:"bold", fontFamily:"\"Zen Kaku Gothic New\", sans-serif" }}>{grpPosts.length}</div>
-              <div style={{ fontSize:10, opacity:0.85 }}>体験談</div>
-            </div>
-            <div style={{ textAlign:"center" }}>
-              <div style={{ fontSize:isMobile ? 16 : 20, fontWeight:"bold", fontFamily:"\"Zen Kaku Gothic New\", sans-serif" }}>{grpReviews.length}</div>
-              <div style={{ fontSize:10, opacity:0.85 }}>口コミ</div>
-            </div>
+      {/* ヒーロー（CSSコンポジション・写真なし） */}
+      <section style={{ position:"relative", overflow:"hidden", borderRadius:18, marginTop:14, marginBottom:24,
+        background: "linear-gradient(135deg, " + C.accentDark + " 0%, " + C.accent + " 100%)", color:"#fff",
+        padding: isMobile ? "30px 22px" : "46px 42px" }}>
+        <span aria-hidden="true" style={{ position:"absolute", right: isMobile ? -14 : 24, top:"50%", transform:"translateY(-50%)", fontSize: isMobile ? 130 : 190, opacity:0.10, lineHeight:1, userSelect:"none", pointerEvents:"none" }}>{theme.emoji}</span>
+        <div aria-hidden="true" style={{ position:"absolute", inset:0, backgroundImage:"radial-gradient(rgba(255,255,255,0.13) 1px, transparent 1px)", backgroundSize:"18px 18px", opacity:0.55, pointerEvents:"none" }} />
+        <div style={{ position:"relative", zIndex:1, maxWidth:780 }}>
+          <span style={{ display:"inline-flex", alignItems:"center", gap:7, background:"rgba(255,255,255,0.16)", borderRadius:20, padding:"4px 13px", fontSize:11.5, fontWeight:"bold", letterSpacing:"0.04em", marginBottom:14 }}>{theme.emoji} {grp}</span>
+          <h1 style={{ fontFamily:"'Zen Kaku Gothic New', sans-serif", fontWeight:900, fontSize: isMobile ? 26 : 38, lineHeight:1.3, marginBottom:12, letterSpacing:"0.01em" }}>{theme.catch}</h1>
+          <p style={{ fontSize: isMobile ? 13 : 15, lineHeight:1.8, opacity:0.92, maxWidth:600, marginBottom:22 }}>{theme.desc}</p>
+          <div style={{ display:"flex", gap: isMobile ? 26 : 40 }}>
+            {[[grpCos.length, "掲載企業"], [grpPosts.length, "体験談"], [grpReviews.length, "口コミ"]].map(([n, l]) => (
+              <div key={l}>
+                <div className="tabnum" style={{ fontFamily:"'Zen Kaku Gothic New', sans-serif", fontWeight:900, fontSize: isMobile ? 24 : 31, lineHeight:1 }}>{n}</div>
+                <div style={{ fontSize:10.5, opacity:0.85, marginTop:5, letterSpacing:"0.05em" }}>{l}</div>
+              </div>
+            ))}
           </div>
         </div>
       </section>
@@ -3054,7 +3098,7 @@ function SubTopPage({ go, goSubTop, grp, companies, posts, reviews, salaries, co
   );
 }
 
-function ThreadPage({ post, posts, companies, go, goThread, uName, authUser, isAdmin, onAddComment, onToggleLike, adminDelete, getAuthorBadge, favorites, toggleFavorite, setBestAnswer, isMobile, setAuthMode }) {
+function ThreadPage({ post, posts, companies, go, goThread, uName, authUser, isAdmin, onAddComment, onToggleLike, adminDelete, getAuthorBadge, favorites, toggleFavorite, setBestAnswer, isMobile, setAuthMode, setGuestName }) {
   const live = posts.find(x => x.id === post.id) || post;
   const p = live;
   const co = companies.find(c => c.id === p.companyId);
@@ -3157,6 +3201,8 @@ function ThreadPage({ post, posts, companies, go, goThread, uName, authUser, isA
           bestAnswerId={p.bestAnswerId}
           onSetBestAnswer={(commentId) => setBestAnswer(p, commentId)}
           canMarkBest={canMarkBest}
+          onSetGuestName={setGuestName}
+          group={co && co.group}
         />
       </div>
     </div>
@@ -3455,7 +3501,7 @@ function CompaniesPage({ go, filtered, searchQ, setSearchQ, grpFilter, setGrpFil
 }
 
 // ─── 企業ページ ───────────────────────────────────────────────────────────────
-function CompanyPage({ go, co, cposts, crevs, csals, cjobs, initTab, onToggleLike, onAddComment, onAddPost, onAddReview, onAddSalary, onAddJob, isAdmin, adminDelete, setEditTgt, plan, setAuthMode, isMobile, uName, favorites, toggleFavorite, sess, unlocked, getAuthorBadge, authUser, profile, toggleFollowCompany }) {
+function CompanyPage({ go, co, cposts, crevs, csals, cjobs, initTab, onToggleLike, onAddComment, onAddPost, onAddReview, onAddSalary, onAddJob, isAdmin, adminDelete, setEditTgt, plan, setAuthMode, isMobile, uName, favorites, toggleFavorite, sess, unlocked, getAuthorBadge, authUser, profile, toggleFollowCompany, goThread }) {
   const [tab,     setTab]     = useState(initTab || "interview");
   const [jobCat,  setJobCat]  = useState("全職種");
   useEffect(() => { if (initTab) setTab(initTab); }, [initTab]);
@@ -3592,6 +3638,7 @@ function PostsTab({ posts, ptype, label, co, uName, onAddPost, onToggleLike, onA
   const [customStage, setCustomStage] = useState("");
   const [showCustomStage, setShowCustomStage] = useState(false);
   const [stages, setStages] = useState([{ stage:"", content:"" }]);
+  const [authorName, setAuthorName] = useState(() => sess ? (sess.displayName || uName) : genGuestName(co.group || co.industry));
   const isES = ptype === "es";
   const isInterview = ptype === "interview";
   const isBoard = ptype === "board";
@@ -3837,13 +3884,11 @@ function PostsTab({ posts, ptype, label, co, uName, onAddPost, onToggleLike, onA
             </Fld>
           ) : isBoard ? (
             <Fld label={`本文 *（最低10文字）　現在${form.content.length}文字`}>
-              <textarea style={{ ...S.input, resize:"vertical", borderColor: form.content.length > 0 && form.content.length < 10 ? "#DC2626" : C.border }} rows={5} placeholder="質問や情報を自由に投稿してください。" value={form.content} onChange={e => setForm({ ...form, content:e.target.value })} />
-              {form.content.length > 0 && form.content.length < 10 && <p style={{ fontSize:11, color:"#DC2626", marginTop:4 }}>あと{10 - form.content.length}文字以上入力してください</p>}
+              <textarea style={{ ...S.input, resize:"vertical", borderColor: C.border }} rows={5} placeholder="質問や情報を自由に投稿してください。" value={form.content} onChange={e => setForm({ ...form, content:e.target.value })} />
             </Fld>
           ) : (
             <Fld label={`本文 *（最低30文字）　現在${form.content.length}文字`}>
-              <textarea style={{ ...S.input, resize:"vertical", borderColor: form.content.length > 0 && form.content.length < 30 ? "#DC2626" : C.border }} rows={5} placeholder="面接の様子、聞かれた内容、準備のポイントなどをご記入ください。（最低30文字）" value={form.content} onChange={e => setForm({ ...form, content:e.target.value })} />
-              {form.content.length > 0 && form.content.length < 30 && <p style={{ fontSize:11, color:"#DC2626", marginTop:4 }}>あと{30 - form.content.length}文字以上入力してください</p>}
+              <textarea style={{ ...S.input, resize:"vertical", borderColor: C.border }} rows={5} placeholder="面接の様子、聞かれた内容、準備のポイントなどをご記入ください。" value={form.content} onChange={e => setForm({ ...form, content:e.target.value })} />
             </Fld>
           )}
           {!isInterview && (form.stage === "内定" || form.stage === "内定辞退") && (
@@ -3856,23 +3901,24 @@ function PostsTab({ posts, ptype, label, co, uName, onAddPost, onToggleLike, onA
               </div>
             </div>
           )}
-          <div style={{ display:"flex", alignItems:"center", gap:8, padding:"8px 0", borderTop:"1px solid " + C.border, fontSize:12, color:C.sub }}>
-            <AC>{ini(isBoard && !sess && form.guestName ? form.guestName : uName)}</AC>
-            {isBoard && !sess
-              ? (form.guestName ? `${form.guestName} として投稿` : "コテハンを入力してください")
-              : `${uName} として投稿`}
+          <div style={{ display:"flex", alignItems:"center", gap:8, padding:"10px 0", borderTop:"1px solid " + C.border, flexWrap:"wrap" }}>
+            <AC>{ini(authorName || uName)}</AC>
+            <span style={{ fontSize:12, color:C.sub }}>表示名</span>
+            <input value={authorName} onChange={e => setAuthorName(e.target.value.slice(0, 24))} placeholder="表示名" style={{ ...S.input, fontSize:13, padding:"6px 10px", maxWidth:200, flex:"0 1 auto" }} />
+            <button type="button" onClick={() => setAuthorName(genGuestName(co.group || co.industry))} title="別の名前を生成" style={{ background:C.light, border:"1px solid " + C.border, color:C.accentDark, fontSize:12, fontWeight:"bold", borderRadius:8, padding:"6px 11px", cursor:"pointer", fontFamily:"inherit", whiteSpace:"nowrap" }}>🎲 別の名前</button>
+            <span style={{ fontSize:11, color:C.sub }}>として投稿（自由に変更できます）</span>
           </div>
           <button style={{ ...S.primaryBtn, width:"100%", padding:"11px" }} onClick={async () => {
             if (!form.title.trim()) { alert("タイトルを入力してください"); return; }
             if (isBoard) {
               if (!form.title.trim()) { alert("タイトルを入力してください"); return; }
-              if (!form.content.trim() || form.content.length < 10) { alert("本文を10文字以上入力してください"); return; }
+              if (!form.content.trim()) { alert("本文を入力してください"); return; }
               if (!sess) {
                 // 未ログインの場合はメール+コテハンが必須
                 if (!form.guestEmail || !form.guestEmail.includes("@")) { alert("メールアドレスを入力してください"); return; }
                 if (!form.guestName.trim()) { alert("表示名（コテハン）を入力してください"); return; }
               }
-              await onAddPost(form);
+              await onAddPost({ ...form, author: authorName || uName });
               setForm(null);
               return;
             }
@@ -3880,14 +3926,14 @@ function PostsTab({ posts, ptype, label, co, uName, onAddPost, onToggleLike, onA
               if (!form.applyMethod) { alert("応募方法を選択してください"); return; }
               if (!form.progressStage) { alert("選考の最終段階を選択してください"); return; }
               const summary = [...form.stages, ...(form.extraStages||[])].filter(s => s.name && s.content).map(s => `【${s.name}】${s.content}`).join("\n\n");
-              await onAddPost({ ...form, content: form.content || summary, stage: form.progressStage, finalResult: (form.progressStage === "内定" || form.progressStage === "内定辞退") ? form.progressStage : "" });
+              await onAddPost({ ...form, author: authorName || uName, content: form.content || summary, stage: form.progressStage, finalResult: (form.progressStage === "内定" || form.progressStage === "内定辞退") ? form.progressStage : "" });
               setForm(null);
               return;
             }
             if (!isES && !form.stage) return;
             if (isES && !form.esQuestion.trim()) { alert("ES設問内容を入力してください"); return; }
-            if (!isInterview && form.content.length < 30) { alert("本文は30文字以上入力してください"); return; }
-            await onAddPost(form);
+            if (!isInterview && !form.content.trim()) { alert("本文を入力してください"); return; }
+            await onAddPost({ ...form, author: authorName || uName });
             setForm(null);
           }}>
             投稿する
@@ -5609,7 +5655,7 @@ function AISummary({ posts, reviews, type }) {
   );
 }
 
-function CommentThread({ post, uName, authUserKey, authUser, isAdmin, onAddComment, adminDelete, getAuthorBadge, bestAnswerId, onSetBestAnswer, canMarkBest }) {
+function CommentThread({ post, uName, authUserKey, authUser, isAdmin, onAddComment, adminDelete, getAuthorBadge, bestAnswerId, onSetBestAnswer, canMarkBest, onSetGuestName, group }) {
   const [cmt, setCmt] = React.useState("");
   const [replyTo, setReplyTo] = React.useState(null); // 返信先のコメントID
   const [replyText, setReplyText] = React.useState("");
@@ -5700,6 +5746,14 @@ function CommentThread({ post, uName, authUserKey, authUser, isAdmin, onAddComme
       <div style={{ display:"flex", gap:8, marginTop:12, alignItems:"flex-start", paddingTop:10, borderTop:"1px solid " + C.border }}>
         <AC>{ini(uName)}</AC>
         <div style={{ flex:1 }}>
+          {onSetGuestName && !authUser && (
+            <div style={{ display:"flex", alignItems:"center", gap:6, marginBottom:6, flexWrap:"wrap" }}>
+              <span style={{ fontSize:11, color:C.sub, whiteSpace:"nowrap" }}>表示名</span>
+              <input value={uName} onChange={e => onSetGuestName(e.target.value)} placeholder="名前（自由に変更できます）" style={{ ...S.input, fontSize:12, padding:"5px 9px", maxWidth:200 }} />
+              <button type="button" onClick={() => onSetGuestName(genGuestName(group))} title="別の名前を生成" style={{ background:"none", border:"1px solid " + C.border, color:C.accentDark, fontSize:11, borderRadius:8, padding:"4px 8px", cursor:"pointer", fontFamily:"inherit" }}>🎲</button>
+              <span style={{ fontSize:10, color:C.sub }}>ログイン不要・自動で名前が入ります</span>
+            </div>
+          )}
           <textarea style={{ ...S.input, resize:"vertical", width:"100%" }} rows={2} placeholder="コメントを入力" value={cmt} onChange={e => setCmt(e.target.value)} />
           <button style={{ ...S.primaryBtn, marginTop:6, fontSize:12, padding:"7px 14px" }} onClick={() => handleSubmit(null)}>
             コメントする
