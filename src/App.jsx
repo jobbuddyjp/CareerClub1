@@ -9,6 +9,7 @@ import {
   updateProfile,
   GoogleAuthProvider,
   signInWithPopup,
+  signInAnonymously,
 } from "firebase/auth";
 import {
   collection,
@@ -210,6 +211,10 @@ const genGuestName = (group) => {
   const pool = (group && GUEST_NAME_POOLS[group]) ? GUEST_NAME_POOLS[group].concat(GUEST_NAME_GENERAL) : GUEST_NAME_GENERAL;
   return pool[Math.floor(Math.random() * pool.length)];
 };
+
+// 荒らし・自演対策の投稿者ID（5ch風）。IP不使用のため端末/アカウント＋日付をハッシュ化。同一投稿者・同日は同じIDになる
+const _fnv = (str) => { let h = 0x811c9dc5; for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 0x01000193); } return h >>> 0; };
+const makePosterId = (seed) => ("0000000" + _fnv(String(seed == null ? "?" : seed)).toString(16)).slice(-8);
 
 // ─── ユーティリティ ────────────────────────────────────────────────────────────
 const ini   = (n) => n ? String(n).slice(0,2) : "?";
@@ -1750,6 +1755,8 @@ export default function App() {
   const [salaries,    setSalaries]    = useState([]);
   const [jobListings, setJobListings] = useState([]);
   const [diary,       setDiary]       = useState([]);
+  const [seenComments, setSeenComments] = useState(() => { try { return new Set(JSON.parse(localStorage.getItem("seenComments") || "[]")); } catch { return new Set(); } });
+  const [tracker, setTracker] = useState([]);
   const [favorites,   setFavorites]   = useState([]); // お気に入り投稿IDのリスト
   const [dataReady,   setDataReady]   = useState(false);
 
@@ -1800,7 +1807,7 @@ export default function App() {
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (user) => {
       setAuthUser(user);
-      if (user) {
+      if (user && !user.isAnonymous) {
         let prof = await fsGet("users", user.uid);
         if (!prof) {
           prof = {
@@ -1834,9 +1841,14 @@ export default function App() {
         // 就活日記を読み込む
         const d = await fsWhere("diary", "uid", "==", user.uid);
         setDiary(d.sort((a, b) => (b.date || "").localeCompare(a.date || "")));
+        try {
+          const tr = await fsWhere("tracker", "uid", "==", user.uid);
+          setTracker(tr.sort((a, b) => (b.updated || b.date || "").localeCompare(a.updated || a.date || "")));
+        } catch (e) { setTracker([]); }
       } else {
         setProfile(null);
         setDiary([]);
+        setTracker([]);
       }
     });
     return unsub;
@@ -2104,6 +2116,14 @@ export default function App() {
     }
   }, [companies, posts, bootDone]);
 
+  // 投稿のゼロ摩擦化：未ログインなら匿名認証でサインイン（要：Firebaseコンソールで匿名認証を有効化。無効なら何もしない）
+  useEffect(() => {
+    const t = setTimeout(() => {
+      if (!auth.currentUser) { signInAnonymously(auth).catch(() => {}); }
+    }, 900);
+    return () => clearTimeout(t);
+  }, []);
+
   // ── 派生値
   const plan    = profile?.plan    || "free";
   const isAdmin = !!profile?.isAdmin;
@@ -2151,6 +2171,12 @@ export default function App() {
     setProfile(p => ({ ...p, notifications }));
   };
 
+  const saveVerifications = async (verifications) => {
+    if (!authUser || !profile) { setAuthMode("login"); toast2("ログイン後に登録できます"); return; }
+    try { await fsUpdate("users", authUser.uid, { verifications }); } catch (e) {}
+    setProfile(p => ({ ...p, verifications }));
+  };
+
   // 企業フォローのトグル
   const toggleFollowCompany = async (coId) => {
     if (!authUser || !profile) { setAuthMode("login"); toast2("ログイン後にフォローできます"); return; }
@@ -2173,7 +2199,9 @@ export default function App() {
 
   const addPost = async (d) => {
     if (!authUser) { setAuthMode("login"); toast2("ログイン後に投稿できます"); return; }
-    const data = { ...d, author: d.author || uName, authorUid: authUser?.uid || null, likes: [], comments: [] };
+    const _coName = (companies.find(c => c.id === d.companyId) || {}).name;
+    const _av = (profile?.verifications || []).find(x => x.company && _coName && x.company === _coName) || null;
+    const data = { ...d, author: d.author || uName, authorUid: authUser?.uid || null, posterId: makePosterId(authUser?.uid ? authUser.uid : (d.guestEmail && d.guestEmail.includes("@")) ? ("em:" + d.guestEmail.toLowerCase().trim()) : ("anon:" + anonKey())), authorVerify: _av ? { type: _av.type, company: _av.company, status: _av.status } : null, likes: [], comments: [] };
     const id   = await fsAdd("posts", data);
     setPosts(prev => [{ id, ...data, createdAt: null }, ...prev]);
     await grantUnlock();
@@ -2228,7 +2256,7 @@ export default function App() {
     if (newCommentsOverride) {
       newCmts = newCommentsOverride;
     } else {
-      const cmt = { id: Math.random().toString(36).slice(2,10), author: uName, authorUid: authUser?.uid || null, content, date: today(), ...(parentId ? { parentId } : {}) };
+      const cmt = { id: Math.random().toString(36).slice(2,10), author: uName, authorUid: authUser?.uid || null, content, date: today(), posterId: makePosterId(authUser?.uid ? authUser.uid : ("anon:" + anonKey())), ...(parentId ? { parentId } : {}) };
       newCmts = [...(post?.comments || []), cmt];
     }
     await fsUpdate("posts", postId, { comments: newCmts });
@@ -2299,6 +2327,16 @@ export default function App() {
     await Promise.all(entries.map(e => fsSet("diary", e.id, { ...e, uid: authUser.uid })));
   };
 
+  const saveTracker = async (entries) => {
+    setTracker(entries);
+    if (!authUser) return;
+    try {
+      const existing = await fsWhere("tracker", "uid", "==", authUser.uid);
+      await Promise.all(existing.map(e => fsDel("tracker", e.id)));
+      await Promise.all(entries.map(e => fsSet("tracker", e.id, { ...e, uid: authUser.uid })));
+    } catch (e) { /* tracker collection のルール未設定時はローカルのみ保持 */ }
+  };
+
   // ── 派生データ
   const coPosts      = (id) => posts.filter(p => p.companyId === id);
   const coRevs       = (id) => reviews.filter(r => r.companyId === id);
@@ -2357,13 +2395,37 @@ export default function App() {
     return getBadge(authorPostCounts[authorUid] || 0);
   };
 
-  const sp = { sess, go, goSubTop, companies, posts, reviews, salaries, jobListings, plan, isAdmin, adminDelete, adminEdit, setEditTgt, setAuthMode, isMobile, uName, upgradePlan, authUser, favorites, toggleFavorite, unlocked, profile, getAuthorBadge, authorPostCounts, goThread, setBestAnswer, guestName, setGuestName };
+  const replyNotifs = (() => {
+    if (!authUser) return [];
+    const me = authUser.uid; const out = [];
+    for (const pp of posts) {
+      if (pp.authorUid !== me) continue;
+      for (const c of (pp.comments || [])) {
+        if (!c || !c.id || (c.authorUid && c.authorUid === me)) continue;
+        if (seenComments.has(c.id)) continue;
+        out.push({ post: pp, comment: c });
+      }
+    }
+    out.sort((a, b) => (b.comment.date || "").localeCompare(a.comment.date || ""));
+    return out.slice(0, 40);
+  })();
+  const markNotifsSeen = () => {
+    setSeenComments(prev => {
+      const next = new Set(prev);
+      for (const pp of posts) { if (pp.authorUid !== authUser?.uid) continue; for (const c of (pp.comments || [])) { if (c && c.id) next.add(c.id); } }
+      try { localStorage.setItem("seenComments", JSON.stringify([...next])); } catch {}
+      return next;
+    });
+  };
+
+  const sp = { sess, go, goSubTop, companies, posts, reviews, salaries, jobListings, plan, isAdmin, adminDelete, adminEdit, setEditTgt, setAuthMode, isMobile, uName, upgradePlan, authUser, favorites, toggleFavorite, unlocked, profile, getAuthorBadge, authorPostCounts, goThread, setBestAnswer, guestName, setGuestName, replyNotifs, markNotifsSeen, saveVerifications };
 
   return (
     <ErrorBoundary>
     <div style={S.root}>
       <style>{CSS}</style>
       <AppNav {...sp} menuOpen={menuOpen} setMenuOpen={setMenuOpen} logout={logout} doGlobalSearch={doGlobalSearch} globalSearch={globalSearch} />
+      {isMobile && <BottomNav go={go} page={page} sess={sess} setAuthMode={setAuthMode} replyNotifs={replyNotifs} />}
       {toast && <div style={S.toast} className="fadeUp">{toast}</div>}
       {authMode && <AuthModal mode={authMode} setMode={setAuthMode} onLogin={login} onRegister={register} onReset={resetPassword} onGoogle={loginWithGoogle} />}
       {editTgt  && <EditModal target={editTgt} setTarget={setEditTgt} onSave={adminEdit} />}
@@ -2378,7 +2440,7 @@ export default function App() {
         </div>
       )}
 
-      <main style={{ ...S.main, padding: isMobile ? "0 12px 60px" : "0 24px 72px" }}>
+      <main style={{ ...S.main, padding: isMobile ? "0 12px 88px" : "0 24px 72px" }}>
         {page === "home"       && <HomePage       {...sp} coPosts={coPosts} coRevs={coRevs} coSals={coSals} setAuthMode={setAuthMode} doGlobalSearch={doGlobalSearch} />}
         {page === "board"      && <GeneralBoardPage {...sp} onAddPost={addPost} onToggleLike={toggleLike} onAddComment={addComment} />}
         {page === "thread"     && selPost && <ThreadPage {...sp} post={selPost} onToggleLike={toggleLike} onAddComment={addComment} />}
@@ -2404,7 +2466,7 @@ export default function App() {
         {page === "addCompany" && <AddCompanyPage {...sp} onSubmit={addCompany} authUser={authUser} setAuthMode={setAuthMode} />}
         {page === "mypage"     && (
           <MyPage {...sp}
-            diary={diary} saveDiary={saveDiary}
+            diary={diary} saveDiary={saveDiary} tracker={tracker} saveTracker={saveTracker}
             myPosts={posts.filter(p => p.authorUid === authUser?.uid)}
             myRevs={reviews.filter(r => r.authorUid === authUser?.uid)}
             favPosts={posts.filter(p => favorites.includes(p.id))}
@@ -2564,8 +2626,34 @@ function EditModal({ target, setTarget, onSave }) {
 }
 
 // ─── AppNav ───────────────────────────────────────────────────────────────────
-function AppNav({ sess, go, plan, isAdmin, setAuthMode, isMobile, menuOpen, setMenuOpen, logout, doGlobalSearch, globalSearch }) {
+function BottomNav({ go, page, sess, setAuthMode, replyNotifs }) {
+  const items = [
+    ["home", "掲示板", "📋"],
+    ["companies", "企業", "🏢"],
+    ["board", "投稿", "✏️"],
+    [sess ? "mypage" : "__login__", sess ? "マイ" : "ログイン", "👤"],
+  ];
+  return (
+    <div style={{ position:"fixed", left:0, right:0, bottom:0, zIndex:60, display:"flex", background:C.surface, borderTop:"1px solid " + C.border, boxShadow:"0 -2px 10px rgba(0,0,0,.05)", paddingBottom:"env(safe-area-inset-bottom, 0px)" }}>
+      {items.map(([key, label, icon]) => {
+        const active = page === key;
+        const isPost = key === "board";
+        const nb = key === "mypage" ? (replyNotifs || []).length : 0;
+        return (
+          <button key={label} onClick={() => key === "__login__" ? setAuthMode("login") : go(key)}
+            style={{ flex:1, background:"none", border:"none", padding:"7px 0 9px", display:"flex", flexDirection:"column", alignItems:"center", gap:2, cursor:"pointer", fontFamily:"inherit", color: isPost ? C.warmAccent : (active ? C.accent : C.sub) }}>
+            <span style={{ fontSize: isPost ? 20 : 18, position:"relative" }}>{icon}{nb > 0 && <span style={{ position:"absolute", top:-4, right:-8, background:C.warmAccent, color:"#fff", fontSize:8, fontWeight:"bold", borderRadius:6, minWidth:13, height:13, display:"inline-flex", alignItems:"center", justifyContent:"center", padding:"0 2px" }}>{nb > 9 ? "9+" : nb}</span>}</span>
+            <span style={{ fontSize:10, fontWeight: (active || isPost) ? "bold" : "normal" }}>{label}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function AppNav({ sess, go, plan, isAdmin, setAuthMode, isMobile, menuOpen, setMenuOpen, logout, doGlobalSearch, globalSearch, authUser, goThread, replyNotifs, markNotifsSeen }) {
   const [drop, setDrop] = useState(false);
+  const [notifOpen, setNotifOpen] = useState(false);
   const pl = PLANS[plan];
   return (
     <nav style={S.nav}>
@@ -2601,13 +2689,36 @@ function AppNav({ sess, go, plan, isAdmin, setAuthMode, isMobile, menuOpen, setM
           </button>
         ) : (
           <div style={{ display:"flex", alignItems:"center", gap:0 }}>
-            {[["home","掲示板"],["board","みんなの相談"],["companies","企業を探す"],["ranking","ランキング"]].map(([p,l]) => (
+            {[["home","掲示板"],["companies","企業を探す"],["ranking","ランキング"]].map(([p,l]) => (
               <span key={p}>
                 <button style={{ background:"none", border:"none", color:C.ink, fontSize:12, padding:"4px 10px", fontFamily:"inherit", cursor:"pointer" }} onClick={() => go(p)}>{l}</button>
                 <span style={{ color:C.border, fontSize:11 }}>|</span>
               </span>
             ))}
-            <button style={{ background:"none", border:"none", color:C.ink, fontSize:12, padding:"4px 10px", fontFamily:"inherit", cursor:"pointer" }} onClick={() => go("addCompany")}>＋企業追加</button>
+            <button style={{ background:C.warmAccent, border:"none", color:"#fff", fontSize:12, fontWeight:"bold", padding:"6px 14px", borderRadius:8, fontFamily:"inherit", cursor:"pointer" }} onClick={() => go("board")}>✏️ 投稿する</button>
+            {authUser && (
+              <div style={{ position:"relative" }}>
+                <button onClick={() => setNotifOpen(o => !o)} title="返信通知" style={{ background:"none", border:"none", cursor:"pointer", position:"relative", padding:"4px 6px", fontSize:18, lineHeight:1 }}>🔔
+                  {(replyNotifs || []).length > 0 && <span style={{ position:"absolute", top:-2, right:-2, background:C.warmAccent, color:"#fff", fontSize:9, fontWeight:"bold", borderRadius:8, minWidth:15, height:15, display:"flex", alignItems:"center", justifyContent:"center", padding:"0 3px" }}>{(replyNotifs || []).length > 99 ? "99+" : (replyNotifs || []).length}</span>}
+                </button>
+                {notifOpen && (
+                  <div style={{ position:"absolute", right:0, top:"120%", width:300, maxHeight:380, overflowY:"auto", background:C.surface, border:"1px solid " + C.border, borderRadius:10, boxShadow:"0 8px 24px rgba(0,0,0,.12)", zIndex:80 }}>
+                    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"10px 12px", borderBottom:"1px solid " + C.border }}>
+                      <span style={{ fontSize:12, fontWeight:"bold", color:C.ink }}>返信通知</span>
+                      {(replyNotifs || []).length > 0 && <button onClick={() => markNotifsSeen()} style={{ background:"none", border:"none", color:C.accent, fontSize:11, cursor:"pointer", fontFamily:"inherit" }}>すべて既読</button>}
+                    </div>
+                    {(replyNotifs || []).length === 0
+                      ? <div style={{ padding:"22px 12px", textAlign:"center", color:C.sub, fontSize:12 }}>新しい返信はありません</div>
+                      : (replyNotifs || []).map((n, i) => (
+                          <button key={n.comment.id + "_" + i} onClick={() => { goThread(n.post); markNotifsSeen(); setNotifOpen(false); }} style={{ display:"block", width:"100%", textAlign:"left", background:"none", border:"none", borderBottom:"1px solid " + C.border, padding:"10px 12px", cursor:"pointer", fontFamily:"inherit" }}>
+                            <div style={{ fontSize:12, color:C.ink, marginBottom:3 }}><b>{n.comment.author || "匿名"}</b>さんが返信</div>
+                            <div style={{ fontSize:11, color:C.sub, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>「{n.post.title}」</div>
+                          </button>
+                        ))}
+                  </div>
+                )}
+              </div>
+            )}
             <span style={{ color:C.border, fontSize:11 }}>|</span>
             {sess ? (
               <div style={{ position:"relative" }}>
@@ -2647,7 +2758,7 @@ function AppNav({ sess, go, plan, isAdmin, setAuthMode, isMobile, menuOpen, setM
       </div>
       {isMobile && menuOpen && (
         <div style={{ background:"#fff", borderBottom:"1px solid " + C.border, boxShadow:"0 4px 12px rgba(0,0,0,0.1)" }} className="fadeUp">
-          {[["home","掲示板"],["board","みんなの相談"],["companies","企業を探す"],["ranking","ランキング"],["addCompany","＋企業追加"]].map(([p,l]) => (
+          {[["home","掲示板"],["companies","企業を探す"],["ranking","ランキング"],["addCompany","＋企業追加"]].map(([p,l]) => (
             <button key={p} style={{ display:"block", width:"100%", textAlign:"left", background:"none", border:"none", padding:"12px 16px", fontSize:13, color:C.ink, fontFamily:"inherit", cursor:"pointer", borderBottom:"1px solid " + C.border }} onClick={() => go(p)}>{l}</button>
           ))}
           {sess ? (
@@ -2773,7 +2884,7 @@ const GROUP_LOGO_COLORS = {
 };
 
 function CompanyLogo({ company, size = 36 }) {
-  const [imgErr, setImgErr] = React.useState(false);
+  const [imgStage, setImgStage] = React.useState(0); // 0=Clearbit, 1=favicon, 2=頭文字
   if (!company) return null;
   const grp = company.group || "メーカー";
   const theme = GROUP_LOGO_COLORS[grp] || { bg:"linear-gradient(135deg, #475569 0%, #94A3B8 100%)", color:"#fff" };
@@ -2826,6 +2937,44 @@ function CompanyLogo({ company, size = 36 }) {
     "テルモ":"terumo.co.jp","シスメックス":"sysmex.co.jp",
     "ベネッセホールディングス":"benesse.co.jp",
     "東宝":"toho.co.jp","講談社":"kodansha.co.jp","集英社":"shueisha.co.jp",
+    "りそな銀行":"resona-gr.co.jp","ゆうちょ銀行":"jp-bank.japanpost.jp","三井住友信託銀行":"smtb.jp","セブン銀行":"sevenbank.co.jp","イオン銀行":"aeonbank.co.jp","楽天銀行":"rakuten-bank.co.jp","ソニー銀行":"sonybank.net","PayPay銀行":"paypay-bank.co.jp","住信SBIネット銀行":"netbk.co.jp","auじぶん銀行":"jibunbank.co.jp","横浜銀行":"boy.co.jp","千葉銀行":"chibabank.co.jp","静岡銀行":"shizuokabank.co.jp","京都銀行":"kyotobank.co.jp","広島銀行":"hirogin.co.jp","SBI新生銀行":"sbishinseibank.co.jp","あおぞら銀行":"aozorabank.co.jp","日本政策投資銀行":"dbj.jp",
+    "SMBC日興証券":"smbcnikko.co.jp","みずほ証券":"mizuho-sc.com","SBI証券":"sbisec.co.jp","楽天証券":"rakuten-sec.co.jp","松井証券":"matsui.co.jp","マネックスグループ":"monex.co.jp","岡三証券":"okasan.co.jp","東海東京証券":"tokaitokyo.co.jp","三菱UFJモルガン・スタンレー証券":"sc.mufg.jp","日本取引所グループ":"jpx.co.jp","東京証券取引所":"jpx.co.jp",
+    "第一生命保険":"dai-ichi-life.co.jp","明治安田生命保険":"meijiyasuda.co.jp","住友生命保険":"sumitomolife.co.jp","かんぽ生命保険":"jp-life.japanpost.jp","ソニー生命保険":"sonylife.co.jp","アフラック生命保険":"aflac.co.jp","プルデンシャル生命保険":"prudential.co.jp","T&Dホールディングス":"td-holdings.co.jp","太陽生命保険":"taiyo-seimei.co.jp","富国生命保険":"fukoku-life.co.jp","朝日生命保険":"asahi-life.co.jp","ライフネット生命保険":"lifenet-seimei.co.jp","アクサ生命保険":"axa.co.jp","オリックス生命保険":"orixlife.co.jp",
+    "三井住友海上火災保険":"ms-ins.com","損害保険ジャパン":"sompo-japan.co.jp","あいおいニッセイ同和損害保険":"aioinissaydowa.co.jp","東京海上ホールディングス":"tokiomarinehd.com","SOMPOホールディングス":"sompo-hd.com","MS&ADインシュアランスグループホールディングス":"ms-ad-hd.com","AIG損害保険":"aig.co.jp","チューリッヒ保険":"zurich.co.jp",
+    "オリックス":"orix.co.jp","三菱HCキャピタル":"mitsubishi-hc-capital.com","東京センチュリー":"tokyocentury.co.jp","クレディセゾン":"saisoncard.co.jp","ジャックス":"jaccs.co.jp","アコム":"acom.co.jp","アイフル":"aiful.co.jp","SBIホールディングス":"sbigroup.co.jp","オリエントコーポレーション":"orico.co.jp","イオンフィナンシャルサービス":"aeonfinancial.co.jp",
+    "豊田通商":"toyota-tsusho.com","双日":"sojitz.com","兼松":"kanematsu.co.jp","岡谷鋼機":"okaya.co.jp","阪和興業":"hanwa.co.jp","岩谷産業":"iwatani.co.jp","ミスミグループ本社":"misumi.co.jp","メディパルホールディングス":"medipal.co.jp","アルフレッサ ホールディングス":"alfresa.co.jp","スズケン":"suzuken.co.jp",
+    "スズキ":"suzuki.co.jp","マツダ":"mazda.co.jp","SUBARU":"subaru.co.jp","いすゞ自動車":"isuzu.co.jp","三菱自動車工業":"mitsubishi-motors.com","ヤマハ発動機":"yamaha-motor.co.jp","川崎重工業":"khi.co.jp","日野自動車":"hino.co.jp","デンソー":"denso.com","アイシン":"aisin.com","豊田自動織機":"toyota-shokki.co.jp","ジェイテクト":"jtekt.co.jp","小糸製作所":"koito.co.jp","豊田合成":"toyoda-gosei.co.jp","ブリヂストン":"bridgestone.co.jp","住友ゴム工業":"srigroup.co.jp","横浜ゴム":"y-yokohama.com","日本電産":"nidec.com","日本特殊陶業":"ngkntk.co.jp","スタンレー電気":"stanley.co.jp",
+    "東芝":"global.toshiba","シャープ":"global.sharp","キヤノン":"canon.jp","リコー":"ricoh.co.jp","コニカミノルタ":"konicaminolta.com","セイコーエプソン":"epson.jp","ブラザー工業":"brother.co.jp","オムロン":"omron.com","横河電機":"yokogawa.co.jp","アンリツ":"anritsu.com","島津製作所":"shimadzu.co.jp","HOYA":"hoya.com","オリンパス":"olympus.co.jp","ニコン":"nikon.co.jp","富士フイルムホールディングス":"fujifilm.com","アドバンテスト":"advantest.com","ディスコ":"disco.co.jp","東京エレクトロン":"tel.com","信越化学工業":"shinetsu.co.jp","レーザーテック":"lasertec.co.jp","TDK":"tdk.com","村田製作所":"murata.com","京セラ":"kyocera.co.jp","ミネベアミツミ":"minebeamitsumi.com","ヤマハ":"yamaha.com","ローム":"rohm.co.jp","ルネサスエレクトロニクス":"renesas.com","SUMCO":"sumcosi.com","アルプスアルパイン":"alpsalpine.com","マキタ":"makita.co.jp","ホシザキ":"hoshizaki.co.jp","パナソニック":"panasonic.com","ダイキン工業":"daikin.co.jp","富士電機":"fujielectric.co.jp","明電舎":"meidensha.co.jp",
+    "三菱マテリアル":"mmc.co.jp","昭和電工":"resonac.com","レゾナック":"resonac.com","三菱重工業":"mhi.com","IHI":"ihi.co.jp","クボタ":"kubota.co.jp","ファナック":"fanuc.co.jp","コマツ":"komatsu.jp","日立建機":"hitachicm.com","DMG森精機":"dmgmori.co.jp","アマダ":"amada.co.jp","ナブテスコ":"nabtesco.com","ヤンマーホールディングス":"yanmar.com","タダノ":"tadano.com","住友重機械工業":"shi.co.jp","日本精工":"jp.nsk.com","SMC":"smcworld.com","東京瓦斯":"tokyo-gas.co.jp","東京ガス":"tokyo-gas.co.jp","大阪ガス":"osakagas.co.jp","JERA":"jera.co.jp","関西電力":"kepco.co.jp","東北電力":"tohoku-epco.co.jp","中部電力":"chuden.co.jp","中国電力":"energia.co.jp","九州電力":"kyuden.co.jp","東京電力ホールディングス":"tepco.co.jp",
+    "三菱ケミカルグループ":"mcgc.com","住友化学":"sumitomo-chem.co.jp","三井化学":"mitsuichemicals.com","旭化成":"asahi-kasei.com","東レ":"toray.com","帝人":"teijin.co.jp","クラレ":"kuraray.co.jp","DIC":"dic-global.com","日本触媒":"shokubai.co.jp","花王":"kao.com","ライオン":"lion.co.jp","資生堂":"shiseido.com","コーセー":"kose.co.jp","ポーラ・オルビスホールディングス":"po-holdings.co.jp","マンダム":"mandom.co.jp","小林製薬":"kobayashi.co.jp","ピジョン":"pigeon.co.jp","ユニ・チャーム":"unicharm.co.jp",
+    "日本製鉄":"nipponsteel.com","JFEホールディングス":"jfe-holdings.co.jp","神戸製鋼所":"kobelco.com","大同特殊鋼":"daido.co.jp","住友金属鉱山":"smm.co.jp","AGC":"agc.com","日本電気硝子":"neg.co.jp","日本板硝子":"nsg.com","太平洋セメント":"taiheiyo-cement.co.jp","UBE":"ube.com","TOTO":"toto.co.jp","LIXILグループ":"lixil.com","タカラスタンダード":"takara-standard.co.jp","クリナップ":"cleanup.jp",
+    "サッポロホールディングス":"sapporoholdings.jp","伊藤園":"itoen.co.jp","明治ホールディングス":"meiji.com","森永製菓":"morinaga.co.jp","江崎グリコ":"glico.com","カルビー":"calbee.co.jp","ロッテ":"lotte.co.jp","森永乳業":"morinagamilk.co.jp","雪印メグミルク":"meg-snow.com","ヤクルト本社":"yakult.co.jp","山崎製パン":"yamazakipan.co.jp","日清食品ホールディングス":"nissin.com","東洋水産":"maruchan.co.jp","ハウス食品グループ本社":"housefoods-group.com","エスビー食品":"sbfoods.co.jp","ミツカン":"mizkan.co.jp","キッコーマン":"kikkoman.com","カゴメ":"kagome.co.jp","プリマハム":"primaham.co.jp","伊藤ハム":"itoham.co.jp","日本ハム":"nipponham.co.jp","ニチレイ":"nichirei.co.jp","マルハニチロ":"maruha-nichiro.co.jp","キッコーマン食品":"kikkoman.com","日清製粉グループ本社":"nisshin.com","キユーピー":"kewpie.com",
+    "王子ホールディングス":"ojiholdings.co.jp","日本製紙":"nipponpapergroup.com","レンゴー":"rengo.co.jp","大王製紙":"daio-paper.co.jp","凸版印刷":"toppan.co.jp","大日本印刷":"dnp.co.jp",
+    "第一三共":"daiichisankyo.co.jp","エーザイ":"eisai.com","中外製薬":"chugai-pharm.co.jp","大塚ホールディングス":"otsuka.com","塩野義製薬":"shionogi.co.jp","協和キリン":"kyowakirin.co.jp","参天製薬":"santen.com","小野薬品工業":"ono-pharma.com","住友ファーマ":"sumitomo-pharma.co.jp","ロート製薬":"rohto.co.jp","久光製薬":"hisamitsu.co.jp","ツムラ":"tsumura.co.jp","沢井製薬":"sawai.co.jp","ニプロ":"nipro.co.jp","日本光電工業":"nihonkohden.co.jp","フクダ電子":"fukuda.co.jp","アズビル":"azbil.com","エム・スリー":"m3.com","ペプチドリーム":"peptidream.com",
+    "三菱鉛筆":"mpuni.co.jp","パイロットコーポレーション":"pilot.co.jp","コクヨ":"kokuyo.co.jp","マブチモーター":"mabuchi-motor.co.jp","アシックス":"asics.com","ミズノ":"mizuno.jp","デサント":"descente.co.jp","ゴールドウイン":"goldwin.co.jp","ヨネックス":"yonex.co.jp","シマノ":"shimano.com","YKK":"ykk.co.jp","YKK AP":"ykkap.co.jp","良品計画":"ryohin-keikaku.jp","タカラトミー":"takaratomy.co.jp","セガサミーホールディングス":"segasammy.co.jp","象印マホービン":"zojirushi.co.jp","タイガー魔法瓶":"tiger.jp",
+    "SCSK":"scsk.jp","TIS":"tis.co.jp","BIPROGY":"biprogy.com","伊藤忠テクノソリューションズ":"ctc-g.co.jp","CTC":"ctc-g.co.jp","オービック":"obic.co.jp","日立ソリューションズ":"hitachi-solutions.co.jp","DTS":"dts.co.jp","ネットワンシステムズ":"netone.co.jp","電通国際情報サービス":"isid.co.jp","サイボウズ":"cybozu.co.jp","マネーフォワード":"moneyforward.com","freee":"freee.co.jp","Sansan":"sansan.com","ラクス":"rakus.co.jp","ラクスル":"raksul.com","BASE":"binc.jp","STORES":"stores.jp","Chatwork":"kubell.com","セールスフォース":"salesforce.com","SAP":"sap.com","オラクル":"oracle.com","アドビ":"adobe.com","サイバーエージェント":"cyberagent.co.jp","ユーザベース":"uzabase.com",
+    "Zホールディングス":"z-holdings.co.jp","エムスリー":"m3.com","クックパッド":"cookpad.com","ミクシィ":"mixi.co.jp","MIXI":"mixi.co.jp","グリー":"gree.net","コロプラ":"colopl.co.jp","アカツキ":"aktsk.jp","ガンホー・オンライン・エンターテイメント":"gungho.co.jp","SHIFT":"shiftinc.jp","エス・エム・エス":"bm-sms.co.jp","ビジョナル":"visional.inc","ビズリーチ":"bizreach.co.jp","ぐるなび":"gnavi.co.jp","食べログ":"tabelog.com","カカクコム":"kakaku.com","ZOZOTOWN":"zozo.jp","ピクシブ":"pixiv.co.jp","ドワンゴ":"dwango.co.jp","KADOKAWA":"kadokawa.co.jp",
+    "NTT":"group.ntt","楽天モバイル":"mobile.rakuten.co.jp","インターネットイニシアティブ":"iij.ad.jp","ニフティ":"nifty.co.jp","BIGLOBE":"biglobe.co.jp","エキサイト":"excite.co.jp","スカパーJSATホールディングス":"skyperfectjsat.space",
+    "ベイカレント・コンサルティング":"baycurrent.co.jp","アビームコンサルティング":"abeam.com","ボストン コンサルティング グループ":"bcg.com","マッキンゼー・アンド・カンパニー":"mckinsey.com","ベイン・アンド・カンパニー":"bain.com","アーサー・ディ・リトル":"adlittle.com","ローランド・ベルガー":"rolandberger.com","A.T. カーニー":"kearney.com","シグマクシス":"sigmaxyz.com","リブ・コンサルティング":"libcon.co.jp","ドリームインキュベータ":"dreamincubator.co.jp","経営共創基盤":"igpi.co.jp","船井総合研究所":"funaisoken.co.jp","山田コンサルティンググループ":"yamada-cg.co.jp","フューチャー":"future.co.jp",
+    "住友不動産":"sumitomo-rd.co.jp","東急不動産":"tokyu-land.co.jp","野村不動産ホールディングス":"nomura-re-hd.co.jp","森ビル":"mori.co.jp","ヒューリック":"hulic.co.jp","東京建物":"tatemono.com","オープンハウスグループ":"openhouse-group.com","オープンハウス":"openhouse-group.com","レオパレス21":"leopalace21.com","大東建託":"kentaku.co.jp","スターツコーポレーション":"starts.co.jp","アパグループ":"apahotel.com","サンフロンティア不動産":"sunfrt.co.jp","タカラレーベン":"takara-leben.co.jp","平和不動産":"heiwa-net.co.jp","近鉄不動産":"kintetsu-re.co.jp","阪急阪神不動産":"hankyu-hanshin-r.co.jp",
+    "大林組":"obayashi.co.jp","竹中工務店":"takenaka.co.jp","戸田建設":"toda.co.jp","熊谷組":"kumagaigumi.co.jp","前田建設工業":"maeda.jp","西松建設":"nishimatsu.co.jp","奥村組":"okumuragumi.co.jp","長谷工コーポレーション":"haseko.co.jp","三井住友建設":"smcon.co.jp","東急建設":"tokyu-cnst.co.jp","住友林業":"sumitomoforestry.co.jp","積水ハウス":"sekisuihouse.co.jp","大和ハウス工業":"daiwahouse.co.jp","ミサワホーム":"misawa.co.jp","旭化成ホームズ":"asahi-kasei.co.jp","三井ホーム":"mitsuihome.co.jp","トヨタホーム":"toyotahome.co.jp","タマホーム":"tamahome.jp","積水化学工業":"sekisui.co.jp",
+    "良品計画":"ryohin-keikaku.jp","三越伊勢丹ホールディングス":"imhds.co.jp","高島屋":"takashimaya.co.jp","Jフロント リテイリング":"j-front-retailing.com","H2Oリテイリング":"h2o-retailing.co.jp","近鉄百貨店":"d-kintetsu.co.jp","松屋":"matsuya.com","東急百貨店":"tokyu-dept.co.jp","ココカラファイン":"cocokarafine.co.jp","スギ薬局":"drug-sugi.co.jp","マツモトキヨシ":"matsukiyococokara.com","ツルハホールディングス":"tsuruha-hd.com","ウエルシアホールディングス":"welcia.co.jp","コスモス薬品":"cosmospc.co.jp","クスリのアオキ":"kusuri-aoki.co.jp","ヤマダホールディングス":"yamada-holdings.jp","ビックカメラ":"biccamera.co.jp","ヨドバシカメラ":"yodobashi.com","ノジマ":"nojima.co.jp","ケーズホールディングス":"ksdenki.com","エディオン":"edion.co.jp","上新電機":"joshin.co.jp","コジマ":"kojima.net",
+    "しまむら":"shimamura.gr.jp","西松屋チェーン":"24028.jp","アダストリア":"adastria.co.jp","ユナイテッドアローズ":"united-arrows.co.jp","ビームス":"beams.co.jp","シップス":"sh-ps.com","オンワードホールディングス":"onward-hd.co.jp","ワールド":"world.co.jp","ストライプインターナショナル":"stripe-intl.com","ハニーズホールディングス":"honeys-hd.com","ABCマート":"abc-mart.net","チヨダ":"chiyodagrp.co.jp","青山商事":"aoyama-syouji.co.jp","AOKIホールディングス":"aoki-hd.co.jp","はるやまホールディングス":"haruyama.co.jp","アスクル":"askul.co.jp","モノタロウ":"monotaro.com","ミスミ":"misumi.co.jp",
+    "ライフコーポレーション":"lifecorp.jp","オーケー":"ok-corporation.jp","サミット":"summitstore.co.jp","成城石井":"seijoishii.co.jp","ヤオコー":"yaoko-net.com","ベルク":"belc.jp","マルエツ":"maruetsu.co.jp","ダイエー":"daiei.co.jp","西友":"seiyu.co.jp","平和堂":"heiwado.jp","イズミ":"izumi.co.jp","オイシックス・ラ・大地":"oisixradaichi.co.jp","千趣会":"senshukai.co.jp",
+    "日本郵船":"nyk.com","商船三井":"mol.co.jp","川崎汽船":"kline.co.jp","名村造船所":"namura.co.jp","ヤマトホールディングス":"yamato-hd.co.jp","SGホールディングス":"sg-hldgs.co.jp","佐川急便":"sagawa-exp.co.jp","日本通運":"nipponexpress.com","近鉄エクスプレス":"kwe.com","三井倉庫ホールディングス":"mitsui-soko.com","住友倉庫":"sumitomo-soko.co.jp","三菱倉庫":"mitsubishi-logistics.co.jp","セイノーホールディングス":"seino.co.jp","福山通運":"fukutsu.co.jp","ハマキョウレックス":"hamakyorex.co.jp","センコーグループホールディングス":"senko.co.jp","鴻池運輸":"konoike.net","成田国際空港":"naa.jp","JR貨物":"jrfreight.co.jp",
+    "リクルート":"recruit.co.jp","パーソルホールディングス":"persol-group.co.jp","パソナグループ":"pasonagroup.co.jp","エン・ジャパン":"en-japan.com","マイナビ":"mynavi.jp","ディップ":"dip-net.co.jp","レバレジーズ":"leverages.jp","JAC Recruitment":"jac-recruitment.jp","アウトソーシング":"outsourcing.co.jp","UTグループ":"ut-g.co.jp","ウィルグループ":"willgroup.co.jp",
+    "ADKホールディングス":"adk.jp","東急エージェンシー":"tokyu-agc.co.jp","ジェイアール東日本企画":"jeki.co.jp","読売広告社":"yomiko.co.jp","ベクトル":"vectorinc.co.jp","共同ピーアール":"kyodo-pr.co.jp",
+    "朝日新聞社":"asahi.com","読売新聞社":"yomiuri.co.jp","毎日新聞社":"mainichi.co.jp","産業経済新聞社":"sankei.co.jp","日本経済新聞社":"nikkei.co.jp","共同通信社":"kyodonews.jp","時事通信社":"jiji.com","NHK":"nhk.or.jp","日本テレビホールディングス":"ntvhd.co.jp","TBSホールディングス":"tbsholdings.co.jp","フジ・メディア・ホールディングス":"fujimediahd.co.jp","テレビ朝日ホールディングス":"tv-asahihd.co.jp","テレビ東京ホールディングス":"txhd.co.jp","WOWOW":"wowow.co.jp","スカパーJSAT":"skyperfectjsat.space","TOKYO MX":"mxtv.co.jp","毎日放送":"mbs.jp","朝日放送グループホールディングス":"asahi.co.jp",
+    "日本マクドナルドホールディングス":"mcdonalds.co.jp","ゼンショーホールディングス":"zensho.co.jp","コロワイド":"colowide.co.jp","くら寿司":"kurasushi.co.jp","FOOD&LIFE COMPANIES":"food-and-life.co.jp","王将フードサービス":"ohsho.co.jp","松屋フーズホールディングス":"matsuyafoods.co.jp","吉野家ホールディングス":"yoshinoya-holdings.com","ロイヤルホールディングス":"royal-holdings.co.jp","モスフードサービス":"mos.co.jp","ドトール・日レスホールディングス":"doutor.co.jp","スターバックスコーヒージャパン":"starbucks.co.jp","タリーズコーヒージャパン":"tullys.co.jp","コメダ":"komeda.co.jp","クリエイト・レストランツ・ホールディングス":"createrestaurants.com","ワタミ":"watami.co.jp","リンガーハット":"ringerhut.co.jp","幸楽苑ホールディングス":"kourakuen.co.jp","物語コーポレーション":"monogatari.co.jp","木曽路":"kisoji.co.jp","サイゼリヤ":"saizeriya.co.jp","ジョイフル":"joyfull.co.jp",
+    "ファンケル":"fancl.co.jp","DHC":"dhc.co.jp","ノエビアホールディングス":"noevirholdings.co.jp","ポーラ":"pola.co.jp","オルビス":"orbis.co.jp","アルビオン":"albion.co.jp",
+    "学研ホールディングス":"gakken.co.jp","ナガセ":"nagase.co.jp","河合塾":"kawai-juku.ac.jp","駿台予備学校":"sundai.ac.jp","Z会":"zkai.co.jp","早稲田アカデミー":"waseda-ac.co.jp","TAC":"tac-school.co.jp","資格の大原":"o-hara.jp","ECC":"ecc.jp","明光ネットワークジャパン":"meikonet.co.jp","リソー教育":"riso-kyoikugroup.com","ヒューマンアカデミー":"athuman.com","ベネッセコーポレーション":"benesse.co.jp","公文教育研究会":"kumon.ne.jp",
+    "コナミグループ":"konami.com","スクウェア・エニックス・ホールディングス":"hd.square-enix.com","コーエーテクモホールディングス":"koeitecmo.co.jp","東映":"toei.co.jp","松竹":"shochiku.co.jp","角川映画":"kadokawa-pictures.jp","ソニー・ミュージックエンタテインメント":"sme.co.jp","エイベックス":"avex.com","アミューズ":"amuse.co.jp","ホリプロ":"horipro.co.jp","研音":"ken-on.co.jp","スターダストプロモーション":"stardust.co.jp","吉本興業":"yoshimoto.co.jp","小学館":"shogakukan.co.jp","新潮社":"shinchosha.co.jp","文藝春秋":"bunshun.co.jp","幻冬舎":"gentosha.co.jp","早川書房":"hayakawa-online.co.jp","東洋経済新報社":"toyokeizai.net","ダイヤモンド社":"diamond.co.jp","日経BP":"nikkeibp.co.jp",
+    "スカイマーク":"skymark.co.jp","Peach Aviation":"flypeach.com","ジェットスター・ジャパン":"jetstar.com","ソラシドエア":"solaseedair.jp","スターフライヤー":"starflyer.jp","JR北海道":"jrhokkaido.co.jp","JR九州":"jrkyushu.co.jp","JR四国":"jr-shikoku.co.jp","東京地下鉄(東京メトロ)":"tokyometro.jp","小田急電鉄":"odakyu.jp","東急電鉄":"tokyu.co.jp","京王電鉄":"keio.co.jp","京急電鉄":"keikyu.co.jp","京成電鉄":"keisei.co.jp","西武鉄道":"seiburailway.jp","東武鉄道":"tobu.co.jp","名古屋鉄道":"meitetsu.co.jp","近鉄":"kintetsu.co.jp","南海電気鉄道":"nankai.co.jp","阪急電鉄":"hankyu.co.jp","阪神電気鉄道":"hanshin.co.jp","京阪電気鉄道":"keihan.co.jp","西日本鉄道":"nishitetsu.jp","大阪市高速電気軌道(Osaka Metro)":"osakametro.co.jp",
+    "UBS証券":"ubs.com","シティグループ証券":"citigroup.com","ドイツ証券":"db.com","クレディ・スイス証券":"credit-suisse.com","バークレイズ証券":"barclays.com","BNPパリバ証券":"bnpparibas","HSBC証券":"hsbc.com","KKRジャパン":"kkr.com","カーライル・ジャパン":"carlyle.com","ベインキャピタル・ジャパン":"baincapital.com","ブラックストーン・グループ・ジャパン":"blackstone.com","アポロ・グローバル・マネジメント":"apollo.com","JAFCO":"jafco.co.jp","グロービス・キャピタル・パートナーズ":"globiscapital.co.jp",
+    "三菱総合研究所":"mri.co.jp","日本総合研究所":"jri.co.jp","大和総研":"dir.co.jp","三菱UFJリサーチ&コンサルティング":"murc.jp","みずほリサーチ&テクノロジーズ":"mizuho-rt.co.jp","識学":"shikigaku.jp",
+    "アップル ジャパン":"apple.com","Oracle Japan":"oracle.com","SAP Japan":"sap.com","シスコシステムズ合同会社":"cisco.com","VMware Japan":"vmware.com","デル・テクノロジーズ":"dell.com","IBM Japan":"ibm.com","Palo Alto Networks Japan":"paloaltonetworks.com","CrowdStrike Japan":"crowdstrike.com","Splunk Japan":"splunk.com","Datadog Japan":"datadoghq.com","MongoDB Japan":"mongodb.com","Snowflake合同会社":"snowflake.com","Databricks Japan":"databricks.com","GitHub Japan":"github.com","GitLab Japan":"gitlab.com","Atlassian Japan":"atlassian.com","Slack Japan":"slack.com","Zoom Japan":"zoom.us","Box Japan":"box.com","Dropbox Japan":"dropbox.com","Stripe Japan":"stripe.com","Coinbase Japan":"coinbase.com","Tesla Japan":"tesla.com","OpenAI Japan":"openai.com","Anthropic Japan":"anthropic.com","NVIDIA Japan":"nvidia.com","AMD Japan":"amd.com","Intel Japan":"intel.com","Qualcomm Japan":"qualcomm.com","Arm Japan":"arm.com","Bloomberg L.P.":"bloomberg.com","S&P Global Japan":"spglobal.com","Moody's Japan":"moodys.com","MSCI Japan":"msci.com","メタ・プラットフォームズ ジャパン":"meta.com","ServiceNow Japan":"servicenow.com",
+    "弁護士ドットコム":"bengo4.com","メドピア":"medpeer.co.jp","PR TIMES":"prtimes.co.jp","じげん":"zigexn.co.jp","ウェルスナビ":"wealthnavi.com","FOLIO":"folio-sec.com","PKSHA Technology":"pkshatech.com","ABEJA":"abejainc.com","プレイド":"plaid.co.jp","ヤプリ":"yappli.co.jp","SmartHR":"smarthr.co.jp","アンドパッド":"andpad.co.jp","Visional":"visional.inc","GMOペパボ":"pepabo.com","GMOペイメントゲートウェイ":"gmo-pg.com","LayerX":"layerx.co.jp","マネーフォワード X":"moneyforward.com",
+    "INPEX":"inpex.co.jp","石油資源開発":"japex.co.jp","ENEOSホールディングス":"hd.eneos.co.jp","出光興産":"idemitsu.com","コスモエネルギーホールディングス":"cosmo-energy.co.jp","電源開発(J-POWER)":"jpower.co.jp","九電工":"kyudenko.co.jp","関電工":"kandenko.co.jp","きんでん":"kinden.co.jp",
   };
 
   let domain = null;
@@ -2834,8 +2983,10 @@ function CompanyLogo({ company, size = 36 }) {
   }
   if (!domain) domain = KNOWN_DOMAINS[company.name] || null;
 
-  const faviconUrl = domain ? `https://www.google.com/s2/favicons?domain=${domain}&sz=${size >= 48 ? 128 : 64}` : null;
-  const showFavicon = faviconUrl && !imgErr;
+  const clearbitUrl = domain ? `https://logo.clearbit.com/${domain}?size=${size >= 48 ? 128 : 64}` : null;
+  const faviconUrl  = domain ? `https://www.google.com/s2/favicons?domain=${domain}&sz=${size >= 48 ? 128 : 64}` : null;
+  const srcUrl      = imgStage === 0 ? clearbitUrl : imgStage === 1 ? faviconUrl : null;
+  const showFavicon = !!(domain && srcUrl && imgStage < 2);
 
   // フォールバック：文字ロゴ
   const name = company.name || "";
@@ -2859,12 +3010,12 @@ function CompanyLogo({ company, size = 36 }) {
         overflow:"hidden",
       }}>
         <img
-          src={faviconUrl}
+          src={srcUrl}
           alt=""
-          width={Math.round(size * 0.7)}
-          height={Math.round(size * 0.7)}
+          width={Math.round(size * (imgStage === 0 ? 0.82 : 0.7))}
+          height={Math.round(size * (imgStage === 0 ? 0.82 : 0.7))}
           style={{ objectFit:"contain" }}
-          onError={() => setImgErr(true)}
+          onError={() => setImgStage(st => st + 1)}
           loading="lazy"
         />
       </div>
@@ -3003,11 +3154,11 @@ function SubTopPage({ go, goSubTop, grp, companies, posts, reviews, salaries, co
 
   return (
     <div>
-      {/* ヒーロー（CSSコンポジション・写真なし） */}
+      {/* ヒーロー（業種写真＋ブランドグラデーション） */}
       <section style={{ position:"relative", overflow:"hidden", borderRadius:18, marginTop:14, marginBottom:24,
-        background: "linear-gradient(135deg, " + C.accentDark + " 0%, " + C.accent + " 100%)", color:"#fff",
+        background: theme.img ? ("linear-gradient(105deg, " + C.accentDark + "F2 0%, " + C.accentDark + "C2 44%, " + C.accent + "82 100%), url(" + theme.img + ")") : ("linear-gradient(135deg, " + C.accentDark + " 0%, " + C.accent + " 100%)"), backgroundSize:"cover", backgroundPosition:"center", color:"#fff",
         padding: isMobile ? "30px 22px" : "46px 42px" }}>
-        <span aria-hidden="true" style={{ position:"absolute", right: isMobile ? -14 : 24, top:"50%", transform:"translateY(-50%)", fontSize: isMobile ? 130 : 190, opacity:0.10, lineHeight:1, userSelect:"none", pointerEvents:"none" }}>{theme.emoji}</span>
+        {!theme.img && <span aria-hidden="true" style={{ position:"absolute", right: isMobile ? -14 : 24, top:"50%", transform:"translateY(-50%)", fontSize: isMobile ? 130 : 190, opacity:0.10, lineHeight:1, userSelect:"none", pointerEvents:"none" }}>{theme.emoji}</span>}
         <div aria-hidden="true" style={{ position:"absolute", inset:0, backgroundImage:"radial-gradient(rgba(255,255,255,0.13) 1px, transparent 1px)", backgroundSize:"18px 18px", opacity:0.55, pointerEvents:"none" }} />
         <div style={{ position:"relative", zIndex:1, maxWidth:780 }}>
           <span style={{ display:"inline-flex", alignItems:"center", gap:7, background:"rgba(255,255,255,0.16)", borderRadius:20, padding:"4px 13px", fontSize:11.5, fontWeight:"bold", letterSpacing:"0.04em", marginBottom:14 }}>{theme.emoji} {grp}</span>
@@ -3127,6 +3278,8 @@ function ThreadPage({ post, posts, companies, go, goThread, uName, authUser, isA
         <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:14 }}>
           <AC>{ini(p.author)}</AC>
           <span style={{ fontSize:12.5, fontWeight:"bold", color:C.ink }}>{p.author}</span>
+          <VerifyBadge v={p.authorVerify} />
+          <PosterId id={p.posterId} seed={p.authorUid || ("anon:" + (p.author || "?") + ":" + (p.id || ""))} />
           {getAuthorBadge && getAuthorBadge(p.authorUid) && <BadgeChip badge={getAuthorBadge(p.authorUid)} small />}
         </div>
 
@@ -3233,7 +3386,7 @@ function GeneralBoardPage({ posts, go, uName, onAddPost, onToggleLike, onAddComm
 function HomePage({ sess, go, goSubTop, companies, posts, reviews, salaries, isAdmin, adminDelete, setEditTgt, coPosts, coRevs, coSals, isMobile, setAuthMode, doGlobalSearch, goThread }) {
   const [feed, setFeed]       = useState("new");
   const [visible, setVisible] = useState(12);
-  const FEEDS = [["new","新着"],["hot","盛り上がり"],["general","みんなの相談"],["board","選考掲示板"],["interview","面接体験談"],["es","ES例文"],["naitei","内定報告"]];
+  const FEEDS = [["new","新着"],["hot","盛り上がり"],["general","みんなの相談"],["board","選考掲示板"],["interview","面接体験談"],["naitei","内定・オファー"]];
 
   let list = [...posts];
   if      (feed === "general")   list = list.filter(p => p.companyId === GENERAL_ID);
@@ -3280,7 +3433,7 @@ function HomePage({ sess, go, goSubTop, companies, posts, reviews, salaries, isA
           <h3 style={{ fontSize:16, fontWeight:"bold", lineHeight:1.5, marginBottom:4, fontFamily:"'Zen Kaku Gothic New', sans-serif", color:C.ink }}>{p.title}{p.bestAnswerId && <span style={{ marginLeft:7, fontSize:10, fontWeight:"bold", color:C.success, background:"#E8F1EB", border:"1px solid #BFDCC8", borderRadius:5, padding:"1px 7px", verticalAlign:"middle" }}>✅ 解決済み</span>}</h3>
           <p style={{ fontSize:12.5, color:C.sub, lineHeight:1.65, display:"-webkit-box", WebkitLineClamp:2, WebkitBoxOrient:"vertical", overflow:"hidden" }}>{p.content && p.content.slice(0,100)}</p>
           <div style={{ display:"flex", alignItems:"center", gap:12, marginTop:10, fontSize:12, color:"#94A0AC" }}>
-            <span style={{ display:"flex", alignItems:"center", gap:6 }}><AC>{ini(p.author)}</AC>{p.author}</span>
+            <span style={{ display:"flex", alignItems:"center", gap:6 }}><AC>{ini(p.author)}</AC>{p.author}<VerifyBadge v={p.authorVerify} /><PosterId id={p.posterId} seed={p.authorUid || ("anon:" + (p.author || "?") + ":" + (p.id || ""))} /></span>
             <span className="tabnum">♡ {likes}</span>
           </div>
         </div>
@@ -3394,7 +3547,7 @@ function HomePage({ sess, go, goSubTop, companies, posts, reviews, salaries, isA
       <section style={{ marginTop:32, padding:"20px 22px", background:C.surface, border:"1px solid " + C.border, borderRadius:12 }}>
         <h2 style={{ fontSize:14, fontWeight:"bold", marginBottom:12, color:C.ink, fontFamily:"'Zen Kaku Gothic New', sans-serif" }}>よく検索されるテーマ</h2>
         <div style={{ display:"flex", flexWrap:"wrap", gap:7 }}>
-          {["面接の逆質問","退職理由の伝え方","ガクチカ","年収交渉","内定報告","エージェント比較","第二新卒","Webテスト対策","残業の実態","志望動機","ES通過","企業研究"].map(kw => (
+          {["面接の逆質問","退職理由の伝え方","年収交渉","エージェント比較","職務経歴書","円満退職","カウンターオファー","リファレンスチェック","残業の実態","第二新卒","入社後のギャップ","企業研究"].map(kw => (
             <span key={kw} style={{ background:C.light, color:C.accent, border:"1px solid " + C.border, padding:"4px 11px", fontSize:11.5, borderRadius:14, cursor:"pointer" }} onClick={() => go("companies")}>#{kw}</span>
           ))}
         </div>
@@ -3639,6 +3792,7 @@ function PostsTab({ posts, ptype, label, co, uName, onAddPost, onToggleLike, onA
   const [showCustomStage, setShowCustomStage] = useState(false);
   const [stages, setStages] = useState([{ stage:"", content:"" }]);
   const [authorName, setAuthorName] = useState(() => sess ? (sess.displayName || uName) : genGuestName(co.group || co.industry));
+  const [showDetails, setShowDetails] = useState(false);
   const isES = ptype === "es";
   const isInterview = ptype === "interview";
   const isBoard = ptype === "board";
@@ -3765,6 +3919,11 @@ function PostsTab({ posts, ptype, label, co, uName, onAddPost, onToggleLike, onA
           </Fld>
           )}
           {isInterview && (
+            <button type="button" onClick={() => setShowDetails(d => !d)} style={{ background: showDetails ? C.light : "none", border:"1px dashed " + C.accent, color:C.accent, fontSize:12, fontWeight:"bold", padding:"9px 12px", borderRadius:8, cursor:"pointer", fontFamily:"inherit", marginBottom:14, width:"100%" }}>
+              {showDetails ? "− 詳細を閉じる（シンプルに投稿）" : "＋ 選考プロセス・年収などを詳しく書く（任意）"}
+            </button>
+          )}
+          {isInterview && showDetails && (
             <>
               <div style={{ background:"#FFF7ED", border:"1px solid #FED7AA", padding:"12px 14px", borderRadius:6, marginBottom:14 }}>
                 <div style={{ fontSize:13, fontWeight:"bold", color:"#9A3412", marginBottom:10 }}>📋 応募・選考前の情報</div>
@@ -3923,8 +4082,8 @@ function PostsTab({ posts, ptype, label, co, uName, onAddPost, onToggleLike, onA
               return;
             }
             if (isInterview) {
-              if (!form.applyMethod) { alert("応募方法を選択してください"); return; }
-              if (!form.progressStage) { alert("選考の最終段階を選択してください"); return; }
+              if (showDetails && !form.applyMethod) { alert("応募方法を選択してください"); return; }
+              if (showDetails && !form.progressStage) { alert("選考の最終段階を選択してください"); return; }
               const summary = [...form.stages, ...(form.extraStages||[])].filter(s => s.name && s.content).map(s => `【${s.name}】${s.content}`).join("\n\n");
               await onAddPost({ ...form, author: authorName || uName, content: form.content || summary, stage: form.progressStage, finalResult: (form.progressStage === "内定" || form.progressStage === "内定辞退") ? form.progressStage : "" });
               setForm(null);
@@ -3932,7 +4091,7 @@ function PostsTab({ posts, ptype, label, co, uName, onAddPost, onToggleLike, onA
             }
             if (!isES && !form.stage) return;
             if (isES && !form.esQuestion.trim()) { alert("ES設問内容を入力してください"); return; }
-            if (!isInterview && !form.content.trim()) { alert("本文を入力してください"); return; }
+            if ((!isInterview || !showDetails) && !form.content.trim()) { alert("本文を入力してください"); return; }
             await onAddPost({ ...form, author: authorName || uName });
             setForm(null);
           }}>
@@ -4049,6 +4208,8 @@ function PostsTab({ posts, ptype, label, co, uName, onAddPost, onToggleLike, onA
               <div style={{ display:"flex", alignItems:"center", gap:10, borderTop:"1px solid " + C.border, paddingTop:10, flexWrap:"wrap" }}>
                 <AC>{ini(p.author)}</AC>
                 <span style={{ fontSize:12, color:C.sub }}>{p.author}</span>
+                <VerifyBadge v={p.authorVerify} />
+                <PosterId id={p.posterId} seed={p.authorUid || ("anon:" + (p.author || "?") + ":" + (p.id || ""))} />
                 {getAuthorBadge && getAuthorBadge(p.authorUid) && <BadgeChip badge={getAuthorBadge(p.authorUid)} small />}
                 {(p.likes || []).length >= 10 && (
                   <span style={{ background:"#FEE2E2", color:"#DC2626", padding:"2px 8px", fontSize:10, fontWeight:"bold", borderRadius:10 }}>
@@ -4908,7 +5069,7 @@ function AddCompanyPage({ go, onSubmit, uName, authUser, setAuthMode }) {
 }
 
 // ─── マイページ ───────────────────────────────────────────────────────────────
-function MyPage({ sess, go, companies, plan, upgradePlan, isMobile, diary, saveDiary, myPosts, myRevs, favPosts, favorites, profile, updateNotifications, markNotificationRead, clearNotifications, toggleFollowCompany }) {
+function MyPage({ sess, go, companies, plan, upgradePlan, isMobile, diary, saveDiary, myPosts, myRevs, favPosts, favorites, profile, updateNotifications, markNotificationRead, clearNotifications, toggleFollowCompany, replyNotifs, markNotifsSeen, goThread, tracker, saveTracker, saveVerifications }) {
   const [mTab, setMTab] = useState("activity");
   const pl = PLANS[plan];
 
@@ -5014,11 +5175,12 @@ function MyPage({ sess, go, companies, plan, upgradePlan, isMobile, diary, saveD
         </div>
         <div>
           <div style={{ display:"flex", borderBottom:"2px solid " + C.ink, marginBottom:14 }}>
-            {[["activity","投稿履歴"],["favorites","お気に入り"],["notifications", "🔔 通知" + (((profile?.unreadNotifications || []).filter(n => !n.read).length > 0) ? ` (${(profile?.unreadNotifications || []).filter(n => !n.read).length})` : "")],["diary","就活日記"],["settings","⚙ 設定"]].map(([k,l]) => (
+            {[["activity","投稿履歴"],["favorites","お気に入り"],["notifications", "🔔 通知" + ((replyNotifs || []).length > 0 ? ` (${(replyNotifs || []).length})` : "")],["diary","就活日記"],["tracker","📊 選考管理"],["settings","⚙ 設定"]].map(([k,l]) => (
               <button key={k} style={{ background:"none", border:"none", padding:"9px 14px", fontSize:12, fontFamily:"inherit", cursor:"pointer", color: mTab===k ? C.accent : C.sub, borderBottom:"3px solid " + (mTab===k ? C.accent : "transparent"), marginBottom:-2, fontWeight: mTab===k ? "bold" : "500" }} onClick={() => setMTab(k)}>{l}</button>
             ))}
           </div>
           {mTab === "diary" && <DiarySection entries={diary} onSave={saveDiary} />}
+          {mTab === "tracker" && <TrackerSection entries={tracker} onSave={saveTracker} />}
           {mTab === "favorites" && (
             <div>
               <STitle label={"お気に入りした投稿（" + (favPosts||[]).length + "件）"} />
@@ -5068,53 +5230,27 @@ function MyPage({ sess, go, companies, plan, upgradePlan, isMobile, diary, saveD
           {mTab === "notifications" && (
             <div>
               <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:14, paddingBottom:10, borderBottom:"1px solid " + C.border }}>
-                <span style={{ fontSize:12, color:C.sub }}>{(profile?.unreadNotifications || []).length}件の通知</span>
-                {(profile?.unreadNotifications || []).length > 0 && (
-                  <button style={{ ...S.secondaryBtn, fontSize:11, padding:"5px 12px" }} onClick={() => clearNotifications && clearNotifications()}>すべてクリア</button>
+                <span style={{ fontSize:12, color:C.sub }}>{(replyNotifs || []).length}件の新着返信</span>
+                {(replyNotifs || []).length > 0 && (
+                  <button style={{ ...S.secondaryBtn, fontSize:11, padding:"5px 12px" }} onClick={() => markNotifsSeen && markNotifsSeen()}>すべて既読</button>
                 )}
               </div>
-              {(profile?.unreadNotifications || []).length === 0
-                ? <Empty text="通知はありません" />
-                : (profile?.unreadNotifications || []).map(n => {
-                    const co = companies.find(c => (c.id === n.coId));
-                    const icons = { comment:"💬", reply:"↩️", milestone:"🎉", follow:"⭐", weekly:"📊" };
-                    return (
-                      <div key={n.id} style={{
-                        background: n.read ? "#fff" : "#FFFBEB",
-                        border:"1px solid " + (n.read ? C.border : "#FCD34D"),
-                        borderRadius:8,
-                        padding:"12px 14px",
-                        marginBottom:8,
-                        cursor:"pointer"
-                      }} onClick={() => {
-                        markNotificationRead && markNotificationRead(n.id);
-                        if (n.postId) {
-                          const post = (window._posts || []).find(p => p.id === n.postId);
-                          if (post) go("company", companies.find(c => c.id === post.companyId));
-                        }
-                      }}>
-                        <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:4 }}>
-                          <span style={{ fontSize:18 }}>{icons[n.type] || "🔔"}</span>
-                          <span style={{ fontSize:13, fontWeight:"bold", color:C.ink }}>
-                            {n.type === "comment" && `${n.fromUser}さんがコメントしました`}
-                            {n.type === "reply" && `${n.fromUser}さんが返信しました`}
-                            {n.type === "milestone" && n.content}
-                            {n.type === "follow" && `フォロー中の「${n.coName}」に新しい投稿`}
-                            {n.type === "weekly" && "週次レポート"}
-                          </span>
-                          {!n.read && <span style={{ background:"#DC2626", color:"#fff", fontSize:9, padding:"1px 6px", borderRadius:8, fontWeight:"bold" }}>NEW</span>}
-                          <span style={{ fontSize:10, color:C.sub, marginLeft:"auto" }}>{new Date(n.ts).toLocaleString("ja-JP", { month:"numeric", day:"numeric", hour:"2-digit", minute:"2-digit" })}</span>
-                        </div>
-                        {n.postTitle && <div style={{ fontSize:11, color:C.sub, marginBottom:4 }}>「{n.postTitle}」</div>}
-                        {n.content && n.type !== "milestone" && <div style={{ fontSize:12, color:C.ink, lineHeight:1.7 }}>{n.content}</div>}
-                      </div>
-                    );
-                  })
+              {(replyNotifs || []).length === 0
+                ? <Empty text="新しい返信はありません。あなたの投稿にコメントが付くとここに表示されます。" />
+                : (replyNotifs || []).map((n, i) => (
+                    <div key={n.comment.id + "_" + i} style={{ background:"#FFFBEB", border:"1px solid #FCD34D", borderRadius:8, padding:"12px 14px", marginBottom:8, cursor:"pointer" }}
+                      onClick={() => { if (goThread) goThread(n.post); if (markNotifsSeen) markNotifsSeen(); }}>
+                      <div style={{ fontSize:13, fontWeight:"bold", color:C.ink, marginBottom:4 }}>{(n.comment.author || "匿名")}さんが返信しました</div>
+                      <div style={{ fontSize:11, color:C.sub, marginBottom:4 }}>「{n.post.title}」</div>
+                      <div style={{ fontSize:12, color:C.ink, lineHeight:1.7, overflow:"hidden", textOverflow:"ellipsis", display:"-webkit-box", WebkitLineClamp:2, WebkitBoxOrient:"vertical" }}>{n.comment.content}</div>
+                    </div>
+                  ))
               }
             </div>
           )}
           {mTab === "settings" && (
             <div>
+              <VerificationSection verifications={profile?.verifications} onSave={saveVerifications} />
               <STitle label="通知設定" />
               <div style={{ background:"#fff", border:"1px solid " + C.border, borderRadius:8, padding:"16px 18px", marginBottom:18 }}>
                 <p style={{ fontSize:12, color:C.sub, marginBottom:14, lineHeight:1.7 }}>
@@ -5196,6 +5332,106 @@ function MyPage({ sess, go, companies, plan, upgradePlan, isMobile, diary, saveD
 }
 
 // ─── 就活日記 ─────────────────────────────────────────────────────────────────
+function VerifyBadge({ v }) {
+  if (!v) return null;
+  const ok = v.status === "verified";
+  return <span title={ok ? "認証済み" : "自己申告（未認証）"} style={{ display:"inline-flex", alignItems:"center", gap:2, background: ok ? "#ECFDF5" : C.light, color: ok ? "#047857" : C.sub, border:"1px solid " + (ok ? "#A7F3D0" : C.border), padding:"1px 7px", fontSize:9, fontWeight:"bold", borderRadius:10, whiteSpace:"nowrap", marginLeft:4 }}>{ok ? "✓" : "🪪"}{v.type}{ok ? "" : "(自己申告)"}</span>;
+}
+
+function VerificationSection({ verifications, onSave }) {
+  const list = verifications || [];
+  const [type, setType] = React.useState("在籍");
+  const [company, setCompany] = React.useState("");
+  const [email, setEmail] = React.useState("");
+  const add = () => {
+    if (!company.trim()) { alert("企業名を入力してください"); return; }
+    if (type === "在籍" && (!email || !email.includes("@"))) { alert("勤務先メールアドレスを入力してください"); return; }
+    const domain = type === "在籍" ? (email.split("@")[1] || "").toLowerCase().trim() : "";
+    const v = { id: Math.random().toString(36).slice(2, 10), type, company: company.trim(), domain, status: "self", date: today() };
+    onSave([v, ...list]); setCompany(""); setEmail("");
+  };
+  const remove = (id) => onSave(list.filter(v => v.id !== id));
+  return (
+    <div style={{ background:"#fff", border:"1px solid " + C.border, borderRadius:8, padding:"16px 18px", marginBottom:18 }}>
+      <div style={{ fontSize:13, fontWeight:"bold", color:C.ink, marginBottom:6 }}>🪪 在籍・内定の登録</div>
+      <p style={{ fontSize:11, color:C.sub, lineHeight:1.7, marginBottom:12 }}>
+        登録すると、その企業の掲示板であなたの投稿に申告ラベルが付きます。<b style={{ color:"#B45309" }}>現在は自己申告（未認証）</b>で、勤務先メールによる本人認証は今後対応予定です。入力したメールアドレスは表示・公開されません。
+      </p>
+      <div style={{ display:"flex", gap:8, flexWrap:"wrap", marginBottom:10 }}>
+        <select value={type} onChange={e => setType(e.target.value)} style={{ ...S.input, fontSize:13, flex:"0 1 110px" }}>
+          <option value="在籍">在籍中</option>
+          <option value="内定">内定者</option>
+          <option value="元社員">元社員</option>
+        </select>
+        <input value={company} onChange={e => setCompany(e.target.value)} placeholder="企業名（正式名称）" style={{ ...S.input, fontSize:13, flex:"1 1 150px" }} />
+        {type === "在籍" && <input value={email} onChange={e => setEmail(e.target.value)} type="email" placeholder="勤務先メール" style={{ ...S.input, fontSize:13, flex:"1 1 150px" }} />}
+        <button onClick={add} style={{ ...S.primaryBtn, padding:"8px 16px", fontSize:13 }}>登録</button>
+      </div>
+      {list.length === 0
+        ? <p style={{ fontSize:11, color:C.sub }}>まだ登録がありません。</p>
+        : list.map(v => (
+            <div key={v.id} style={{ display:"flex", alignItems:"center", gap:8, padding:"8px 0", borderTop:"1px solid " + C.border, fontSize:12 }}>
+              <VerifyBadge v={v} />
+              <span style={{ color:C.ink }}>{v.company}</span>
+              {v.domain && <span style={{ color:C.sub, fontSize:11 }}>@{v.domain}</span>}
+              <button onClick={() => remove(v.id)} title="削除" style={{ marginLeft:"auto", background:"none", border:"none", color:C.sub, cursor:"pointer", fontSize:16 }}>×</button>
+            </div>
+          ))}
+    </div>
+  );
+}
+
+function TrackerRow({ e, onStage, onRemove }) {
+  const doneSet = ["内定", "内定辞退", "不合格", "辞退"];
+  const isDone = doneSet.includes(e.stage);
+  return (
+    <div style={{ display:"flex", alignItems:"center", gap:10, background:"#fff", border:"1px solid " + C.border, borderRadius:8, padding:"10px 12px", marginBottom:8, opacity: isDone ? 0.7 : 1 }}>
+      <div style={{ flex:1, minWidth:0 }}>
+        <div style={{ fontSize:13, fontWeight:"bold", color:C.ink, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{e.company}</div>
+        <div style={{ fontSize:10, color:C.sub, marginTop:2 }}>更新: {e.updated || e.date}</div>
+      </div>
+      <select value={e.stage} onChange={ev => onStage(e.id, ev.target.value)} style={{ ...S.input, fontSize:12, padding:"5px 8px", flex:"0 0 auto", maxWidth:130 }}>
+        {STAGES.map(s => <option key={s} value={s}>{s}</option>)}
+      </select>
+      <button onClick={() => onRemove(e.id)} title="削除" style={{ background:"none", border:"none", color:C.sub, cursor:"pointer", fontSize:18, padding:"2px 4px", lineHeight:1 }}>×</button>
+    </div>
+  );
+}
+
+function TrackerSection({ entries, onSave }) {
+  const [co, setCo] = React.useState("");
+  const [stage, setStage] = React.useState(STAGES[0]);
+  const list = entries || [];
+  const add = () => {
+    if (!co.trim()) return;
+    const ne = { id: Math.random().toString(36).slice(2, 10), company: co.trim(), stage, date: today(), updated: today() };
+    onSave([ne, ...list]); setCo("");
+  };
+  const onStage = (id, st) => onSave(list.map(e => e.id === id ? { ...e, stage: st, updated: today() } : e));
+  const onRemove = (id) => onSave(list.filter(e => e.id !== id));
+  const doneSet = ["内定", "内定辞退", "不合格", "辞退"];
+  const active = list.filter(e => !doneSet.includes(e.stage));
+  const done = list.filter(e => doneSet.includes(e.stage));
+  return (
+    <div>
+      <STitle label="選考管理" />
+      <p style={{ fontSize:12, color:C.sub, lineHeight:1.7, marginBottom:12 }}>応募中の企業と選考ステータスを記録できます（自分だけが見られます）。</p>
+      <div style={{ display:"flex", gap:8, marginBottom:18, flexWrap:"wrap" }}>
+        <input value={co} onChange={e => setCo(e.target.value)} onKeyDown={e => { if (e.key === "Enter") add(); }} placeholder="企業名" style={{ ...S.input, flex:"1 1 160px", fontSize:13 }} />
+        <select value={stage} onChange={e => setStage(e.target.value)} style={{ ...S.input, fontSize:13, flex:"0 1 140px" }}>
+          {STAGES.map(s => <option key={s} value={s}>{s}</option>)}
+        </select>
+        <button onClick={add} style={{ ...S.primaryBtn, padding:"8px 16px", fontSize:13 }}>追加</button>
+      </div>
+      {list.length === 0 && <Empty text="まだ登録がありません。応募中の企業を追加してみましょう。" />}
+      {active.length > 0 && <div style={{ fontSize:11, fontWeight:"bold", color:C.sub, margin:"4px 0 8px" }}>進行中（{active.length}）</div>}
+      {active.map(e => <TrackerRow key={e.id} e={e} onStage={onStage} onRemove={onRemove} />)}
+      {done.length > 0 && <div style={{ fontSize:11, fontWeight:"bold", color:C.sub, margin:"18px 0 8px" }}>完了（{done.length}）</div>}
+      {done.map(e => <TrackerRow key={e.id} e={e} onStage={onStage} onRemove={onRemove} />)}
+    </div>
+  );
+}
+
 function DiarySection({ entries, onSave }) {
   const [adding, setAdding] = useState(false);
   const [f, setF] = useState({ title:"", content:"", mood:"😊", date:today() });
@@ -5686,6 +5922,7 @@ function CommentThread({ post, uName, authUserKey, authUser, isAdmin, onAddComme
           <div style={{ display:"flex", alignItems:"center", gap:6, marginBottom:6, flexWrap:"wrap" }}>
             <AC>{ini(c.author)}</AC>
             <span style={{ fontSize:12, fontWeight:"bold", color:C.ink }}>{c.author}</span>
+            <PosterId id={c.posterId} seed={c.authorUid || ("anon:" + (c.author || "?") + ":" + (c.id || ""))} />
             {getAuthorBadge && getAuthorBadge(c.authorUid) && <BadgeChip badge={getAuthorBadge(c.authorUid)} small />}
             <span style={{ fontSize:10, color:C.sub }}>{c.date}</span>
             {isAdmin && <SmBtn red onClick={() => adminDelete("comment", post.id + ":" + c.id)}>削除</SmBtn>}
@@ -5881,6 +6118,11 @@ function SmBtn({ onClick, red, children }) {
   return (
     <button style={{ background:"none", border:"1px solid " + (red ? "#FAA" : C.border), padding:"3px 8px", fontSize:11, cursor:"pointer", fontFamily:"inherit", color: red ? "#C00" : C.sub, marginLeft:4 }} onClick={onClick}>{children}</button>
   );
+}
+function PosterId({ id, seed }) {
+  const v = id || (seed != null ? makePosterId(seed) : null);
+  if (!v) return null;
+  return <span title="荒らし対策の投稿者ID（同じ人は同じIDになります）" style={{ fontSize:10, color:"#C0C0C0", fontFamily:"monospace", letterSpacing:"0.02em", whiteSpace:"nowrap" }}>#{v}</span>;
 }
 function AC({ children }) {
   return (
