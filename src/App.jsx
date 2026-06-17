@@ -3874,19 +3874,14 @@ function PostsTab({ posts, ptype, label, co, uName, onAddPost, onToggleLike, onA
           {isBoard && !sess && (
             <div style={{ background:"#F0F9FF", border:"1px solid #BAE6FD", padding:"12px 14px", borderRadius:6, marginBottom:14 }}>
               <div style={{ fontSize:13, fontWeight:"bold", color:"#0C4A6E", marginBottom:8 }}>
-                💬 メールアドレスだけで投稿できます（パスワード不要）
+                💬 ログイン不要で投稿できます
               </div>
-              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
-                <Fld label="メールアドレス *">
-                  <input style={S.input} type="email" placeholder="example@email.com" value={form.guestEmail} onChange={e => setForm({ ...form, guestEmail:e.target.value })} />
-                </Fld>
-                <Fld label="表示名（コテハン） *">
-                  <input style={S.input} placeholder="例：転職検討中" value={form.guestName} onChange={e => setForm({ ...form, guestName:e.target.value })} />
-                </Fld>
-              </div>
+              <Fld label="メールアドレス（任意）">
+                <input style={S.input} type="email" placeholder="example@email.com" value={form.guestEmail} onChange={e => setForm({ ...form, guestEmail:e.target.value })} />
+              </Fld>
               <p style={{ fontSize:10, color:C.sub, marginTop:4, lineHeight:1.7 }}>
-                ※ メールアドレスは荒らし対策のためのみ使用し、公開されません。<br />
-                ※ 会員登録すると、このメールアドレスでそのままログインできます。
+                ※ 表示名は下の「表示名」欄に<strong>自動で入っています</strong>（🎲で引き直し・自由に変更も可）。<br />
+                ※ メールは任意です。入力しても公開されず、機種変更後も同じ投稿者IDを引き継げます。会員登録すればそのままログインできます。
               </p>
             </div>
           )}
@@ -4042,11 +4037,11 @@ function PostsTab({ posts, ptype, label, co, uName, onAddPost, onToggleLike, onA
               <textarea style={{ ...S.input, resize:"vertical" }} rows={3} placeholder="選考全体を通しての感想・準備のポイントなどがあれば（任意）" value={form.content} onChange={e => setForm({ ...form, content:e.target.value })} />
             </Fld>
           ) : isBoard ? (
-            <Fld label={`本文 *（最低10文字）　現在${form.content.length}文字`}>
+            <Fld label={`本文 *　${form.content.length}文字`}>
               <textarea style={{ ...S.input, resize:"vertical", borderColor: C.border }} rows={5} placeholder="質問や情報を自由に投稿してください。" value={form.content} onChange={e => setForm({ ...form, content:e.target.value })} />
             </Fld>
           ) : (
-            <Fld label={`本文 *（最低30文字）　現在${form.content.length}文字`}>
+            <Fld label={`本文 *　${form.content.length}文字`}>
               <textarea style={{ ...S.input, resize:"vertical", borderColor: C.border }} rows={5} placeholder="面接の様子、聞かれた内容、準備のポイントなどをご記入ください。" value={form.content} onChange={e => setForm({ ...form, content:e.target.value })} />
             </Fld>
           )}
@@ -4072,11 +4067,7 @@ function PostsTab({ posts, ptype, label, co, uName, onAddPost, onToggleLike, onA
             if (isBoard) {
               if (!form.title.trim()) { alert("タイトルを入力してください"); return; }
               if (!form.content.trim()) { alert("本文を入力してください"); return; }
-              if (!sess) {
-                // 未ログインの場合はメール+コテハンが必須
-                if (!form.guestEmail || !form.guestEmail.includes("@")) { alert("メールアドレスを入力してください"); return; }
-                if (!form.guestName.trim()) { alert("表示名（コテハン）を入力してください"); return; }
-              }
+              if (!sess && form.guestEmail && !form.guestEmail.includes("@")) { alert("メールアドレスの形式が正しくありません"); return; }
               await onAddPost({ ...form, author: authorName || uName });
               setForm(null);
               return;
@@ -4104,7 +4095,7 @@ function PostsTab({ posts, ptype, label, co, uName, onAddPost, onToggleLike, onA
       {/* 選考掲示板はライトモード（未ログインでも閲覧可・メールのみで投稿可） */}
       {ptype === "board" && (
         <div style={{ background:"#F0FDF4", border:"1px solid #BBF7D0", borderRadius:8, padding:"12px 14px", marginBottom:14, fontSize:12, color:"#166534", lineHeight:1.7 }}>
-          💬 <strong>選考掲示板はメールアドレスだけで投稿できます</strong>（パスワード不要・コテハン可）<br />
+          💬 <strong>ログイン不要で投稿できます</strong>（表示名は自動で入ります・自由に変更可）<br />
           閲覧は登録不要です。気軽に情報交換しましょう。
         </div>
       )}
