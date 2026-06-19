@@ -3795,6 +3795,7 @@ function PostsTab({ posts, ptype, label, co, uName, onAddPost, onToggleLike, onA
   const isES = ptype === "es";
   const isInterview = ptype === "interview";
   const isBoard = ptype === "board";
+  const isGeneral = !!(co && co.isGeneral); // みんなの相談（横断板）
   const initF = isES
     ? { companyId:co.id, ptype, stage:"内定", title:"", content:"", jobCategory:"全職種", esQuestion:"", year:new Date().getFullYear() }
     : isInterview
@@ -3831,6 +3832,15 @@ function PostsTab({ posts, ptype, label, co, uName, onAddPost, onToggleLike, onA
       </div>
       {form && (
         <div style={{ background:C.surface, border:"1px solid " + C.border, borderTop:"3px solid " + C.accent, padding:"18px 20px", marginBottom:20 }}>
+          {isGeneral && (
+            <div style={{ display:"flex", alignItems:"center", gap:8, padding:"0 0 12px", marginBottom:14, borderBottom:"1px solid " + C.border, flexWrap:"wrap" }}>
+              <AC>{ini(uName)}</AC>
+              <span style={{ fontSize:12, color:C.sub }}>名前</span>
+              <input value={uName} onChange={e => setGuestName(e.target.value.slice(0, 24))} placeholder="表示名" style={{ ...S.input, fontSize:13, padding:"6px 10px", maxWidth:220, flex:"0 1 auto" }} />
+              <button type="button" onClick={() => setGuestName(genGuestName(co.group || co.industry))} title="別の名前を生成" style={{ background:C.light, border:"1px solid " + C.border, color:C.accentDark, fontSize:12, fontWeight:"bold", borderRadius:8, padding:"6px 11px", cursor:"pointer", fontFamily:"inherit", whiteSpace:"nowrap" }}>🎲</button>
+            </div>
+          )}
+          {!isGeneral && (
           <Fld label="職種カテゴリ">
             <div style={{ display:"flex", gap:8 }}>
               <select style={{...S.input, flex:1}} value={form.jobCategory === "__custom__" ? "__custom__" : (form.jobCategory || "全職種")} onChange={e => {
@@ -3845,6 +3855,7 @@ function PostsTab({ posts, ptype, label, co, uName, onAddPost, onToggleLike, onA
               )}
             </div>
           </Fld>
+          )}
           {isES && (
             <>
               <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
@@ -3873,12 +3884,12 @@ function PostsTab({ posts, ptype, label, co, uName, onAddPost, onToggleLike, onA
                 <input style={S.input} type="email" placeholder="example@email.com" value={form.guestEmail} onChange={e => setForm({ ...form, guestEmail:e.target.value })} />
               </Fld>
               <p style={{ fontSize:10, color:C.sub, marginTop:4, lineHeight:1.7 }}>
-                ※ 表示名は下の「表示名」欄に<strong>自動で入っています</strong>（🎲で引き直し・自由に変更も可）。<br />
+                ※ 表示名は<strong>自動で入っています</strong>（🎲で引き直し・自由に変更も可）。<br />
                 ※ メールは任意です。入力しても公開されず、機種変更後も同じ投稿者IDを引き継げます。会員登録すればそのままログインできます。
               </p>
             </div>
           )}
-          {isBoard && (
+          {isBoard && !isGeneral && (
             <Fld label="投稿カテゴリ">
               <select style={S.input} value={form.stage} onChange={e => setForm({...form, stage:e.target.value})}>
                 <option value="掲示板">通常の質問・情報共有</option>
@@ -4048,6 +4059,7 @@ function PostsTab({ posts, ptype, label, co, uName, onAddPost, onToggleLike, onA
               </div>
             </div>
           )}
+          {!isGeneral && (
           <div style={{ display:"flex", alignItems:"center", gap:8, padding:"10px 0", borderTop:"1px solid " + C.border, flexWrap:"wrap" }}>
             <AC>{ini(uName)}</AC>
             <span style={{ fontSize:12, color:C.sub }}>表示名</span>
@@ -4055,6 +4067,7 @@ function PostsTab({ posts, ptype, label, co, uName, onAddPost, onToggleLike, onA
             <button type="button" onClick={() => setGuestName(genGuestName(co.group || co.industry))} title="別の名前を生成" style={{ background:C.light, border:"1px solid " + C.border, color:C.accentDark, fontSize:12, fontWeight:"bold", borderRadius:8, padding:"6px 11px", cursor:"pointer", fontFamily:"inherit", whiteSpace:"nowrap" }}>🎲 別の名前</button>
             <span style={{ fontSize:11, color:C.sub }}>として投稿（自由に変更できます）</span>
           </div>
+          )}
           <button style={{ ...S.primaryBtn, width:"100%", padding:"11px" }} onClick={async () => {
             if (!form.title.trim()) { alert("タイトルを入力してください"); return; }
             if (isBoard) {
