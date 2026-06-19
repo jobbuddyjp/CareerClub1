@@ -26,9 +26,7 @@ import {
   serverTimestamp,
   limit,
 } from "firebase/firestore";
-import { auth, db, functions } from "./firebase.js";
-import { httpsCallable } from "firebase/functions";
-const callAIDraft = httpsCallable(functions, "draftExperience");
+import { auth, db } from "./firebase.js";
 
 
 // エラー境界 - レンダリングエラーをキャッチして表示する
@@ -2954,13 +2952,13 @@ function CompanyLogo({ company, size = 36 }) {
     "王子ホールディングス":"ojiholdings.co.jp","日本製紙":"nipponpapergroup.com","レンゴー":"rengo.co.jp","大王製紙":"daio-paper.co.jp","凸版印刷":"toppan.co.jp","大日本印刷":"dnp.co.jp",
     "第一三共":"daiichisankyo.co.jp","エーザイ":"eisai.com","中外製薬":"chugai-pharm.co.jp","大塚ホールディングス":"otsuka.com","塩野義製薬":"shionogi.co.jp","協和キリン":"kyowakirin.co.jp","参天製薬":"santen.com","小野薬品工業":"ono-pharma.com","住友ファーマ":"sumitomo-pharma.co.jp","ロート製薬":"rohto.co.jp","久光製薬":"hisamitsu.co.jp","ツムラ":"tsumura.co.jp","沢井製薬":"sawai.co.jp","ニプロ":"nipro.co.jp","日本光電工業":"nihonkohden.co.jp","フクダ電子":"fukuda.co.jp","アズビル":"azbil.com","エム・スリー":"m3.com","ペプチドリーム":"peptidream.com",
     "三菱鉛筆":"mpuni.co.jp","パイロットコーポレーション":"pilot.co.jp","コクヨ":"kokuyo.co.jp","マブチモーター":"mabuchi-motor.co.jp","アシックス":"asics.com","ミズノ":"mizuno.jp","デサント":"descente.co.jp","ゴールドウイン":"goldwin.co.jp","ヨネックス":"yonex.co.jp","シマノ":"shimano.com","YKK":"ykk.co.jp","YKK AP":"ykkap.co.jp","良品計画":"ryohin-keikaku.jp","タカラトミー":"takaratomy.co.jp","セガサミーホールディングス":"segasammy.co.jp","象印マホービン":"zojirushi.co.jp","タイガー魔法瓶":"tiger.jp",
-    "SCSK":"scsk.jp","TIS":"tis.co.jp","BIPROGY":"biprogy.com","伊藤忠テクノソリューションズ":"ctc-g.co.jp","CTC":"ctc-g.co.jp","オービック":"obic.co.jp","日立ソリューションズ":"hitachi-solutions.co.jp","DTS":"dts.co.jp","ネットワンシステムズ":"netone.co.jp","電通国際情報サービス":"isid.co.jp","サイボウズ":"cybozu.co.jp","マネーフォワード":"moneyforward.com","freee":"freee.co.jp","Sansan":"sansan.com","ラクス":"rakus.co.jp","ラクスル":"raksul.com","BASE":"binc.jp","STORES":"stores.jp","Chatwork":"kubell.com","セールスフォース":"salesforce.com","SAP":"sap.com","オラクル":"oracle.com","アドビ":"adobe.com","サイバーエージェント":"cyberagent.co.jp","ユーザベース":"uzabase.com",
+    "SCSK":"scsk.jp","TIS":"tis.co.jp","BIPROGY":"biprogy.com","伊藤忠テクノソリューションズ":"ctc-g.co.jp","CTC":"ctc-g.co.jp","オービック":"obic.co.jp","日立ソリューションズ":"hitachi-solutions.co.jp","DTS":"dts.co.jp","ネットワンシステムズ":"netone.co.jp","電通国際情報サービス":"isid.co.jp","サイボウズ":"cybozu.co.jp","マネーフォワード":"moneyforward.com","freee":"freee.co.jp","Sansan":"sansan.com","ラクス":"rakus.co.jp","ラクスル":"raksul.com","BASE":"binc.jp","STORES":"stores.jp","Chatwork":"kubell.com","セールスフォース":"salesforce.com","SAP":"sap.com","オラクル":"oracle.com","アドビ":"adobe.com","ユーザベース":"uzabase.com",
     "Zホールディングス":"z-holdings.co.jp","エムスリー":"m3.com","クックパッド":"cookpad.com","ミクシィ":"mixi.co.jp","MIXI":"mixi.co.jp","グリー":"gree.net","コロプラ":"colopl.co.jp","アカツキ":"aktsk.jp","ガンホー・オンライン・エンターテイメント":"gungho.co.jp","SHIFT":"shiftinc.jp","エス・エム・エス":"bm-sms.co.jp","ビジョナル":"visional.inc","ビズリーチ":"bizreach.co.jp","ぐるなび":"gnavi.co.jp","食べログ":"tabelog.com","カカクコム":"kakaku.com","ZOZOTOWN":"zozo.jp","ピクシブ":"pixiv.co.jp","ドワンゴ":"dwango.co.jp","KADOKAWA":"kadokawa.co.jp",
     "NTT":"group.ntt","楽天モバイル":"mobile.rakuten.co.jp","インターネットイニシアティブ":"iij.ad.jp","ニフティ":"nifty.co.jp","BIGLOBE":"biglobe.co.jp","エキサイト":"excite.co.jp","スカパーJSATホールディングス":"skyperfectjsat.space",
     "ベイカレント・コンサルティング":"baycurrent.co.jp","アビームコンサルティング":"abeam.com","ボストン コンサルティング グループ":"bcg.com","マッキンゼー・アンド・カンパニー":"mckinsey.com","ベイン・アンド・カンパニー":"bain.com","アーサー・ディ・リトル":"adlittle.com","ローランド・ベルガー":"rolandberger.com","A.T. カーニー":"kearney.com","シグマクシス":"sigmaxyz.com","リブ・コンサルティング":"libcon.co.jp","ドリームインキュベータ":"dreamincubator.co.jp","経営共創基盤":"igpi.co.jp","船井総合研究所":"funaisoken.co.jp","山田コンサルティンググループ":"yamada-cg.co.jp","フューチャー":"future.co.jp",
     "住友不動産":"sumitomo-rd.co.jp","東急不動産":"tokyu-land.co.jp","野村不動産ホールディングス":"nomura-re-hd.co.jp","森ビル":"mori.co.jp","ヒューリック":"hulic.co.jp","東京建物":"tatemono.com","オープンハウスグループ":"openhouse-group.com","オープンハウス":"openhouse-group.com","レオパレス21":"leopalace21.com","大東建託":"kentaku.co.jp","スターツコーポレーション":"starts.co.jp","アパグループ":"apahotel.com","サンフロンティア不動産":"sunfrt.co.jp","タカラレーベン":"takara-leben.co.jp","平和不動産":"heiwa-net.co.jp","近鉄不動産":"kintetsu-re.co.jp","阪急阪神不動産":"hankyu-hanshin-r.co.jp",
     "大林組":"obayashi.co.jp","竹中工務店":"takenaka.co.jp","戸田建設":"toda.co.jp","熊谷組":"kumagaigumi.co.jp","前田建設工業":"maeda.jp","西松建設":"nishimatsu.co.jp","奥村組":"okumuragumi.co.jp","長谷工コーポレーション":"haseko.co.jp","三井住友建設":"smcon.co.jp","東急建設":"tokyu-cnst.co.jp","住友林業":"sumitomoforestry.co.jp","積水ハウス":"sekisuihouse.co.jp","大和ハウス工業":"daiwahouse.co.jp","ミサワホーム":"misawa.co.jp","旭化成ホームズ":"asahi-kasei.co.jp","三井ホーム":"mitsuihome.co.jp","トヨタホーム":"toyotahome.co.jp","タマホーム":"tamahome.jp","積水化学工業":"sekisui.co.jp",
-    "良品計画":"ryohin-keikaku.jp","三越伊勢丹ホールディングス":"imhds.co.jp","高島屋":"takashimaya.co.jp","Jフロント リテイリング":"j-front-retailing.com","H2Oリテイリング":"h2o-retailing.co.jp","近鉄百貨店":"d-kintetsu.co.jp","松屋":"matsuya.com","東急百貨店":"tokyu-dept.co.jp","ココカラファイン":"cocokarafine.co.jp","スギ薬局":"drug-sugi.co.jp","マツモトキヨシ":"matsukiyococokara.com","ツルハホールディングス":"tsuruha-hd.com","ウエルシアホールディングス":"welcia.co.jp","コスモス薬品":"cosmospc.co.jp","クスリのアオキ":"kusuri-aoki.co.jp","ヤマダホールディングス":"yamada-holdings.jp","ビックカメラ":"biccamera.co.jp","ヨドバシカメラ":"yodobashi.com","ノジマ":"nojima.co.jp","ケーズホールディングス":"ksdenki.com","エディオン":"edion.co.jp","上新電機":"joshin.co.jp","コジマ":"kojima.net",
+    "三越伊勢丹ホールディングス":"imhds.co.jp","高島屋":"takashimaya.co.jp","Jフロント リテイリング":"j-front-retailing.com","H2Oリテイリング":"h2o-retailing.co.jp","近鉄百貨店":"d-kintetsu.co.jp","松屋":"matsuya.com","東急百貨店":"tokyu-dept.co.jp","ココカラファイン":"cocokarafine.co.jp","スギ薬局":"drug-sugi.co.jp","マツモトキヨシ":"matsukiyococokara.com","ツルハホールディングス":"tsuruha-hd.com","ウエルシアホールディングス":"welcia.co.jp","コスモス薬品":"cosmospc.co.jp","クスリのアオキ":"kusuri-aoki.co.jp","ヤマダホールディングス":"yamada-holdings.jp","ビックカメラ":"biccamera.co.jp","ヨドバシカメラ":"yodobashi.com","ノジマ":"nojima.co.jp","ケーズホールディングス":"ksdenki.com","エディオン":"edion.co.jp","上新電機":"joshin.co.jp","コジマ":"kojima.net",
     "しまむら":"shimamura.gr.jp","西松屋チェーン":"24028.jp","アダストリア":"adastria.co.jp","ユナイテッドアローズ":"united-arrows.co.jp","ビームス":"beams.co.jp","シップス":"sh-ps.com","オンワードホールディングス":"onward-hd.co.jp","ワールド":"world.co.jp","ストライプインターナショナル":"stripe-intl.com","ハニーズホールディングス":"honeys-hd.com","ABCマート":"abc-mart.net","チヨダ":"chiyodagrp.co.jp","青山商事":"aoyama-syouji.co.jp","AOKIホールディングス":"aoki-hd.co.jp","はるやまホールディングス":"haruyama.co.jp","アスクル":"askul.co.jp","モノタロウ":"monotaro.com","ミスミ":"misumi.co.jp",
     "ライフコーポレーション":"lifecorp.jp","オーケー":"ok-corporation.jp","サミット":"summitstore.co.jp","成城石井":"seijoishii.co.jp","ヤオコー":"yaoko-net.com","ベルク":"belc.jp","マルエツ":"maruetsu.co.jp","ダイエー":"daiei.co.jp","西友":"seiyu.co.jp","平和堂":"heiwado.jp","イズミ":"izumi.co.jp","オイシックス・ラ・大地":"oisixradaichi.co.jp","千趣会":"senshukai.co.jp",
     "日本郵船":"nyk.com","商船三井":"mol.co.jp","川崎汽船":"kline.co.jp","名村造船所":"namura.co.jp","ヤマトホールディングス":"yamato-hd.co.jp","SGホールディングス":"sg-hldgs.co.jp","佐川急便":"sagawa-exp.co.jp","日本通運":"nipponexpress.com","近鉄エクスプレス":"kwe.com","三井倉庫ホールディングス":"mitsui-soko.com","住友倉庫":"sumitomo-soko.co.jp","三菱倉庫":"mitsubishi-logistics.co.jp","セイノーホールディングス":"seino.co.jp","福山通運":"fukutsu.co.jp","ハマキョウレックス":"hamakyorex.co.jp","センコーグループホールディングス":"senko.co.jp","鴻池運輸":"konoike.net","成田国際空港":"naa.jp","JR貨物":"jrfreight.co.jp",
@@ -3785,49 +3783,6 @@ function CompanyPage({ go, co, cposts, crevs, csals, cjobs, initTab, onToggleLik
 }
 
 // ─── 掲示板・体験談タブ ───────────────────────────────────────────────────────
-function AIDraftPanel({ ptype, company, setForm }) {
-  const [open, setOpen] = useState(false);
-  const [memo, setMemo] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [err, setErr] = useState("");
-  const [done, setDone] = useState(false);
-  async function run() {
-    if (!memo.trim() || loading) return;
-    setLoading(true); setErr(""); setDone(false);
-    try {
-      const res = await callAIDraft({ ptype, company: company || "", notes: memo });
-      const d = (res && res.data) || {};
-      setForm(f => f ? { ...f, title: d.title || f.title, content: d.body || f.content } : f);
-      setDone(true);
-    } catch (e) {
-      setErr("整形に失敗しました。メモを具体的にして再度お試しください。（AI機能のデプロイ前はこのエラーになります）");
-    } finally { setLoading(false); }
-  }
-  return (
-    <div style={{ border:"1px solid #F6CBBC", background:"#FFFBF9", borderRadius:10, marginBottom:14, overflow:"hidden" }}>
-      <button type="button" onClick={() => setOpen(o => !o)}
-        style={{ width:"100%", textAlign:"left", background:"transparent", border:"none", cursor:"pointer", fontFamily:"inherit", fontSize:13, fontWeight:"bold", color:C.coral || "#E0512F", padding:"11px 14px" }}>
-        {"\u270E"} AIで下書きを作る {open ? "\u25B2" : "\u25BC"}
-      </button>
-      {open && (
-        <div style={{ padding:"0 14px 14px" }}>
-          <p style={{ fontSize:11, color:C.sub, lineHeight:1.7, margin:"0 0 8px" }}>
-            面接で聞かれたこと・雰囲気・結果などを思いつくまま書くと、AIが下書きを作成します。<strong>内容は必ず確認・編集</strong>してから投稿してください。
-          </p>
-          <textarea value={memo} onChange={e => setMemo(e.target.value)}
-            placeholder={"例）一次面接 オンライン30分／志望動機と転職理由／逆質問はキャリアパス／雰囲気は和やか／3日後に通過"}
-            style={{ ...S.input, minHeight:90, resize:"vertical", lineHeight:1.7, marginBottom:8 }} />
-          {err && <div style={{ fontSize:12, color:C.coral || "#E0512F", marginBottom:8, lineHeight:1.6 }}>{err}</div>}
-          {done && <div style={{ fontSize:12, color:"#166534", marginBottom:8 }}>{"\u2713"} 下書きをタイトル・本文に反映しました。内容を確認・編集してください。</div>}
-          <button type="button" onClick={run} disabled={!memo.trim() || loading}
-            style={{ background:C.coral || "#E0512F", color:"#fff", border:"none", borderRadius:8, padding:"9px 18px", fontSize:13, fontWeight:"bold", fontFamily:"inherit", cursor:(!memo.trim() || loading) ? "default" : "pointer", opacity:(!memo.trim() || loading) ? 0.55 : 1 }}>
-            {loading ? "AIが整えています\u2026" : "AIで整える"}
-          </button>
-        </div>
-      )}
-    </div>
-  );
-}
 function PostsTab({ posts, ptype, label, co, uName, onAddPost, onToggleLike, onAddComment, isAdmin, adminDelete, setEditTgt, favorites, toggleFavorite, jobCat, sess, setAuthMode, unlocked, getAuthorBadge, authUser, hideBoardNotice, goThread, setGuestName }) {
   const authUserKey = authUser?.uid || ("guest:" + uName);
   const [exp,  setExp]  = useState(null);
@@ -3876,7 +3831,6 @@ function PostsTab({ posts, ptype, label, co, uName, onAddPost, onToggleLike, onA
       </div>
       {form && (
         <div style={{ background:C.surface, border:"1px solid " + C.border, borderTop:"3px solid " + C.accent, padding:"18px 20px", marginBottom:20 }}>
-          {(ptype === "board" || ptype === "interview") && <AIDraftPanel ptype={ptype} company={co && co.name} setForm={setForm} />}
           <Fld label="職種カテゴリ">
             <div style={{ display:"flex", gap:8 }}>
               <select style={{...S.input, flex:1}} value={form.jobCategory === "__custom__" ? "__custom__" : (form.jobCategory || "全職種")} onChange={e => {
