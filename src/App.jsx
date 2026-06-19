@@ -26,7 +26,9 @@ import {
   serverTimestamp,
   limit,
 } from "firebase/firestore";
-import { auth, db } from "./firebase.js";
+import { auth, db, functions } from "./firebase.js";
+import { httpsCallable } from "firebase/functions";
+const callAIDraft = httpsCallable(functions, "draftExperience");
 
 
 // エラー境界 - レンダリングエラーをキャッチして表示する
@@ -206,7 +208,7 @@ const GUEST_NAME_POOLS = {
   "小売・流通": ["売場が好き", "元バイヤー志望", "物流の人", "棚割り職人"],
   "医療・ヘルス": ["白衣の志望者", "MR志望", "治験に詳しい", "元看護志望"],
 };
-const GUEST_NAME_GENERAL = ["名無しの求職者", "就活生", "転職検討中", "キャリア迷子", "情報収集中", "次の一手を探す人", "面接帰りの人", "ESに追われる人", "内定ほしい人", "逆質問は準備済み", "沈黙が苦手", "逆求人待ち", "名無しさん"];
+const GUEST_NAME_GENERAL = ["名無しの求職者", "就活生", "転職検討中", "キャリア迷子", "情報収集中", "次の一手を探す人", "面接帰りの人", "ESに追われる人", "内定ほしい人", "逆質問は準備済み", "沈黙が苦手", "逆求人待ち"];
 const genGuestName = (group) => {
   const pool = (group && GUEST_NAME_POOLS[group]) ? GUEST_NAME_POOLS[group].concat(GUEST_NAME_GENERAL) : GUEST_NAME_GENERAL;
   return pool[Math.floor(Math.random() * pool.length)];
@@ -2193,7 +2195,7 @@ export default function App() {
     const id   = await fsAdd("companies", data);
     setCompanies(prev => [{ id, ...data, createdAt: null }, ...prev]);
     await grantUnlock();
-    toast2("「" + d.name + "」を追加しました（30日間 全コンテンツ閲覧可能になりました）");
+    toast2("「" + d.name + "」を追加しました");
     go("company", { id, ...data }, "interview");
   };
 
@@ -2205,7 +2207,7 @@ export default function App() {
     const id   = await fsAdd("posts", data);
     setPosts(prev => [{ id, ...data, createdAt: null }, ...prev]);
     await grantUnlock();
-    toast2("投稿ありがとうございます！30日間 全コンテンツが閲覧可能になりました");
+    toast2("投稿ありがとうございます！");
     if (d.companyId === GENERAL_ID) go("board");
     else go("company", companies.find(c => c.id === d.companyId), d.ptype);
   };
@@ -2216,7 +2218,7 @@ export default function App() {
     const id   = await fsAdd("reviews", data);
     setReviews(prev => [{ id, ...data, createdAt: null }, ...prev]);
     await grantUnlock();
-    toast2("口コミありがとうございます！30日間 全コンテンツが閲覧可能になりました");
+    toast2("口コミありがとうございます！");
     go("company", companies.find(c => c.id === d.companyId), "review");
   };
 
@@ -2226,7 +2228,7 @@ export default function App() {
     const id   = await fsAdd("salaries", data);
     setSalaries(prev => [{ id, ...data, createdAt: null }, ...prev]);
     await grantUnlock();
-    toast2("年収情報ありがとうございます！30日間 全コンテンツが閲覧可能になりました");
+    toast2("年収情報ありがとうございます！");
     go("company", companies.find(c => c.id === d.companyId), "salary");
   };
 
@@ -2236,7 +2238,7 @@ export default function App() {
     const id   = await fsAdd("joblistings", data);
     setJobListings(prev => [{ id, ...data }, ...prev]);
     await grantUnlock();
-    toast2("募集要項ありがとうございます！30日間 全コンテンツが閲覧可能になりました");
+    toast2("募集要項ありがとうございます！");
     go("company", companies.find(c => c.id === d.companyId), "jobs");
   };
 
@@ -2380,7 +2382,7 @@ export default function App() {
     );
   }
 
-  const unlocked = !!authUser && profile && (profile.viewUnlockUntil || 0) > Date.now();
+  const unlocked = true; // 掲示板は全開放（閲覧ゲートなし）
 
   // 投稿者ごとの投稿数集計（authorUid -> count）
   const authorPostCounts = (() => {
@@ -3362,7 +3364,7 @@ function ThreadPage({ post, posts, companies, go, goThread, uName, authUser, isA
   );
 }
 
-function GeneralBoardPage({ posts, go, uName, onAddPost, onToggleLike, onAddComment, isAdmin, adminDelete, setEditTgt, favorites, toggleFavorite, sess, setAuthMode, unlocked, getAuthorBadge, authUser, isMobile, goThread }) {
+function GeneralBoardPage({ posts, go, uName, onAddPost, onToggleLike, onAddComment, isAdmin, adminDelete, setEditTgt, favorites, toggleFavorite, sess, setAuthMode, unlocked, getAuthorBadge, authUser, isMobile, goThread, setGuestName }) {
   const genPosts = posts.filter(p => p.companyId === GENERAL_ID);
   return (
     <div>
@@ -3378,7 +3380,7 @@ function GeneralBoardPage({ posts, go, uName, onAddPost, onToggleLike, onAddComm
         isAdmin={isAdmin} adminDelete={adminDelete} setEditTgt={setEditTgt}
         favorites={favorites} toggleFavorite={toggleFavorite} jobCat="全職種"
         sess={sess} setAuthMode={setAuthMode} unlocked={unlocked} getAuthorBadge={getAuthorBadge}
-        authUser={authUser} hideBoardNotice={true} goThread={goThread} />
+        authUser={authUser} hideBoardNotice={true} goThread={goThread} setGuestName={setGuestName} />
     </div>
   );
 }
@@ -3654,7 +3656,7 @@ function CompaniesPage({ go, filtered, searchQ, setSearchQ, grpFilter, setGrpFil
 }
 
 // ─── 企業ページ ───────────────────────────────────────────────────────────────
-function CompanyPage({ go, co, cposts, crevs, csals, cjobs, initTab, onToggleLike, onAddComment, onAddPost, onAddReview, onAddSalary, onAddJob, isAdmin, adminDelete, setEditTgt, plan, setAuthMode, isMobile, uName, favorites, toggleFavorite, sess, unlocked, getAuthorBadge, authUser, profile, toggleFollowCompany, goThread }) {
+function CompanyPage({ go, co, cposts, crevs, csals, cjobs, initTab, onToggleLike, onAddComment, onAddPost, onAddReview, onAddSalary, onAddJob, isAdmin, adminDelete, setEditTgt, plan, setAuthMode, isMobile, uName, favorites, toggleFavorite, sess, unlocked, getAuthorBadge, authUser, profile, toggleFollowCompany, goThread, setGuestName }) {
   const [tab,     setTab]     = useState(initTab || "interview");
   const [jobCat,  setJobCat]  = useState("全職種");
   useEffect(() => { if (initTab) setTab(initTab); }, [initTab]);
@@ -3771,9 +3773,9 @@ function CompanyPage({ go, co, cposts, crevs, csals, cjobs, initTab, onToggleLik
       </div>
       <div style={{ marginTop:14 }} />
       <div style={{ paddingTop:20 }}>
-        {tab === "interview" && <PostsTab posts={iv} ptype="interview" label="面接体験談" co={co} uName={uName} onAddPost={onAddPost} onToggleLike={onToggleLike} onAddComment={onAddComment} isAdmin={isAdmin} adminDelete={adminDelete} setEditTgt={setEditTgt} favorites={favorites} toggleFavorite={toggleFavorite} jobCat={jobCat} sess={sess} setAuthMode={setAuthMode} unlocked={unlocked} getAuthorBadge={getAuthorBadge} authUser={authUser} goThread={goThread} />}
-        {tab === "board"     && <PostsTab posts={bd} ptype="board"     label="選考掲示板" co={co} uName={uName} onAddPost={onAddPost} onToggleLike={onToggleLike} onAddComment={onAddComment} isAdmin={isAdmin} adminDelete={adminDelete} setEditTgt={setEditTgt} favorites={favorites} toggleFavorite={toggleFavorite} jobCat={jobCat} sess={sess} setAuthMode={setAuthMode} unlocked={unlocked} getAuthorBadge={getAuthorBadge} authUser={authUser} goThread={goThread} />}
-        {tab === "es"        && <PostsTab posts={es} ptype="es"        label="ES例文"     co={co} uName={uName} onAddPost={onAddPost} onToggleLike={onToggleLike} onAddComment={onAddComment} isAdmin={isAdmin} adminDelete={adminDelete} setEditTgt={setEditTgt} favorites={favorites} toggleFavorite={toggleFavorite} jobCat={jobCat} sess={sess} setAuthMode={setAuthMode} unlocked={unlocked} getAuthorBadge={getAuthorBadge} authUser={authUser} goThread={goThread} />}
+        {tab === "interview" && <PostsTab posts={iv} ptype="interview" label="面接体験談" co={co} uName={uName} onAddPost={onAddPost} onToggleLike={onToggleLike} onAddComment={onAddComment} isAdmin={isAdmin} adminDelete={adminDelete} setEditTgt={setEditTgt} favorites={favorites} toggleFavorite={toggleFavorite} jobCat={jobCat} sess={sess} setAuthMode={setAuthMode} unlocked={unlocked} getAuthorBadge={getAuthorBadge} authUser={authUser} goThread={goThread} setGuestName={setGuestName} />}
+        {tab === "board"     && <PostsTab posts={bd} ptype="board"     label="選考掲示板" co={co} uName={uName} onAddPost={onAddPost} onToggleLike={onToggleLike} onAddComment={onAddComment} isAdmin={isAdmin} adminDelete={adminDelete} setEditTgt={setEditTgt} favorites={favorites} toggleFavorite={toggleFavorite} jobCat={jobCat} sess={sess} setAuthMode={setAuthMode} unlocked={unlocked} getAuthorBadge={getAuthorBadge} authUser={authUser} goThread={goThread} setGuestName={setGuestName} />}
+        {tab === "es"        && <PostsTab posts={es} ptype="es"        label="ES例文"     co={co} uName={uName} onAddPost={onAddPost} onToggleLike={onToggleLike} onAddComment={onAddComment} isAdmin={isAdmin} adminDelete={adminDelete} setEditTgt={setEditTgt} favorites={favorites} toggleFavorite={toggleFavorite} jobCat={jobCat} sess={sess} setAuthMode={setAuthMode} unlocked={unlocked} getAuthorBadge={getAuthorBadge} authUser={authUser} goThread={goThread} setGuestName={setGuestName} />}
         {tab === "review"    && <ReviewsTab revs={crevs} avgData={a}   co={co} uName={uName} plan={plan} onAddReview={onAddReview} isAdmin={isAdmin} adminDelete={adminDelete} setEditTgt={setEditTgt} go={go} sess={sess} setAuthMode={setAuthMode} unlocked={unlocked} getAuthorBadge={getAuthorBadge} />}
         {tab === "salary"    && <SalaryTab  sals={csals} avgSalary={sal} co={co} uName={uName} plan={plan} onAddSalary={onAddSalary} isAdmin={isAdmin} adminDelete={adminDelete} setEditTgt={setEditTgt} go={go} sess={sess} setAuthMode={setAuthMode} unlocked={unlocked} getAuthorBadge={getAuthorBadge} />}
         {tab === "jobs"      && <JobsTab    jobs={cjobs} co={co} uName={uName} onAddJob={onAddJob} isAdmin={isAdmin} adminDelete={adminDelete} setEditTgt={setEditTgt} />}
@@ -3783,7 +3785,50 @@ function CompanyPage({ go, co, cposts, crevs, csals, cjobs, initTab, onToggleLik
 }
 
 // ─── 掲示板・体験談タブ ───────────────────────────────────────────────────────
-function PostsTab({ posts, ptype, label, co, uName, onAddPost, onToggleLike, onAddComment, isAdmin, adminDelete, setEditTgt, favorites, toggleFavorite, jobCat, sess, setAuthMode, unlocked, getAuthorBadge, authUser, hideBoardNotice, goThread }) {
+function AIDraftPanel({ ptype, company, setForm }) {
+  const [open, setOpen] = useState(false);
+  const [memo, setMemo] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState("");
+  const [done, setDone] = useState(false);
+  async function run() {
+    if (!memo.trim() || loading) return;
+    setLoading(true); setErr(""); setDone(false);
+    try {
+      const res = await callAIDraft({ ptype, company: company || "", notes: memo });
+      const d = (res && res.data) || {};
+      setForm(f => f ? { ...f, title: d.title || f.title, content: d.body || f.content } : f);
+      setDone(true);
+    } catch (e) {
+      setErr("整形に失敗しました。メモを具体的にして再度お試しください。（AI機能のデプロイ前はこのエラーになります）");
+    } finally { setLoading(false); }
+  }
+  return (
+    <div style={{ border:"1px solid #F6CBBC", background:"#FFFBF9", borderRadius:10, marginBottom:14, overflow:"hidden" }}>
+      <button type="button" onClick={() => setOpen(o => !o)}
+        style={{ width:"100%", textAlign:"left", background:"transparent", border:"none", cursor:"pointer", fontFamily:"inherit", fontSize:13, fontWeight:"bold", color:C.coral || "#E0512F", padding:"11px 14px" }}>
+        {"\u270E"} AIで下書きを作る {open ? "\u25B2" : "\u25BC"}
+      </button>
+      {open && (
+        <div style={{ padding:"0 14px 14px" }}>
+          <p style={{ fontSize:11, color:C.sub, lineHeight:1.7, margin:"0 0 8px" }}>
+            面接で聞かれたこと・雰囲気・結果などを思いつくまま書くと、AIが下書きを作成します。<strong>内容は必ず確認・編集</strong>してから投稿してください。
+          </p>
+          <textarea value={memo} onChange={e => setMemo(e.target.value)}
+            placeholder={"例）一次面接 オンライン30分／志望動機と転職理由／逆質問はキャリアパス／雰囲気は和やか／3日後に通過"}
+            style={{ ...S.input, minHeight:90, resize:"vertical", lineHeight:1.7, marginBottom:8 }} />
+          {err && <div style={{ fontSize:12, color:C.coral || "#E0512F", marginBottom:8, lineHeight:1.6 }}>{err}</div>}
+          {done && <div style={{ fontSize:12, color:"#166534", marginBottom:8 }}>{"\u2713"} 下書きをタイトル・本文に反映しました。内容を確認・編集してください。</div>}
+          <button type="button" onClick={run} disabled={!memo.trim() || loading}
+            style={{ background:C.coral || "#E0512F", color:"#fff", border:"none", borderRadius:8, padding:"9px 18px", fontSize:13, fontWeight:"bold", fontFamily:"inherit", cursor:(!memo.trim() || loading) ? "default" : "pointer", opacity:(!memo.trim() || loading) ? 0.55 : 1 }}>
+            {loading ? "AIが整えています\u2026" : "AIで整える"}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+function PostsTab({ posts, ptype, label, co, uName, onAddPost, onToggleLike, onAddComment, isAdmin, adminDelete, setEditTgt, favorites, toggleFavorite, jobCat, sess, setAuthMode, unlocked, getAuthorBadge, authUser, hideBoardNotice, goThread, setGuestName }) {
   const authUserKey = authUser?.uid || ("guest:" + uName);
   const [exp,  setExp]  = useState(null);
   const [cmt,  setCmt]  = useState("");
@@ -3791,7 +3836,6 @@ function PostsTab({ posts, ptype, label, co, uName, onAddPost, onToggleLike, onA
   const [customStage, setCustomStage] = useState("");
   const [showCustomStage, setShowCustomStage] = useState(false);
   const [stages, setStages] = useState([{ stage:"", content:"" }]);
-  const [authorName, setAuthorName] = useState(() => sess ? (sess.displayName || uName) : genGuestName(co.group || co.industry));
   const [showDetails, setShowDetails] = useState(false);
   const isES = ptype === "es";
   const isInterview = ptype === "interview";
@@ -3832,12 +3876,7 @@ function PostsTab({ posts, ptype, label, co, uName, onAddPost, onToggleLike, onA
       </div>
       {form && (
         <div style={{ background:C.surface, border:"1px solid " + C.border, borderTop:"3px solid " + C.accent, padding:"18px 20px", marginBottom:20 }}>
-          {sess && !unlocked && (
-            <div style={{ background:"#FFF8E7", border:"1px solid #FCD34D", borderRadius:8, padding:"10px 14px", marginBottom:14, fontSize:12, color:"#92400E", lineHeight:1.7 }}>
-              🎁 <strong>この投稿で30日間 全コンテンツ閲覧可能になります！</strong><br />
-              他の方の体験談・口コミ・年収情報がすべて閲覧できるようになります。
-            </div>
-          )}
+          {(ptype === "board" || ptype === "interview") && <AIDraftPanel ptype={ptype} company={co && co.name} setForm={setForm} />}
           <Fld label="職種カテゴリ">
             <div style={{ display:"flex", gap:8 }}>
               <select style={{...S.input, flex:1}} value={form.jobCategory === "__custom__" ? "__custom__" : (form.jobCategory || "全職種")} onChange={e => {
@@ -4056,10 +4095,10 @@ function PostsTab({ posts, ptype, label, co, uName, onAddPost, onToggleLike, onA
             </div>
           )}
           <div style={{ display:"flex", alignItems:"center", gap:8, padding:"10px 0", borderTop:"1px solid " + C.border, flexWrap:"wrap" }}>
-            <AC>{ini(authorName || uName)}</AC>
+            <AC>{ini(uName)}</AC>
             <span style={{ fontSize:12, color:C.sub }}>表示名</span>
-            <input value={authorName} onChange={e => setAuthorName(e.target.value.slice(0, 24))} placeholder="表示名" style={{ ...S.input, fontSize:13, padding:"6px 10px", maxWidth:200, flex:"0 1 auto" }} />
-            <button type="button" onClick={() => setAuthorName(genGuestName(co.group || co.industry))} title="別の名前を生成" style={{ background:C.light, border:"1px solid " + C.border, color:C.accentDark, fontSize:12, fontWeight:"bold", borderRadius:8, padding:"6px 11px", cursor:"pointer", fontFamily:"inherit", whiteSpace:"nowrap" }}>🎲 別の名前</button>
+            <input value={uName} onChange={e => setGuestName(e.target.value.slice(0, 24))} placeholder="表示名" style={{ ...S.input, fontSize:13, padding:"6px 10px", maxWidth:200, flex:"0 1 auto" }} />
+            <button type="button" onClick={() => setGuestName(genGuestName(co.group || co.industry))} title="別の名前を生成" style={{ background:C.light, border:"1px solid " + C.border, color:C.accentDark, fontSize:12, fontWeight:"bold", borderRadius:8, padding:"6px 11px", cursor:"pointer", fontFamily:"inherit", whiteSpace:"nowrap" }}>🎲 別の名前</button>
             <span style={{ fontSize:11, color:C.sub }}>として投稿（自由に変更できます）</span>
           </div>
           <button style={{ ...S.primaryBtn, width:"100%", padding:"11px" }} onClick={async () => {
@@ -4068,7 +4107,7 @@ function PostsTab({ posts, ptype, label, co, uName, onAddPost, onToggleLike, onA
               if (!form.title.trim()) { alert("タイトルを入力してください"); return; }
               if (!form.content.trim()) { alert("本文を入力してください"); return; }
               if (!sess && form.guestEmail && !form.guestEmail.includes("@")) { alert("メールアドレスの形式が正しくありません"); return; }
-              await onAddPost({ ...form, author: authorName || uName });
+              await onAddPost({ ...form, author: uName });
               setForm(null);
               return;
             }
@@ -4076,14 +4115,14 @@ function PostsTab({ posts, ptype, label, co, uName, onAddPost, onToggleLike, onA
               if (showDetails && !form.applyMethod) { alert("応募方法を選択してください"); return; }
               if (showDetails && !form.progressStage) { alert("選考の最終段階を選択してください"); return; }
               const summary = [...form.stages, ...(form.extraStages||[])].filter(s => s.name && s.content).map(s => `【${s.name}】${s.content}`).join("\n\n");
-              await onAddPost({ ...form, author: authorName || uName, content: form.content || summary, stage: form.progressStage, finalResult: (form.progressStage === "内定" || form.progressStage === "内定辞退") ? form.progressStage : "" });
+              await onAddPost({ ...form, author: uName, content: form.content || summary, stage: form.progressStage, finalResult: (form.progressStage === "内定" || form.progressStage === "内定辞退") ? form.progressStage : "" });
               setForm(null);
               return;
             }
             if (!isES && !form.stage) return;
             if (isES && !form.esQuestion.trim()) { alert("ES設問内容を入力してください"); return; }
             if ((!isInterview || !showDetails) && !form.content.trim()) { alert("本文を入力してください"); return; }
-            await onAddPost({ ...form, author: authorName || uName });
+            await onAddPost({ ...form, author: uName });
             setForm(null);
           }}>
             投稿する
@@ -4395,11 +4434,6 @@ function ReviewsTab({ revs, avgData: a, co, uName, plan, onAddReview, isAdmin, a
       </div>
       {form && (
         <div style={{ background:C.surface, border:"1px solid " + C.border, borderTop:"3px solid " + C.accent, padding:"18px 20px", marginBottom:20 }}>
-          {sess && !unlocked && (
-            <div style={{ background:"#FFF8E7", border:"1px solid #FCD34D", borderRadius:8, padding:"10px 14px", marginBottom:14, fontSize:12, color:"#92400E", lineHeight:1.7 }}>
-              🎁 <strong>この投稿で30日間 全コンテンツ閲覧可能になります！</strong>
-            </div>
-          )}
           <Fld label="総合評価 *"><StarPicker value={form.overall} onChange={v => setForm({ ...form, overall:v })} label="総合評価" /></Fld>
           <Fld label="カテゴリ別評価とコメント">
             <div style={{ borderLeft:"3px solid " + C.border, paddingLeft:12 }}>
@@ -4571,11 +4605,6 @@ function SalaryTab({ sals, avgSalary, co, uName, plan, onAddSalary, isAdmin, adm
       </div>
       {form && (
         <div style={{ background:C.surface, border:"1px solid " + C.border, borderTop:"3px solid " + C.accent, padding:"18px 20px", marginBottom:20 }}>
-          {sess && !unlocked && (
-            <div style={{ background:"#FFF8E7", border:"1px solid #FCD34D", borderRadius:8, padding:"10px 14px", marginBottom:14, fontSize:12, color:"#92400E", lineHeight:1.7 }}>
-              🎁 <strong>この投稿で30日間 全コンテンツ閲覧可能になります！</strong>
-            </div>
-          )}
           <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
             <Fld label="職種 *">
               <div style={{ display:"flex", gap:8 }}>
@@ -5127,19 +5156,10 @@ function MyPage({ sess, go, companies, plan, upgradePlan, isMobile, diary, saveD
                 </div>
               );
             })()}
-            {/* 閲覧権ステータス */}
-            {(() => {
-              const unlock = (profile && profile.viewUnlockUntil) || 0;
-              const remain = Math.max(0, Math.floor((unlock - Date.now()) / 86400000));
-              return (
-                <div style={{ marginBottom:12, padding:"8px 12px", background: remain > 0 ? "#F0FDF4" : "#FFF8E7", borderRadius:6, fontSize:11, color: remain > 0 ? "#166534" : "#92400E", border:"1px solid " + (remain > 0 ? "#BBF7D0" : "#FCD34D") }}>
-                  {remain > 0
-                    ? <><strong>🔓 全閲覧権 残り{remain}日</strong><br /><span style={{ fontSize:10 }}>すべての投稿が閲覧可能です</span></>
-                    : <><strong>🔒 閲覧権なし</strong><br /><span style={{ fontSize:10 }}>投稿1件で30日間 全コンテンツ閲覧可能</span></>
-                  }
-                </div>
-              );
-            })()}
+            {/* 閲覧ステータス（全開放） */}
+            <div style={{ marginBottom:12, padding:"8px 12px", background:"#F0FDF4", borderRadius:6, fontSize:11, color:"#166534", border:"1px solid #BBF7D0" }}>
+              <strong>✓ 全コンテンツ閲覧可能</strong><br /><span style={{ fontSize:10 }}>登録不要で、すべての投稿が読めます</span>
+            </div>
             {/* もらったいいね数 */}
             {(() => {
               const totalLikes = myPosts.reduce((sum, p) => sum + ((p.likes || []).length), 0)
