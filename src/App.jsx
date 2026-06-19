@@ -1763,7 +1763,7 @@ export default function App() {
   // UI
   const [page,     setPage]     = useState("home");
   const [selCo,    setSelCo]    = useState(null);
-  const [selTab,   setSelTab]   = useState("interview");
+  const [selTab,   setSelTab]   = useState("board");
   const [selPost,  setSelPost]  = useState(null);
   const [guestName, setGuestNameState] = useState(() => {
     if (typeof window === "undefined") return "名無しさん";
@@ -2031,7 +2031,7 @@ export default function App() {
     setPage(p);
     if (co  !== null) setSelCo(co);
     if (tab !== null) setSelTab(tab);
-    else if (p === "company") setSelTab("interview");
+    else if (p === "company") setSelTab("board");
     window.scrollTo(0, 0);
     setMenuOpen(false);
     // ブラウザ履歴に追加
@@ -2105,7 +2105,7 @@ export default function App() {
       setBootDone(true);
     } else if (route === "company" && arg) {
       const co = companies.find(c => c.id === arg);
-      if (co) { setSelCo(co); setSelTab("interview"); setPage("company"); window.history.replaceState({ p:"company", coId: arg, tab:"interview" }, "", "#company/" + arg); }
+      if (co) { setSelCo(co); setSelTab("board"); setPage("company"); window.history.replaceState({ p:"company", coId: arg, tab:"board" }, "", "#company/" + arg); }
       setBootDone(true);
     } else if (route === "subtop" && arg) {
       setSubTopGroup(decodeURIComponent(arg)); setPage("subTop"); setBootDone(true);
@@ -3257,7 +3257,7 @@ function ThreadPage({ post, posts, companies, go, goThread, uName, authUser, isA
   const isQuestion = p.ptype === "board";
   const authUserKey = authUser?.uid || ("guest:" + uName);
   const canMarkBest = isQuestion && ((authUser && p.authorUid === authUser.uid) || isAdmin);
-  const ptypeLabel = isGen ? "相談" : p.ptype === "es" ? "ES例文" : p.ptype === "board" ? "選考掲示板" : "面接体験談";
+  const ptypeLabel = isGen ? "相談" : p.ptype === "es" ? "ES例文" : p.ptype === "board" ? "投稿" : "面接体験談";
   return (
     <div style={{ maxWidth:760, margin:"0 auto" }}>
       <button onClick={() => (typeof window !== "undefined" && window.history.length > 1 ? window.history.back() : go("home"))}
@@ -3406,7 +3406,7 @@ function HomePage({ sess, go, goSubTop, companies, posts, reviews, salaries, isA
   }).slice(0, 8);
 
   const ptypeMeta = p =>
-    p.ptype === "board" ? { label:"選考掲示板", bg:"#EAF1F8", fg:C.accent }
+    p.ptype === "board" ? { label:"投稿", bg:"#EAF1F8", fg:C.accent }
     : p.ptype === "es"  ? { label:"ES例文",   bg:"#EDE8F4", fg:"#6B4FA6" }
     : { label:"面接体験談", bg:"#F1ECDB", fg:"#9A7B12" };
 
@@ -3655,7 +3655,7 @@ function CompaniesPage({ go, filtered, searchQ, setSearchQ, grpFilter, setGrpFil
 
 // ─── 企業ページ ───────────────────────────────────────────────────────────────
 function CompanyPage({ go, co, cposts, crevs, csals, cjobs, initTab, onToggleLike, onAddComment, onAddPost, onAddReview, onAddSalary, onAddJob, isAdmin, adminDelete, setEditTgt, plan, setAuthMode, isMobile, uName, favorites, toggleFavorite, sess, unlocked, getAuthorBadge, authUser, profile, toggleFollowCompany, goThread, setGuestName }) {
-  const [tab,     setTab]     = useState(initTab || "interview");
+  const [tab,     setTab]     = useState(initTab || "board");
   const [jobCat,  setJobCat]  = useState("全職種");
   useEffect(() => { if (initTab) setTab(initTab); }, [initTab]);
 
@@ -3719,25 +3719,26 @@ function CompanyPage({ go, co, cposts, crevs, csals, cjobs, initTab, onToggleLik
           )}
         </div>
       </div>
-      {/* 職種別フィルター（既存カテゴリ＋投稿で使われた新職種） */}
-      <div style={{ overflowX:"auto", margin:"12px 0 0 0", paddingBottom:4 }}>
-        <div style={{ display:"flex", gap:4, minWidth:"max-content" }}>
-          {(() => {
-            const base = getJobCategories(co.group || co.industry);
-            const usedInPosts = [...new Set(cposts.map(p => p.jobCategory).filter(Boolean))];
-            const merged = [...base];
-            usedInPosts.forEach(j => { if (!merged.includes(j) && j !== "全職種" && j !== "__custom__") merged.push(j); });
-            return merged.map(jc => (
-              <button key={jc} style={{ border:"1px solid " + C.border, background: jobCat===jc ? C.accent : "#F7F7F7", color: jobCat===jc ? "#fff" : C.sub, padding:"3px 10px", fontSize:11, cursor:"pointer", fontFamily:"inherit", whiteSpace:"nowrap" }} onClick={() => setJobCat(jc)}>{jc}</button>
-            ));
-          })()}
-        </div>
-      </div>
+      {/* 職種別フィルター：実際に投稿で使われた職種だけ表示。無ければ行ごと非表示 */}
+      {(() => {
+        const used = [...new Set(cposts.map(p => p.jobCategory).filter(j => j && j !== "全職種" && j !== "__custom__"))];
+        if (used.length === 0) return null;
+        const merged = ["全職種", ...used];
+        return (
+          <div style={{ overflowX:"auto", margin:"12px 0 0 0", paddingBottom:4 }}>
+            <div style={{ display:"flex", gap:4, minWidth:"max-content" }}>
+              {merged.map(jc => (
+                <button key={jc} style={{ border:"1px solid " + C.border, background: jobCat===jc ? C.accent : "#F7F7F7", color: jobCat===jc ? "#fff" : C.sub, padding:"3px 10px", fontSize:11, cursor:"pointer", fontFamily:"inherit", whiteSpace:"nowrap" }} onClick={() => setJobCat(jc)}>{jc}</button>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
       {/* セグメント（6タブ→3つに集約：みんなの投稿 / 企業の評価 / 募集要項） */}
       <div style={{ marginTop:14 }}>
         <div style={{ display:"flex", gap:6 }}>
           {[
-            ["posts","みんなの投稿","掲示板・面接・ES","board"],
+            ["posts","みんなの投稿","相談・面接体験など","board"],
             ["eval","企業の評価","口コミ・年収","review"],
             ["jobs","募集要項","求人","jobs"],
           ].map(([seg,t,d,first]) => {
@@ -3752,28 +3753,27 @@ function CompanyPage({ go, co, cposts, crevs, csals, cjobs, initTab, onToggleLik
           })}
         </div>
         <div style={{ borderTop:"2px solid " + C.accent, paddingTop:14 }}>
-          <div style={{ display:"flex", gap:7, flexWrap:"wrap", alignItems:"center" }}>
-            <span style={{ fontSize:11.5, color:C.sub, marginRight:2 }}>表示</span>
-            {(() => {
-              const seg = (tab==="review"||tab==="salary") ? "eval" : tab==="jobs" ? "jobs" : "posts";
-              const subs = seg === "eval" ? [["review","口コミ",crevs.length],["salary","年収",csals.length]]
-                : seg === "jobs" ? [["jobs","募集要項",cjobs.length]]
-                : [["board","選考掲示板",bd.length],["interview","面接体験談",iv.length],["es","ES例文",es.length]];
-              return subs.map(([k,l,n]) => (
-                <button key={k} onClick={() => setTab(k)}
-                  style={{ fontSize:12, fontWeight:500, border:"1px solid " + (tab===k ? C.ink : C.border), background: tab===k ? C.ink : "#fff", color: tab===k ? "#fff" : C.ink, borderRadius:16, padding:"5px 12px", cursor:"pointer", fontFamily:"inherit" }}>
-                  {l}<span className="tabnum" style={{ fontSize:10, marginLeft:4, opacity:0.7 }}>{n}</span>
-                </button>
-              ));
-            })()}
-          </div>
+          {(() => {
+            const seg = (tab==="review"||tab==="salary") ? "eval" : tab==="jobs" ? "jobs" : "posts";
+            const subs = seg === "eval" ? [["review","口コミ",crevs.length],["salary","年収",csals.length]] : [];
+            if (subs.length < 2) return null;
+            return (
+              <div style={{ display:"flex", gap:7, flexWrap:"wrap", alignItems:"center" }}>
+                <span style={{ fontSize:11.5, color:C.sub, marginRight:2 }}>表示</span>
+                {subs.map(([k,l,n]) => (
+                  <button key={k} onClick={() => setTab(k)}
+                    style={{ fontSize:12, fontWeight:500, border:"1px solid " + (tab===k ? C.ink : C.border), background: tab===k ? C.ink : "#fff", color: tab===k ? "#fff" : C.ink, borderRadius:16, padding:"5px 12px", cursor:"pointer", fontFamily:"inherit" }}>
+                    {l}<span className="tabnum" style={{ fontSize:10, marginLeft:4, opacity:0.7 }}>{n}</span>
+                  </button>
+                ))}
+              </div>
+            );
+          })()}
         </div>
       </div>
       <div style={{ marginTop:14 }} />
       <div style={{ paddingTop:20 }}>
-        {tab === "interview" && <PostsTab posts={iv} ptype="interview" label="面接体験談" co={co} uName={uName} onAddPost={onAddPost} onToggleLike={onToggleLike} onAddComment={onAddComment} isAdmin={isAdmin} adminDelete={adminDelete} setEditTgt={setEditTgt} favorites={favorites} toggleFavorite={toggleFavorite} jobCat={jobCat} sess={sess} setAuthMode={setAuthMode} unlocked={unlocked} getAuthorBadge={getAuthorBadge} authUser={authUser} goThread={goThread} setGuestName={setGuestName} />}
-        {tab === "board"     && <PostsTab posts={bd} ptype="board"     label="選考掲示板" co={co} uName={uName} onAddPost={onAddPost} onToggleLike={onToggleLike} onAddComment={onAddComment} isAdmin={isAdmin} adminDelete={adminDelete} setEditTgt={setEditTgt} favorites={favorites} toggleFavorite={toggleFavorite} jobCat={jobCat} sess={sess} setAuthMode={setAuthMode} unlocked={unlocked} getAuthorBadge={getAuthorBadge} authUser={authUser} goThread={goThread} setGuestName={setGuestName} />}
-        {tab === "es"        && <PostsTab posts={es} ptype="es"        label="ES例文"     co={co} uName={uName} onAddPost={onAddPost} onToggleLike={onToggleLike} onAddComment={onAddComment} isAdmin={isAdmin} adminDelete={adminDelete} setEditTgt={setEditTgt} favorites={favorites} toggleFavorite={toggleFavorite} jobCat={jobCat} sess={sess} setAuthMode={setAuthMode} unlocked={unlocked} getAuthorBadge={getAuthorBadge} authUser={authUser} goThread={goThread} setGuestName={setGuestName} />}
+        {(tab === "board" || tab === "interview" || tab === "es") && <PostsTab posts={[...bd, ...iv, ...es]} ptype="interview" label="投稿" co={co} uName={uName} onAddPost={onAddPost} onToggleLike={onToggleLike} onAddComment={onAddComment} isAdmin={isAdmin} adminDelete={adminDelete} setEditTgt={setEditTgt} favorites={favorites} toggleFavorite={toggleFavorite} jobCat={jobCat} sess={sess} setAuthMode={setAuthMode} unlocked={unlocked} getAuthorBadge={getAuthorBadge} authUser={authUser} goThread={goThread} setGuestName={setGuestName} />}
         {tab === "review"    && <ReviewsTab revs={crevs} avgData={a}   co={co} uName={uName} plan={plan} onAddReview={onAddReview} isAdmin={isAdmin} adminDelete={adminDelete} setEditTgt={setEditTgt} go={go} sess={sess} setAuthMode={setAuthMode} unlocked={unlocked} getAuthorBadge={getAuthorBadge} />}
         {tab === "salary"    && <SalaryTab  sals={csals} avgSalary={sal} co={co} uName={uName} plan={plan} onAddSalary={onAddSalary} isAdmin={isAdmin} adminDelete={adminDelete} setEditTgt={setEditTgt} go={go} sess={sess} setAuthMode={setAuthMode} unlocked={unlocked} getAuthorBadge={getAuthorBadge} />}
         {tab === "jobs"      && <JobsTab    jobs={cjobs} co={co} uName={uName} onAddJob={onAddJob} isAdmin={isAdmin} adminDelete={adminDelete} setEditTgt={setEditTgt} />}
@@ -3827,12 +3827,12 @@ function PostsTab({ posts, ptype, label, co, uName, onAddPost, onToggleLike, onA
       <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:14, paddingBottom:10, borderBottom:"1px solid " + C.border, flexWrap:"wrap", gap:8 }}>
         <span style={{ fontSize:12, color:C.sub }}>{posts.length}件の{label}{ptype === "board" && jobCat !== "全職種" ? ` (${jobCat})` : ""}</span>
         <button style={S.primaryBtn} onClick={() => setForm(form ? null : initF)}>
-          {form ? "キャンセル" : "＋ " + label + "を投稿する"}
+          {form ? "キャンセル" : "＋ 投稿する"}
         </button>
       </div>
       {form && (
         <div style={{ background:C.surface, border:"1px solid " + C.border, borderTop:"3px solid " + C.accent, padding:"18px 20px", marginBottom:20 }}>
-          {isGeneral && (
+          {(isGeneral || isInterview) && (
             <div style={{ display:"flex", alignItems:"center", gap:8, padding:"0 0 12px", marginBottom:14, borderBottom:"1px solid " + C.border, flexWrap:"wrap" }}>
               <AC>{ini(uName)}</AC>
               <span style={{ fontSize:12, color:C.sub }}>名前</span>
@@ -3840,7 +3840,7 @@ function PostsTab({ posts, ptype, label, co, uName, onAddPost, onToggleLike, onA
               <button type="button" onClick={() => setGuestName(genGuestName(co.group || co.industry))} title="別の名前を生成" style={{ background:C.light, border:"1px solid " + C.border, color:C.accentDark, fontSize:12, fontWeight:"bold", borderRadius:8, padding:"6px 11px", cursor:"pointer", fontFamily:"inherit", whiteSpace:"nowrap" }}>🎲</button>
             </div>
           )}
-          {!isGeneral && (
+          {!isGeneral && !isInterview && (
           <Fld label="職種カテゴリ">
             <div style={{ display:"flex", gap:8 }}>
               <select style={{...S.input, flex:1}} value={form.jobCategory === "__custom__" ? "__custom__" : (form.jobCategory || "全職種")} onChange={e => {
@@ -3875,7 +3875,7 @@ function PostsTab({ posts, ptype, label, co, uName, onAddPost, onToggleLike, onA
               </Fld>
             </>
           )}
-          {isBoard && !sess && (
+          {(isBoard || isInterview) && !sess && (
             <div style={{ background:"#F0F9FF", border:"1px solid #BAE6FD", padding:"12px 14px", borderRadius:6, marginBottom:14 }}>
               <div style={{ fontSize:13, fontWeight:"bold", color:"#0C4A6E", marginBottom:8 }}>
                 💬 ログイン不要で投稿できます
@@ -3919,7 +3919,7 @@ function PostsTab({ posts, ptype, label, co, uName, onAddPost, onToggleLike, onA
           )}
           {isInterview && (
             <button type="button" onClick={() => setShowDetails(d => !d)} style={{ background: showDetails ? C.light : "none", border:"1px dashed " + C.accent, color:C.accent, fontSize:12, fontWeight:"bold", padding:"9px 12px", borderRadius:8, cursor:"pointer", fontFamily:"inherit", marginBottom:14, width:"100%" }}>
-              {showDetails ? "− 詳細を閉じる（シンプルに投稿）" : "＋ 選考プロセス・年収などを詳しく書く（任意）"}
+              {showDetails ? "− 面接の詳細を閉じる" : "＋ 面接体験談にする（選考プロセス・年収などを記録）"}
             </button>
           )}
           {isInterview && showDetails && (
@@ -4037,8 +4037,8 @@ function PostsTab({ posts, ptype, label, co, uName, onAddPost, onToggleLike, onA
             <input style={S.input} placeholder="例：一次面接で聞かれたこと" value={form.title} onChange={e => setForm({ ...form, title:e.target.value })} />
           </Fld>
           {isInterview ? (
-            <Fld label="総評・感想（任意）">
-              <textarea style={{ ...S.input, resize:"vertical" }} rows={3} placeholder="選考全体を通しての感想・準備のポイントなどがあれば（任意）" value={form.content} onChange={e => setForm({ ...form, content:e.target.value })} />
+            <Fld label={`本文 *　${form.content.length}文字`}>
+              <textarea style={{ ...S.input, resize:"vertical" }} rows={5} placeholder="相談・質問・面接の感想など、自由に書いてください。" value={form.content} onChange={e => setForm({ ...form, content:e.target.value })} />
             </Fld>
           ) : isBoard ? (
             <Fld label={`本文 *　${form.content.length}文字`}>
@@ -4059,7 +4059,7 @@ function PostsTab({ posts, ptype, label, co, uName, onAddPost, onToggleLike, onA
               </div>
             </div>
           )}
-          {!isGeneral && (
+          {!(isGeneral || isInterview) && (
           <div style={{ display:"flex", alignItems:"center", gap:8, padding:"10px 0", borderTop:"1px solid " + C.border, flexWrap:"wrap" }}>
             <AC>{ini(uName)}</AC>
             <span style={{ fontSize:12, color:C.sub }}>表示名</span>
@@ -4079,10 +4079,13 @@ function PostsTab({ posts, ptype, label, co, uName, onAddPost, onToggleLike, onA
               return;
             }
             if (isInterview) {
+              if (!form.content.trim()) { alert("本文を入力してください"); return; }
               if (showDetails && !form.applyMethod) { alert("応募方法を選択してください"); return; }
               if (showDetails && !form.progressStage) { alert("選考の最終段階を選択してください"); return; }
+              if (!sess && form.guestEmail && !form.guestEmail.includes("@")) { alert("メールアドレスの形式が正しくありません"); return; }
               const summary = [...form.stages, ...(form.extraStages||[])].filter(s => s.name && s.content).map(s => `【${s.name}】${s.content}`).join("\n\n");
-              await onAddPost({ ...form, author: uName, content: form.content || summary, stage: form.progressStage, finalResult: (form.progressStage === "内定" || form.progressStage === "内定辞退") ? form.progressStage : "" });
+              const detailed = showDetails && !!form.progressStage;
+              await onAddPost({ ...form, author: uName, content: form.content + (summary ? "\n\n" + summary : ""), ptype: detailed ? "interview" : "board", stage: detailed ? form.progressStage : "掲示板", finalResult: (form.progressStage === "内定" || form.progressStage === "内定辞退") ? form.progressStage : "" });
               setForm(null);
               return;
             }
